@@ -9,13 +9,15 @@ Kurulu KONİ (NSIS) kendini günceller: [tauri-plugin-updater](https://v2.tauri.
 2. `release` iş akışı (`.github/workflows/release.yml`):
    - `windows` işi kurulumu `TAURI_SIGNING_PRIVATE_KEY` ile imzalar (`KONI_<sürüm>_x64-setup.exe.sig`, `client/src-tauri/updater.conf.json`). İmza yoksa iş başarısız olur.
    - Kurulum, taşınabilir zip ve notlar bu (private) reponun release'ine konur; ayrıca `latest.json` hazırlanır.
-   - `public` işi kurulum + zip + `latest.json` + `notes.md`'yi **`Savas07/koni-releases`** (public) reposunun `incoming` dalına tek commit olarak iter (her sürümde üzerine yazılır). Yalnızca o repoya yazabilen deploy key kullanılır (secret `KONI_RELEASES_DEPLOY_KEY`).
+   - `macos` işi (Windows'tan sonra) `client/scripts/build-macos.sh` ile `KONI.app`'i derler, ad hoc imzalar (Apple sertifikası yok), `.dmg` ve güncelleme arşivini (`KONI_<sürüm>_aarch64.app.tar.gz` + `.sig`) aynı release'e ekler. Başarısız olursa Windows sürümü yine çıkar, `latest.json`'da yalnızca macOS eksik kalır.
+   - `public` işi kurulum + zip + (varsa) dmg ve macOS arşivi + `latest.json` (`windows-x86_64` ve `darwin-aarch64`) + `notes.md`'yi **`Savas07/koni-releases`** (public) reposunun `incoming` dalına tek commit olarak iter (her sürümde üzerine yazılır). Yalnızca o repoya yazabilen deploy key kullanılır (secret `KONI_RELEASES_DEPLOY_KEY`).
    - O reponun `publish` iş akışı `incoming`'i `v<sürüm>` Release'i yapar (`--latest`).
 3. Uygulama `https://github.com/Savas07/koni-releases/releases/latest/download/latest.json` adresine bakar (`plugins.updater.endpoints`). Repo private olduğu için dosyalar ayrı public repoda; kaynak kod orada yok.
 
 ## İstemci
 - `client/src-tauri/src/update.rs`: `update_check` (sürüm, not, `portable`), `update_install` (indir, imzayı doğrula, kur; ilerleme `update://progress`). Geliştirme derlemesi hiç bakmaz.
 - Açılışta yeni sürüm varsa (henüz odada değilken) hemen kurulur: NSIS `passive` (`/P /R /UPDATE`) çalışır, uygulama kapanır, kurulum bitince yeniden açılır (~10 sn). Uygulama açıkken 6 saatte bir bakılır; bulunursa sağ panelde "Güncelle" kartı çıkar (oda bölünmez).
+- macOS: güncelleyici `.app.tar.gz`'yi indirir, imzasını doğrular, `KONI.app`'i yerinde değiştirir ve uygulamayı yeniden başlatır. Uygulama içinden indirilen dosya karantinaya alınmaz, Gatekeeper yalnızca ilk kurulumda sorar.
 - Taşınabilir kopya (yanında `uninstall.exe` yok) kendini güncellemez, yalnızca etkinlikte "çıktı" der.
 - İmza tutmazsa kurulum yapılmaz ("signature verification failed"), uygulama çalışmaya devam eder.
 

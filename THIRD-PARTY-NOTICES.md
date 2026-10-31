@@ -4,7 +4,7 @@ KONİ's own code is MIT licensed (see `LICENSE`). The Windows installer also shi
 
 | Component | License | Source | Notes |
 |---|---|---|---|
-| mpv / libmpv, FFmpeg and friends | LGPL-2.1-or-later and others | see `tools/libmpv/NOTICE.md` | Separate, replaceable DLLs; sources and licenses ship in the package. |
+| mpv / libmpv, FFmpeg and friends | LGPL-2.1-or-later and others | see `tools/libmpv/NOTICE.md` (macOS: `NOTICE-macos.md`) | Separate, replaceable DLLs / dylibs; sources and licenses ship in the package. |
 | yt-dlp | Unlicense | https://github.com/yt-dlp/yt-dlp | Unmodified `yt-dlp.exe`, run as a separate program. |
 | uBlock Origin Lite | GPL-3.0 | https://github.com/uBlockOrigin/uBOL-home | Unmodified except `manifest.json`: `host_permissions` is set to `<all_urls>` so it runs without a permission prompt. Its own license file ships in `extensions/ubol/`. |
 

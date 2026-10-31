@@ -6,12 +6,13 @@
 
 Make a room, call your friends in, and everyone sees the same frame at the same moment.
 
-[**⬇ Download for Windows**](https://github.com/Savas07/koni-releases/releases/latest) ·
+[**⬇ Download for Windows and macOS**](https://github.com/Savas07/koni-releases/releases/latest) ·
 [Run your own server](docs/SELF-HOSTING.md) ·
 [Release notes](docs/releases/) ·
 [Türkçe](#türkçe)
 
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white)
+![macOS](https://img.shields.io/badge/macOS-11%2B%20(Apple%20Silicon)-000000?logo=apple&logoColor=white)
 ![Languages](https://img.shields.io/badge/UI-English%20%7C%20T%C3%BCrk%C3%A7e-8A2BE2)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -155,12 +156,15 @@ More detail: [docs/design/sync.md](docs/design/sync.md) and [docs/PROTOCOL.md](d
 
 ## Get started
 
-1. **Download** the latest installer from the [releases page](https://github.com/Savas07/koni-releases/releases/latest) and run it. It installs for your user only, no admin rights needed. KONİ updates itself after that.
+1. **Download** the latest version from the [releases page](https://github.com/Savas07/koni-releases/releases/latest). On Windows run the installer (`…_x64-setup.exe`): it installs for your user only, no admin rights needed. On a Mac (M1 or newer) open the `.dmg` and drag KONİ into Applications. KONİ updates itself after that.
 2. **Join a server.** KONİ has no built-in server: each group of friends runs its own. Click a friend's invite link and the sign-up screen fills in by itself. Starting a new group? [Host your own server](docs/SELF-HOSTING.md), enter its address on the first screen, and make the first invite yourself.
 3. **Create a room**, pick a mode, and call your friends in.
 
 > [!NOTE]
-> The installer is not code-signed yet, so Windows SmartScreen may ask once. Choose *More info → Run anyway*.
+> KONİ is not code-signed, so your computer asks once on the first launch.
+> - **Windows**: SmartScreen says it protected your PC. Choose *More info → Run anyway*.
+> - **macOS**: macOS says it can't verify the app. On macOS 14 or older, right-click KONİ in Applications → *Open* → *Open*. On macOS 15 or newer, try to open it once, then go to *System Settings → Privacy & Security*, scroll down and click *Open Anyway* next to KONİ.
+>   If it still won't open, run `xattr -dr com.apple.quarantine /Applications/KONI.app` in Terminal.
 
 > [!IMPORTANT]
 > KONİ is a player, not a content source. It hosts and ships no media and no streaming sources. Title info such as names, posters, ratings and episode lists comes from public metadata services. Use KONİ with your own files and with content you have the right to watch.
@@ -199,6 +203,8 @@ npm ci
 npx tauri dev   # put libmpv-2.dll next to the exe in target/debug first
 ```
 
+On a Mac (Apple Silicon), `client/scripts/build-macos.sh <libmpv-lgpl-macos-arm64.zip>` builds `KONI.app` and the `.dmg`.
+
 Run the server and its tests:
 
 ```sh
@@ -216,7 +222,7 @@ Details: [client/README.md](client/README.md), [docs/LIBMPV.md](docs/LIBMPV.md),
 <br>
 
 - ✅ Windows 10 / 11
-- 🔜 macOS
+- 🆕 macOS 11 or newer on Apple Silicon (M1 or newer). New and tested less than Windows. *Cast to TV* is Windows-only; on a Mac use AirPlay screen mirroring from Control Center. The Discover browser has no extra ad-blocking extension on macOS.
 - 💤 Linux (maybe later)
 
 What changed in each version: [docs/releases/](docs/releases/).
@@ -237,13 +243,15 @@ What changed in each version: [docs/releases/](docs/releases/).
 
 KONİ hazır bir sunucuyla gelmez: her arkadaş grubu kendi sunucusunu kurar. Arkadaşının davet linkine tıklarsan sunucu adresi kendiliğinden gelir; yeni bir grup kuruyorsan ilk ekranda kendi sunucunun adresini yazarsın.
 
+Windows 10/11 ve macOS 11+ (Apple Silicon, M1 ve sonrası) için. Uygulama imzasız olduğundan ilk açılışta bir kez onay ister: Windows'ta *Ek bilgi → Yine de çalıştır*; Mac'te macOS 14 ve öncesinde uygulamaya sağ tık → *Aç*, macOS 15 ve sonrasında bir kez açmayı dene, sonra *Sistem Ayarları → Gizlilik ve Güvenlik* → *Yine de Aç*.
+
 Uygulama varsayılan olarak İngilizce açılır; **Ayarlar**'dan ya da giriş ekranından Türkçe seçilebilir. İndirmek için [sürümler sayfası](https://github.com/Savas07/koni-releases/releases/latest), kendi sunucunu kurmak için [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
 ---
 
 <div align="center">
 
-[MIT License](LICENSE) · Playback by [libmpv](https://mpv.io/) (LGPL, loaded as a replaceable DLL) · [Third-party notices](THIRD-PARTY-NOTICES.md)
+[MIT License](LICENSE) · Playback by [libmpv](https://mpv.io/) (LGPL, loaded as a replaceable library) · [Third-party notices](THIRD-PARTY-NOTICES.md)
 
 <sub>Screenshots use sample data and public-domain titles.</sub>
 

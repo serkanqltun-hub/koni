@@ -1,6 +1,7 @@
 name: release
 
-# Windows installer + portable zip, built here and attached to a GitHub release.
+# Windows installer + portable zip and macOS dmg (Apple Silicon), built here and attached
+# to a GitHub release. latest.json carries both platforms for the in-app updater.
 # Otomatik: main'de client/src-tauri/tauri.conf.json "version" değişince v<version>
 # etiketi ve release'i bu iş akışı kendisi oluşturur (o sürüm zaten yayınlıysa atlar).
 # Elle: v* etiketi itmek ya da var olan etiketle çalıştırmak da çalışır.
@@ -34,6 +35,8 @@ jobs:
     timeout-minutes: 60
     outputs:
       skip: ${{ steps.ver.outputs.skip }}
+      version: ${{ steps.ver.outputs.version }}
+      tag: ${{ steps.tag.outputs.tag }}
     defaults:
       run:
         shell: pwsh
@@ -62,6 +65,9 @@ jobs:
             exit 0
           }
           if ("v$v" -ne $env:TAG) { throw "etiket $env:TAG, tauri.conf.json sürümü v$v" }
+      - name: Tag output
+        id: tag
+        run: '"tag=$env:TAG" >> $env:GITHUB_OUTPUT'
       - uses: actions/setup-node@v4
         if: steps.ver.outputs.skip != 'true'
         with:
@@ -137,13 +143,73 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # macOS (Apple Silicon): dmg + güncelleme arşivi. Windows release'i oluşturduktan sonra
+  # ona eklenir. Başarısız olursa Windows sürümü yine yayınlanır (public işi bekler ama
+  # macOS'u isteğe bağlı birleştirir).
+  macos:
+    needs: windows
+    if: needs.windows.outputs.skip != 'true'
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      TAG: ${{ needs.windows.outputs.tag }}
+      VERSION: ${{ needs.windows.outputs.version }}
+      # LGPL libmpv package, workflow "libmpv (LGPL, macOS arm64)" (docs/LIBMPV.md).
+      LIBMPV_MAC_RELEASE: libmpv-macos-v0.40.0-r1
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: client
+      - run: npm ci
+        working-directory: client
+      - name: Fetch LGPL libmpv
+        run: gh release download "$LIBMPV_MAC_RELEASE" -p libmpv-lgpl-macos-arm64.zip -D "$RUNNER_TEMP"
+      - name: Build KONI.app + dmg
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: ./scripts/build-macos.sh "$RUNNER_TEMP/libmpv-lgpl-macos-arm64.zip"
+        working-directory: client
+      - name: Stage + publish
+        run: |
+          set -euo pipefail
+          b=client/target/release/bundle
+          out="$RUNNER_TEMP/koni-releases-macos"; mkdir -p "$out"
+          dmg="KONI_${VERSION}_aarch64.dmg"
+          tgz="KONI_${VERSION}_aarch64.app.tar.gz"
+          cp "$b"/dmg/*.dmg "$out/$dmg"
+          cp "$b/macos/KONI.app.tar.gz" "$out/$tgz"
+          sig="$b/macos/KONI.app.tar.gz.sig"
+          [ -f "$sig" ] || { echo "güncelleme imzası yok: $sig"; exit 1; }
+          jq -n --arg sig "$(cat "$sig")" \
+            --arg url "https://github.com/Savas07/koni-releases/releases/download/v$VERSION/$tgz" \
+            '{"darwin-aarch64": {signature: $sig, url: $url}}' > "$out/platform-darwin.json"
+          gh release upload "$TAG" "$out/$dmg" "$out/$tgz" --clobber
+          ls -la "$out"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: koni-releases-macos
+          path: ${{ runner.temp }}/koni-releases-macos
+          if-no-files-found: error
+          retention-days: 7
+
   # Public Savas07/koni-releases: kurulum + latest.json oraya gider, uygulama
   # güncellemeyi oradan alır (bu repo private). Deploy key yalnızca o repoya yazar.
   # `incoming` = o reponun main'i + dosyalar (tek commit, her sürümde üzerine yazılır);
   # publish.yml commit'in içinde olmalı ki push o iş akışını tetiklesin.
   public:
-    needs: windows
-    if: needs.windows.outputs.skip != 'true'
+    needs: [windows, macos]
+    if: always() && needs.windows.result == 'success' && needs.windows.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -151,6 +217,20 @@ jobs:
         with:
           name: koni-releases
           path: out
+      - uses: actions/download-artifact@v4
+        if: needs.macos.result == 'success'
+        with:
+          name: koni-releases-macos
+          path: out-macos
+      - name: Add macOS to latest.json
+        if: needs.macos.result == 'success'
+        run: |
+          set -euo pipefail
+          jq --slurpfile mac out-macos/platform-darwin.json '.platforms += $mac[0]' out/latest.json > latest.tmp
+          mv latest.tmp out/latest.json
+          rm out-macos/platform-darwin.json
+          cp out-macos/* out/
+          cat out/latest.json
       - name: Push to Savas07/koni-releases (incoming)
         env:
           DEPLOY_KEY: ${{ secrets.KONI_RELEASES_DEPLOY_KEY }}
