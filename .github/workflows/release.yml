@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: release-${{ inputs.tag || github.ref_name }}
@@ -173,7 +174,12 @@ jobs:
       - run: npm ci
         working-directory: client
       - name: Fetch LGPL libmpv
-        run: gh release download "$LIBMPV_MAC_RELEASE" -p libmpv-lgpl-macos-arm64.zip -D "$RUNNER_TEMP"
+        run: |
+          if ! gh release download "$LIBMPV_MAC_RELEASE" -R "$GITHUB_REPOSITORY" -p libmpv-lgpl-macos-arm64.zip -D "$RUNNER_TEMP"; then
+            # Release henüz yoksa: son başarılı derlemenin artifact'i.
+            id="$(gh run list -R "$GITHUB_REPOSITORY" -w libmpv-lgpl-macos.yml -s success -L 1 --json databaseId -q '.[0].databaseId')"
+            gh run download "$id" -R "$GITHUB_REPOSITORY" -n libmpv-lgpl-macos-arm64 -D "$RUNNER_TEMP"
+          fi
       - name: Build KONI.app + dmg
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
