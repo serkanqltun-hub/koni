@@ -146,6 +146,7 @@ pub fn run() {
             commands::avatar_get,
             commands::lobby_start,
             commands::lobby_decline,
+            commands::lobby_remote_state,
             commands::bug_report,
             commands::sync_fun,
             commands::queue_add,

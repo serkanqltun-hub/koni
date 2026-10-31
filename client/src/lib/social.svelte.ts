@@ -25,6 +25,13 @@ export function pic(id: string | undefined | null): string | undefined {
 
 let unlisten: (() => void) | null = null;
 
+/** Telefon kumandası (p0.24): komut `remote` lobiden gelir, App oynatıcıya uygular. */
+export type RemoteOp = { op: "toggle" | "seek" | "vol" | "status"; by: number };
+let remoteHandler: ((m: RemoteOp) => void) | null = null;
+export function onRemote(fn: ((m: RemoteOp) => void) | null) {
+  remoteHandler = fn;
+}
+
 /** Giriş yapılınca: profili al, lobiyi aç. Tekrar çağrılabilir. */
 export async function startSocial(server: string) {
   social.server = server;
@@ -34,6 +41,8 @@ export async function startSocial(server: string) {
       if (m.t === "presence") {
         social.presence = m as unknown as Presence;
         social.online = true;
+      } else if (m.t === "remote") {
+        remoteHandler?.(m as unknown as RemoteOp);
       } else if (m.t === "hello") {
         social.online = true;
       } else if (m.t === "offline" || m.t === "error") {

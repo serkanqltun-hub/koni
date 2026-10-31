@@ -87,6 +87,9 @@ export interface OpenRoom {
 export interface Presence { friends: PresenceFriend[]; requests: Friend[]; calls: RoomCall[]; rooms?: OpenRoom[] }
 export const lobbyStart = (url: string) => invoke<void>("lobby_start", { url });
 export const lobbyDecline = (invite: string) => invoke<void>("lobby_decline", { invite });
+/** Telefon kumandasına durum (p0.24). */
+export interface RemoteState { title: string; paused: boolean; pos: number | null; dur: number | null; vol: number }
+export const lobbyRemoteState = (state: RemoteState) => invoke<void>("lobby_remote_state", { state });
 
 /** Karşılıklı arkadaşların toplamları (PROTOCOL §3.0 `stats`, docs/design/accounts.md §5.4). */
 export interface UserStats { user: string; avatar?: string; days?: number; watchSec: number; nightSec: number; longestSec: number; pauses: number; seeks: number; holds: number; listenSec?: number }
