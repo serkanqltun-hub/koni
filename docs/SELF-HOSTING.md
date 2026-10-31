@@ -1,7 +1,7 @@
 # Run KONİ on your own server
 
 KONİ has two parts: the desktop app and a small sync server (the *Santral*, `server/`).
-The app ships with a default server, but anyone can run their own and point the app at it.
+The app ships without a server: each group of friends runs its own, or joins a friend's through an invite link.
 Your accounts, invites, friends and stats then live only on your server.
 
 What goes through the server: room state, chat, presence and small JSON calls.
@@ -60,12 +60,13 @@ runuser -u koni -- /opt/koni/koni-server admin -db /var/lib/koni/koni.db -off 'N
 
 ## Connect the app
 
-On the sign-in screen, click **Host your own server** (Turkish: *Kendi sunucunu kur*) at the bottom. The language switch is in the top-right corner of the same screen and type your domain
-(`koni.example.com`; `wss://` and `/ws` are added for you). Then sign in or register with the code.
+On first launch the sign-in screen shows a server address box at the bottom. Type your domain
+(`koni.example.com`; `wss://` and `/ws` are added for you) and press **Connect** (Turkish: *Bağlan*).
+The language switch is in the top-right corner of the same screen. Then sign in, or register with the code.
 
 Invite links made on your server carry its address (`koni://invite/CODE?s=koni.example.com`),
-so friends who open the link are switched to your server automatically.
-To go back to the default server, sign out and use **Change → Back to invite sign-in** (Turkish: *Değiştir → Davetli girişe dön*).
+so friends who open the link are connected to your server automatically.
+To switch servers later, sign out and use **Change** under the sign-in form.
 
 ## Optional features (API keys)
 

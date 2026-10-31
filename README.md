@@ -95,7 +95,7 @@ No more 40 minutes of scrolling. The host starts a round and the screen opens fo
 <summary><b>👥 Friends, rooms and profiles</b></summary>
 <br>
 
-- **Invite-only.** Members create invite codes. Whoever joins with your code becomes your friend.
+- **Invite-only.** Members create invite links. The link carries your server's address, so a friend only has to click it. Whoever joins with it becomes your friend.
 - **Add friends** by `Name#1234`. Only friends can be called into a room.
 - **Open rooms** stay on the home screen, so you can drop back in until the room closes.
 - **Lists**: *Watchlist* and *Watched*. Watch 80% of a movie together and it's added to *Watched* with who you watched it with.
@@ -156,7 +156,7 @@ More detail: [docs/design/sync.md](docs/design/sync.md) and [docs/PROTOCOL.md](d
 ## Get started
 
 1. **Download** the latest installer from the [releases page](https://github.com/Savas07/koni-releases/releases/latest) and run it. It installs for your user only, no admin rights needed. KONİ updates itself after that.
-2. **Sign in** with an invite code from a friend, or [host your own server](docs/SELF-HOSTING.md) and make the first invite yourself.
+2. **Join a server.** KONİ has no built-in server: each group of friends runs its own. Click a friend's invite link and the sign-up screen fills in by itself. Starting a new group? [Host your own server](docs/SELF-HOSTING.md), enter its address on the first screen, and make the first invite yourself.
 3. **Create a room**, pick a mode, and call your friends in.
 
 > [!NOTE]
@@ -177,7 +177,7 @@ cd /opt/koni/src
 DOMAIN=koni.example.com NGINX=1 ./deploy/install.sh
 ```
 
-In the app, choose *No invite? Host your own server* on the sign-in screen and enter your address. The full guide: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
+On first launch KONİ asks for a server address. Enter yours there; invite links you create then carry it to your friends. The full guide: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
 </details>
 
@@ -234,6 +234,8 @@ What changed in each version: [docs/releases/](docs/releases/).
 - **Keşfet:** YouTube'da ara ya da bir siteye git, *KONİ'de izle* de, oda seninle gelsin.
 - **Ne izlesek?:** herkes önerir, herkes kaydırır; hepinizin beğendiği ilk film kazanır, eşleşme yoksa çark karar verir.
 - **Arkadaşlar, listeler, istatistik ve rozetler:** yalnızca karşılıklı arkadaşlar görür.
+
+KONİ hazır bir sunucuyla gelmez: her arkadaş grubu kendi sunucusunu kurar. Arkadaşının davet linkine tıklarsan sunucu adresi kendiliğinden gelir; yeni bir grup kuruyorsan ilk ekranda kendi sunucunun adresini yazarsın.
 
 Uygulama varsayılan olarak İngilizce açılır; **Ayarlar**'dan ya da giriş ekranından Türkçe seçilebilir. İndirmek için [sürümler sayfası](https://github.com/Savas07/koni-releases/releases/latest), kendi sunucunu kurmak için [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
