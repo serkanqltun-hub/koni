@@ -212,6 +212,7 @@ export const playerSetTrack = (kind: TrackKind, key: string) => invoke<void>("pl
 export const playerState = () => invoke<PlayerState>("player_state");
 export const setLayout = (layout: LayoutConfig) => invoke<void>("set_layout", { layout });
 export const setFullscreen = (on: boolean) => invoke<void>("set_fullscreen", { on });
+export const openCastPanel = () => invoke<void>("open_cast_panel");
 
 // ---------------------------------------------------------------- Oda senkronu
 

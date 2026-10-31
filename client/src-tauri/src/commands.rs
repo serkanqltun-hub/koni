@@ -380,6 +380,46 @@ pub fn set_fullscreen(app: AppHandle, on: bool) -> CmdResult {
     Ok(())
 }
 
+/// Windows'un "Yayınla" panelini (Win+K) açar: kullanıcı Miracast destekli TV'yi seçer,
+/// ekran TV'ye yansır. Oynatma ve oda senkronu bu bilgisayarda kalır.
+#[tauri::command]
+pub fn open_cast_panel() -> CmdResult {
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::Input::KeyboardAndMouse::{
+            SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+            KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_LWIN,
+        };
+        let key = |vk: VIRTUAL_KEY, up: bool| INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk,
+                    dwFlags: if up {
+                        KEYEVENTF_KEYUP
+                    } else {
+                        KEYBD_EVENT_FLAGS(0)
+                    },
+                    ..Default::default()
+                },
+            },
+        };
+        let k = VIRTUAL_KEY(b'K' as u16);
+        let inputs = [
+            key(VK_LWIN, false),
+            key(k, false),
+            key(k, true),
+            key(VK_LWIN, true),
+        ];
+        // SAFETY: yerel diziye işaret eden düz bir Win32 çağrısı.
+        let sent = unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
+        if sent as usize != inputs.len() {
+            return Err("Yayınla paneli açılamadı".into());
+        }
+    }
+    Ok(())
+}
+
 /// Win32 çağrıları pencerenin sahibi olan ana thread'de yapılmalı.
 fn on_main<F>(app: &AppHandle, f: F) -> CmdResult
 where

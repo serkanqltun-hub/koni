@@ -9,7 +9,7 @@
     COCKPIT_LAYOUT, playerLoad, playerPause, playerTogglePause, playerSeek, playerSetSpeed,
     playerSetVolume, playerAddSubtitle, playerSubDelay, playerTracks, playerSetTrack,
     type Tracks, type TrackKind,
-    playerState, setLayout, setFullscreen, type PlayerState,
+    playerState, setLayout, setFullscreen, openCastPanel, type PlayerState,
     syncConnect, syncPlay, syncPause, syncSeek, syncLeave, syncContinueWithout, syncResync, syncDownload,
     syncSetCohost, syncSetPolicy, accountGet, accountLogin, accountRegister, accountLogout, snifferClose,
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, bugReport,
@@ -1878,6 +1878,7 @@
         <input class="vol" type="range" min="0" max="130" step="1" value={volume} style="--p:{(volume / 130) * 100}%"
           oninput={(e) => setVolume(+e.currentTarget.value)} />
       </div>
+      <button class="icon" title={t("TV'ye yansıt")} onclick={() => run("TV'ye yansıt", openCastPanel())}><Icon name="cast" size={15} /></button>
       {#if roomView === "watch"}
         <button class="icon" title={t("Tam ekran (F)")} onclick={() => setFs(true)}><Icon name="max" size={15} /></button>
       {/if}

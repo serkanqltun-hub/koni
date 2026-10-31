@@ -42,4 +42,5 @@ tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 # Yakalayıcı reklam engeli (adblock.rs): Tauri'nin kullandığı sürümlerle aynı olmalı.
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.39"
-windows = "0.62"
+# Win32_UI_Input_KeyboardAndMouse: "TV'ye yansıt" düğmesi Windows'un Yayınla panelini açar.
+windows = { version = "0.62", features = ["Win32_UI_Input_KeyboardAndMouse"] }
