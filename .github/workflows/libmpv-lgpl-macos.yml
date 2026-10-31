@@ -1,0 +1,92 @@
+name: libmpv (LGPL, macOS arm64)
+
+# Elle çalışır (Actions → "libmpv (LGPL, macOS arm64)" → Run workflow), ~25 dk.
+# Betik ya da bu dosya değişen PR'larda da derler (yayınlamaz), ki değişiklik denenmiş olsun.
+on:
+  workflow_dispatch:
+    inputs:
+      mpv_ref:
+        description: mpv git tag
+        default: v0.40.0
+      ffmpeg_ref:
+        description: FFmpeg git tag
+        default: n7.1.1
+      release:
+        description: Doluysa paket bu adla GitHub Release olarak yayınlanır (ör. libmpv-macos-v0.40.0-r1)
+        default: ''
+  pull_request:
+    paths:
+      - tools/libmpv/build-macos.sh
+      - .github/workflows/libmpv-lgpl-macos.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      MPV_REF: ${{ inputs.mpv_ref || 'v0.40.0' }}
+      FFMPEG_REF: ${{ inputs.ffmpeg_ref || 'n7.1.1' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build tools
+        run: brew install meson ninja nasm pkg-config
+
+      - name: Build LGPL libmpv
+        run: tools/libmpv/build-macos.sh "$PWD/out"
+
+      - name: Verify (LGPL-only, relocatable)
+        run: |
+          set -euo pipefail
+          PKG=out/libmpv-lgpl-macos-arm64
+          ls -la "$PKG"
+          fail=0
+          if strings -a "$PKG"/libavcodec.*.dylib | grep -E -- '--enable-(gpl|nonfree|version3)'; then
+            echo "FAIL: GPL/nonfree FFmpeg configuration found"; fail=1
+          fi
+          if strings -a "$PKG"/*.dylib | grep -i -E 'libx264|libx265|libxvid|libfdk'; then
+            echo "FAIL: GPL/nonfree codec library found"; fail=1
+          fi
+          for sym in mpv_create mpv_initialize mpv_command mpv_render_context_create mpv_render_context_render; do
+            nm -gU "$PKG/libmpv.2.dylib" | grep -q "_$sym\$" || { echo "FAIL: missing export $sym"; fail=1; }
+          done
+          # Only @rpath (inside the package) or the OS itself.
+          for f in "$PKG"/*.dylib; do
+            if otool -L "$f" | tail -n +2 | awk '{print $1}' | grep -v -E '^(@rpath/|/usr/lib/|/System/)'; then
+              echo "FAIL: $f links outside the package"; fail=1
+            fi
+          done
+          exit $fail
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Smoke test (koni-player example)
+        working-directory: client
+        run: cargo run -p koni-player --example smoke -- --lib "$GITHUB_WORKSPACE/out/libmpv-lgpl-macos-arm64/libmpv.2.dylib"
+
+      - name: Zip
+        run: |
+          cd out
+          ditto -c -k --keepParent libmpv-lgpl-macos-arm64 libmpv-lgpl-macos-arm64.zip
+          shasum -a 256 libmpv-lgpl-macos-arm64.zip > libmpv-lgpl-macos-arm64.zip.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-lgpl-macos-arm64
+          path: |
+            out/libmpv-lgpl-macos-arm64.zip
+            out/libmpv-lgpl-macos-arm64.zip.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish release
+        if: github.event_name == 'workflow_dispatch' && inputs.release != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.release }}" out/libmpv-lgpl-macos-arm64.zip out/libmpv-lgpl-macos-arm64.zip.sha256 \
+            --target "$GITHUB_SHA" --title "libmpv LGPL macOS arm64 (${{ inputs.release }})" \
+            --notes "LGPL libmpv for KONİ on macOS (Apple Silicon). See NOTICE.md and BUILDINFO.txt inside the zip."
