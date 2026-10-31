@@ -189,6 +189,11 @@ jobs:
           tgz="KONI_${VERSION}_aarch64.app.tar.gz"
           cp "$b"/dmg/*.dmg "$out/$dmg"
           cp "$b/macos/KONI.app.tar.gz" "$out/$tgz"
+          # koni-releases keeps the files in git: GitHub refuses files over 100 MB.
+          for f in "$out/$dmg" "$out/$tgz"; do
+            sz=$(stat -f %z "$f"); echo "$f: $sz bytes"
+            [ "$sz" -lt 99000000 ] || { echo "çok büyük (>99 MB): $f"; exit 1; }
+          done
           sig="$b/macos/KONI.app.tar.gz.sig"
           [ -f "$sig" ] || { echo "güncelleme imzası yok: $sig"; exit 1; }
           jq -n --arg sig "$(cat "$sig")" \

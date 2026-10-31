@@ -30,10 +30,20 @@ PKG="$(dirname "$DYLIB")"
 [ -f "$PKG/NOTICE.md" ] || { echo "NOTICE.md missing: not the LGPL package?" >&2; exit 1; }
 # dylibs → Contents/Frameworks; NOTICE.md, LICENSES/, source/, BUILDINFO.txt, REBUILD.md →
 # Contents/Resources/libmpv (LGPL).
+# Debug symbols are stripped (smaller download; GitHub caps release files kept in git at
+# 100 MB). The source tarballs stay in the libmpv release; SOURCE.txt points there (LGPL).
 cp "$PKG"/*.dylib "$VENDOR/lib/"
-for f in NOTICE.md REBUILD.md BUILDINFO.txt LICENSES source; do
+chmod u+w "$VENDOR"/lib/*.dylib
+strip -x "$VENDOR"/lib/*.dylib
+for f in NOTICE.md REBUILD.md BUILDINFO.txt LICENSES; do
   [ -e "$PKG/$f" ] && cp -R "$PKG/$f" "$VENDOR/licenses/"
 done
+cat > "$VENDOR/licenses/SOURCE.txt" <<EOT
+Exact sources of every library in KONI.app/Contents/Frameworks (mpv, FFmpeg, libplacebo,
+libass, HarfBuzz, FriBidi, FreeType, dav1d) and the script that built them:
+https://github.com/serkanqltun-hub/koni/releases/tag/${LIBMPV_MAC_RELEASE:-libmpv-macos-v0.40.0-r1}
+(libmpv-lgpl-macos-arm64.zip, folder source/). Versions and commits: BUILDINFO.txt.
+EOT
 
 curl -fsSL "$YTDLP_URL" -o "$VENDOR/yt-dlp"
 chmod 755 "$VENDOR/yt-dlp"
@@ -63,7 +73,7 @@ cat "$CLIENT/src-tauri/vendor/macos.conf.json"
 configs=(--config src-tauri/vendor/macos.conf.json)
 [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ] && configs+=(--config src-tauri/updater.conf.json)
 cd "$CLIENT"
-npm run tauri -- build "${configs[@]}"
+CARGO_PROFILE_RELEASE_STRIP=true npm run tauri -- build "${configs[@]}"
 
 APP="$CLIENT/target/release/bundle/macos/KONI.app"
 codesign --verify --deep --strict "$APP"
@@ -74,3 +84,4 @@ for f in "$APP"/Contents/Frameworks/*.dylib; do
   fi
 done
 ls -la "$CLIENT/target/release/bundle/macos" "$CLIENT/target/release/bundle/dmg"
+du -sh "$APP"/Contents/* "$APP"/Contents/Frameworks "$APP"/Contents/Resources/* 2>/dev/null || true
