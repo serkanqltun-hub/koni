@@ -57,6 +57,7 @@
     "allow-avatar-get",
     "allow-lobby-start",
     "allow-lobby-decline",
+    "allow-lobby-remote-state",
     "allow-bug-report",
     "allow-sync-fun",
     "allow-queue-add",
