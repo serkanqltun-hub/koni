@@ -48,7 +48,7 @@
     if (!code) return;
     const me = social.profile ? `${social.profile.name}#${social.profile.tag}` : "";
     const link = inviteLink(code, social.server);
-    navigator.clipboard.writeText(me ? t("{me} seni KONİ'ye davet ediyor: {link} (kod: {code})", { me, link, code }) : t("KONİ'ye davet ediyor: {link} (kod: {code})", { link, code }))
+    navigator.clipboard.writeText(me ? t("{me} seni KONİ'ye davet ediyor: {link}", { me, link }) : t("KONİ'ye davet: {link}", { link }))
       .then(() => { copied = true; setTimeout(() => (copied = false), 1800); });
   }
   function left(ms: number) {
@@ -121,11 +121,11 @@
         <h2>{t("Davet hakkın yok")}</h2>
         <p>{t("Davet ettiğin biri bir admin tarafından banlandığı için davet hakkın alındı. Bir admin geri verebilir.")}</p>
       {:else}
-      <h2>{code ? t("Davet kodun hazır") : t("Davet kodun hazırlanıyor")}</h2>
-      <p>{t("Bu kodla kaydolan kişi doğrudan arkadaşın olur. Kodu yalnızca üyeler oluşturabilir, tek kişilik kullanılır.")}</p>
-      <div class="code"><b class="mono">{code ?? "····-····"}</b>
+      <h2>{code ? t("Davet linkin hazır") : t("Davet linkin hazırlanıyor")}</h2>
+      <p>{t("Linki arkadaşına gönder: tıklayınca KONİ sunucu dahil her şeyi kendisi doldurur. Bu linkle kaydolan doğrudan arkadaşın olur, link tek kişiliktir.")}</p>
+      <div class="code"><b class="mono link-text">{code ? inviteLink(code, social.server) : "koni://invite/····-····"}</b>
         <button class="white" disabled={!code} onclick={copy}>{copied ? t("Kopyalandı ✓") : t("Linki kopyala")}</button></div>
-      {#if code}<button class="link newc" disabled={busy} onclick={newInvite}>{t("Yeni kod oluştur")}</button>{/if}
+      {#if code}<button class="link newc" disabled={busy} onclick={newInvite}>{t("Yeni link oluştur")}</button>{/if}
       <div class="facts"><span><b>{t("7 gün")}</b>{t("geçerli")}</span><span><b>{t("1 kişi")}</b>{t("kullanabilir")}</span><span><b>{t("Otomatik")}</b>{t("arkadaş olursunuz")}</span></div>
       {/if}
       {#if social.profile?.invites.length}
@@ -204,6 +204,7 @@
   .muted { color: var(--text-2); }
   .code { display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: 16px; background: rgba(0, 0, 0, 0.4); border: 1px dashed rgba(255, 255, 255, 0.22); }
   .code b { font-size: 26px; font-weight: 700; letter-spacing: 0.12em; user-select: text; }
+  .code b.link-text { flex: 1; min-width: 0; font-size: 13px; letter-spacing: 0; word-break: break-all; }
   .code button { margin-left: auto; }
   .newc { align-self: flex-start; font-size: 12px; margin-top: -6px; }
   .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }

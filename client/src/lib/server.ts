@@ -20,7 +20,18 @@ export function serverLabel(url: string): string {
   return url.replace(/^wss?:\/\//i, "").replace(/\/ws$/, "");
 }
 
-/** Üye davet linki; varsayılan sunucu dışındaysa adres de linke eklenir. */
+/** Üye davet linki; sunucu adresini de taşır, linke tıklayan hiçbir şey yazmaz. */
 export function inviteLink(code: string, server: string): string {
-  return server === DEFAULT_SERVER ? `koni://invite/${code}` : `koni://invite/${code}?s=${encodeURIComponent(serverLabel(server))}`;
+  return `koni://invite/${code}?s=${encodeURIComponent(serverLabel(server))}`;
+}
+
+/** Sunucuya ulaşılıyor mu? `/healthz`'e bakar (yanıt gövdesi okunmaz, yalnızca bağlantı). */
+export async function probe(url: string): Promise<boolean> {
+  const http = url.replace(/^ws/i, "http").replace(/\/ws$/, "");
+  try {
+    await fetch(`${http}/healthz`, { mode: "no-cors", cache: "no-store", signal: AbortSignal.timeout(5000) });
+    return true;
+  } catch {
+    return false;
+  }
 }
