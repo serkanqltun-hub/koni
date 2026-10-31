@@ -91,6 +91,7 @@ fi
 # --- mpv: -Dgpl=false, libmpv only ------------------------------------------
 # auto_features=disabled turns off everything not listed here. coreaudio = sound,
 # gl-cocoa = the OpenGL backend the render API needs, videotoolbox-gl = hardware decoding.
+# swift-build: mpv 0.40's macOS code (clipboard etc.) needs its Swift bridge header.
 cd "$WORK/mpv"
 rm -rf build
 meson setup build --prefix="$PREFIX" --libdir=lib --buildtype=release \
@@ -99,7 +100,7 @@ meson setup build --prefix="$PREFIX" --libdir=lib --buildtype=release \
   -Dzlib=enabled -Diconv=enabled -Dlibavdevice=enabled \
   -Dcocoa=enabled -Dgl=enabled -Dgl-cocoa=enabled -Dvideotoolbox-gl=enabled \
   -Dcoreaudio=enabled \
-  -Dswift-build=disabled -Dmacos-cocoa-cb=disabled -Dmacos-media-player=disabled \
+  -Dswift-build=enabled -Dmacos-cocoa-cb=disabled -Dmacos-media-player=disabled \
   -Dmacos-touchbar=disabled \
   -Dlua=disabled -Djavascript=disabled \
   --wrap-mode=nodownload
