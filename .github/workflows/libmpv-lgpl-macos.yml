@@ -19,6 +19,10 @@ on:
       - tools/libmpv/build-macos.sh
       - .github/workflows/libmpv-lgpl-macos.yml
 
+concurrency:
+  group: libmpv-macos-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: write
 
