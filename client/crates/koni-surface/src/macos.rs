@@ -210,19 +210,25 @@ impl MacVideoSurface {
                 .ok_or(os("NSWindow"))?;
             let parent: Option<Retained<AnyObject>> = msg_send![window, contentView];
             let parent = parent.ok_or(os("contentView"))?;
-            let attrs = [
-                PFA_OPENGL_PROFILE,
-                PROFILE_3_2_CORE,
-                PFA_DOUBLE_BUFFER,
-                PFA_ACCELERATED,
-                PFA_ALLOW_OFFLINE_RENDERERS,
-                0,
-            ];
-            let pf: Option<Retained<AnyObject>> = msg_send![
-                msg_send![class!(NSOpenGLPixelFormat), alloc],
-                initWithAttributes: attrs.as_ptr()
-            ];
-            let pf = pf.ok_or(os("NSOpenGLPixelFormat"))?;
+            // Hardware first; without a GPU (virtual machines) fall back to Apple's
+            // software renderer instead of having no video at all.
+            let pixel_format = |accelerated: bool| -> Option<Retained<AnyObject>> {
+                let mut attrs = vec![PFA_OPENGL_PROFILE, PROFILE_3_2_CORE, PFA_DOUBLE_BUFFER];
+                if accelerated {
+                    attrs.extend([PFA_ACCELERATED, PFA_ALLOW_OFFLINE_RENDERERS]);
+                }
+                attrs.push(0);
+                msg_send![
+                    msg_send![class!(NSOpenGLPixelFormat), alloc],
+                    initWithAttributes: attrs.as_ptr()
+                ]
+            };
+            let pf = pixel_format(true)
+                .or_else(|| {
+                    eprintln!("[koni] donanım OpenGL yok, yazılım çiziciye geçiliyor");
+                    pixel_format(false)
+                })
+                .ok_or(os("NSOpenGLPixelFormat"))?;
             let view: Option<Retained<AnyObject>> = msg_send![
                 msg_send![class!(NSOpenGLView), alloc],
                 initWithFrame: CGRect::default(),
