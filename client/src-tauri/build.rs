@@ -46,6 +46,7 @@ const COMMANDS: &[&str] = &[
     "avatar_get",
     "lobby_start",
     "lobby_decline",
+    "lobby_remote_state",
     "bug_report",
     "sync_fun",
     "queue_add",
