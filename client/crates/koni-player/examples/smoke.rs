@@ -66,6 +66,25 @@ fn run() -> Result<(), String> {
     }
     println!("file loaded, duration: {:?}", player.duration());
 
+    if let Some(r) = &render {
+        let (w, h) = (320, 240);
+        let mut buf = vec![0u8; w * h * 4];
+        let end = Instant::now() + Duration::from_secs(5);
+        let mut lit = 0;
+        while Instant::now() < end && lit == 0 {
+            // Drive mpv's frame queue, then draw whatever frame is current.
+            let _ = r.needs_frame();
+            r.render_sw(w as i32, h as i32, w * 4, &mut buf)
+                .map_err(|e| format!("render_sw: {e}"))?;
+            lit = buf.chunks(4).filter(|p| p[..3] != [0, 0, 0]).count();
+            let _ = player.wait_event(0.02);
+        }
+        println!("render-sw: {lit} non-black pixels of {}", w * h);
+        if lit == 0 {
+            return Err("render API produced no picture".into());
+        }
+    }
+
     player
         .seek_absolute(1.0)
         .map_err(|e| format!("seek: {e}"))?;
@@ -85,25 +104,6 @@ fn run() -> Result<(), String> {
             Some(PlayerEvent::Shutdown) => return Err("mpv shut down".into()),
             Some(ev) => println!("event: {ev:?}"),
             None => {}
-        }
-    }
-
-    if let Some(r) = &render {
-        let (w, h) = (320, 240);
-        let mut buf = vec![0u8; w * h * 4];
-        let end = Instant::now() + Duration::from_secs(5);
-        let mut lit = 0;
-        while Instant::now() < end && lit == 0 {
-            if r.needs_frame() {
-                r.render_sw(w as i32, h as i32, w * 4, &mut buf)
-                    .map_err(|e| format!("render_sw: {e}"))?;
-                lit = buf.chunks(4).filter(|p| p[..3] != [0, 0, 0]).count();
-            }
-            std::thread::sleep(Duration::from_millis(20));
-        }
-        println!("render-sw: {lit} non-black pixels of {}", w * h);
-        if lit == 0 {
-            return Err("render API produced no picture".into());
         }
     }
 
