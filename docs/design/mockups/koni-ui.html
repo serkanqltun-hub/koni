@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KONİ arayüz mockupları</title>
+<!--
+  KONİ UI/UX mockupları (docs/UI-PLAN.md ile birlikte okunur).
+  Statik HTML: her .frame 1280x800 DIP bir uygulama penceresidir.
+  "mpv" etiketli alanlar native video penceresidir (web oraya çizmez).
+-->
+<style>
+  :root {
+    --bg: #0b0c0e; --panel: #111214; --raise: #16171a;
+    --line: rgba(255,255,255,.07); --line-2: rgba(255,255,255,.12);
+    --glass: rgba(255,255,255,.045); --glass-2: rgba(255,255,255,.08); --glass-3: rgba(255,255,255,.12);
+    --text: #f5f5f7; --text-2: #a1a1a6; --text-3: #6e6e73;
+    --accent: #0a84ff; --accent-2: #409cff; --ok: #30d158; --warn: #ffd60a; --bad: #ff453a; --violet: #bf5af2;
+    --r-xs: 6px; --r-sm: 10px; --r-md: 14px; --r-lg: 20px;
+    --font: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", "Cascadia Mono", ui-monospace, "DejaVu Sans Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #2a2b30; color: var(--text); font: 13px/1.4 var(--font); -webkit-font-smoothing: antialiased; padding: 40px 0 80px; }
+  h1.page { width: 1280px; margin: 0 auto 8px; font-size: 28px; letter-spacing: -.02em; }
+  p.lead { width: 1280px; margin: 0 auto 32px; color: #c7c7cc; font-size: 14px; max-width: 1280px; }
+  .scene { width: 1280px; margin: 0 auto 56px; }
+  .scene > header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+  .scene > header .id { font: 600 12px var(--mono); color: #8e8e93; background: #1c1c1e; padding: 3px 8px; border-radius: 6px; }
+  .scene > header h2 { font-size: 18px; letter-spacing: -.01em; }
+  .scene > header .note { color: #aeaeb2; font-size: 13px; }
+  .scene > .desc { color: #aeaeb2; font-size: 13px; margin-top: 10px; max-width: 980px; }
+  .frame { width: 1280px; height: 800px; position: relative; overflow: hidden; background: var(--bg); border-radius: 10px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.08); }
+  svg.i { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  svg.i.s { width: 14px; height: 14px; } svg.i.l { width: 20px; height: 20px; }
+
+  /* ---------- Başlık çubuğu (özel, decorations:false) ---------- */
+  .tb { position: absolute; inset: 0 0 auto 0; height: 40px; display: flex; align-items: center; padding-left: 12px;
+    border-bottom: 1px solid var(--line); background: var(--bg); z-index: 2; }
+  .tb .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: .06em; font-size: 13px; }
+  .tb .brand .mark { width: 22px; height: 22px; border-radius: 6px; background: #17181b; display: grid; place-items: center; border: 1px solid var(--line); }
+  .tb .center { position: absolute; left: 50%; transform: translateX(-50%); }
+  .tb .right { margin-left: auto; display: flex; align-items: center; height: 100%; }
+  .wc { display: flex; height: 100%; }
+  .wc span { width: 46px; display: grid; place-items: center; color: var(--text-2); }
+  .avatar-btn { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: 12px; margin-right: 10px;
+    background: linear-gradient(135deg, #0a84ff, #5e5ce6); }
+
+  .pill { display: inline-flex; align-items: center; gap: 7px; height: 24px; padding: 0 12px; border-radius: 99px; font-size: 12px; font-weight: 500;
+    background: var(--glass); border: 1px solid var(--line-2); white-space: nowrap; }
+  .pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .pill.warn i { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+  .pill.bad i { background: var(--bad); box-shadow: 0 0 8px var(--bad); }
+  .pill.idle i { background: var(--text-3); box-shadow: none; }
+  .pill .sub { color: var(--text-2); }
+
+  /* ---------- Ortak bileşenler ---------- */
+  .eyebrow { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; }
+  .label { font-size: 12px; font-weight: 500; color: var(--text-2); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+  .input { height: 34px; border-radius: var(--r-sm); background: rgba(255,255,255,.035); border: 1px solid var(--line-2); padding: 0 12px;
+    display: flex; align-items: center; color: var(--text-3); font-size: 13px; flex: 1; min-width: 0; gap: 8px; white-space: nowrap; overflow: hidden; }
+  .input.filled { color: var(--text); }
+  .input.focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(10,132,255,.25); color: var(--text); }
+  .input.err { border-color: rgba(255,69,58,.6); }
+  .input.lg { height: 42px; font-size: 14px; border-radius: 12px; }
+  .btn { height: 34px; padding: 0 14px; border-radius: var(--r-sm); display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font-weight: 600; font-size: 13px; background: var(--glass-2); border: 1px solid var(--line-2); color: var(--text); white-space: nowrap; }
+  .btn.white { background: #f5f5f7; color: #000; border-color: transparent; }
+  .btn.blue { background: var(--accent); border-color: transparent; }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--text-2); }
+  .btn.danger { color: #ff6961; }
+  .btn.sq { width: 34px; padding: 0; }
+  .btn.lg { height: 42px; border-radius: 12px; font-size: 14px; padding: 0 18px; }
+  .btn.block { width: 100%; }
+  .btn.sm { height: 26px; padding: 0 10px; font-size: 12px; border-radius: 8px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .card { border-radius: var(--r-md); background: var(--glass); border: 1px solid var(--line); padding: 14px; }
+  .tag { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+  .tag.ok { color: var(--ok); background: rgba(48,209,88,.12); }
+  .tag.warn { color: var(--warn); background: rgba(255,214,10,.12); }
+  .tag.bad { color: var(--bad); background: rgba(255,69,58,.12); }
+  .tag.blue { color: var(--accent-2); background: rgba(10,132,255,.14); }
+  .tag.mute { color: var(--text-2); background: var(--glass-2); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; border-radius: 8px; font: 500 12px var(--mono);
+    background: var(--glass); border: 1px solid var(--line-2); color: var(--text); }
+  .hair { height: 1px; background: var(--line); }
+  .meter { height: 4px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .meter b { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+  .meter.warn b { background: var(--warn); } .meter.ok b { background: var(--ok); }
+  .kbd { font: 500 11px var(--mono); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line-2); color: var(--text-2); }
+  .muted { color: var(--text-2); } .dim { color: var(--text-3); }
+  .mono { font-family: var(--mono); }
+
+  /* ---------- Video alanı (native mpv) ---------- */
+  .movie { position: absolute; background:
+      radial-gradient(120% 60% at 70% 105%, #3a1d0a 0 35%, transparent 36%),
+      radial-gradient(90% 50% at 15% 110%, #5a2c0e 0 40%, transparent 41%),
+      radial-gradient(60% 40% at 72% 30%, rgba(255,214,150,.9), rgba(255,170,90,.35) 30%, transparent 60%),
+      linear-gradient(180deg, #c97a3a 0%, #e9a865 38%, #a85a24 62%, #5c2a0c 100%); }
+  .movie::after { content: "mpv · native video"; position: absolute; left: 12px; top: 10px; font: 600 10px var(--mono); letter-spacing: .05em;
+    color: rgba(255,255,255,.75); background: rgba(0,0,0,.35); padding: 3px 7px; border-radius: 5px; }
+  .movie.letter { background-clip: content-box; }
+  .blackbox { position: absolute; background: #000; }
+  .empty { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; }
+  .empty .logo { width: 72px; height: 72px; border-radius: 20px; display: grid; place-items: center; margin-bottom: 10px;
+    background: linear-gradient(180deg, #1b1c20, #111215); border: 1px solid var(--line-2); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+  .empty b { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+  .empty span { color: var(--text-2); max-width: 340px; }
+  .empty .hints { display: flex; gap: 8px; margin-top: 14px; }
+
+  /* ---------- Dock (alt şerit, video ile aynı siyah zemin) ---------- */
+  .strip { position: absolute; background: #000; display: grid; place-items: center; }
+  .dock { width: 560px; border-radius: 18px; padding: 10px 14px 12px; background: rgba(28,29,33,.72); border: 1px solid var(--line-2);
+    box-shadow: 0 12px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06); backdrop-filter: blur(24px) saturate(160%); }
+  .dock .seekrow { display: flex; align-items: center; gap: 12px; font: 500 11px var(--mono); color: var(--text-2); }
+  .seek { flex: 1; height: 4px; border-radius: 4px; background: rgba(255,255,255,.12); position: relative; }
+  .seek b { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: #f5f5f7; }
+  .seek em { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: rgba(255,255,255,.22); }
+  .seek .mk { position: absolute; top: -4px; width: 2px; height: 12px; border-radius: 2px; background: var(--warn); }
+  .dock .ctl { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .play { width: 36px; height: 36px; border-radius: 50%; background: #f5f5f7; color: #000; display: grid; place-items: center; }
+  .play svg { fill: currentColor; stroke: none; }
+  .vol { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: 99px; background: var(--glass-2); color: var(--text-2); }
+  .vol .bar { width: 64px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.15); position: relative; }
+  .vol .bar b { position: absolute; inset: 0 30% 0 0; background: #f5f5f7; border-radius: 4px; }
+  .ib { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: var(--text-2); background: var(--glass); border: 1px solid var(--line); }
+  .ib.on { color: var(--text); background: var(--glass-3); }
+
+  /* ---------- Sağ panel (Yön A) ---------- */
+  .side { position: absolute; top: 40px; right: 0; bottom: 0; width: 320px; background: var(--panel); border-left: 1px solid var(--line);
+    display: flex; flex-direction: column; }
+  .side .sec { padding: 16px 16px 0; }
+  .side .head { padding: 16px; display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid var(--line); }
+  .side .head h3 { font-size: 17px; font-weight: 650; letter-spacing: -.015em; margin-top: 2px; }
+  .side .foot { margin-top: auto; padding: 12px 16px 16px; border-top: 1px solid var(--line); }
+  .now { margin-top: 0; }
+  .now .t { font-weight: 600; font-size: 14px; margin: 4px 0 8px; letter-spacing: -.01em; }
+  .now .meta { display: flex; align-items: center; justify-content: space-between; color: var(--text-2); font-size: 12px; }
+  .now .meta b { color: var(--text); font-weight: 500; }
+  .now .thumb { width: 52px; height: 52px; border-radius: 10px; flex: none; background: linear-gradient(160deg, #e9a865, #5c2a0c); }
+  .members { display: flex; flex-direction: column; gap: 6px; }
+  .mem { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px; border-radius: 12px; background: var(--glass); border: 1px solid var(--line); }
+  .mem.tall { height: auto; padding: 10px; flex-wrap: wrap; }
+  .av { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; font-weight: 650; font-size: 12px; flex: none; position: relative;
+    background: hsl(var(--h,210) 55% 45% / .9); }
+  .av.round { border-radius: 50%; }
+  .av .dot { position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); border: 2px solid var(--panel); }
+  .av .dot.warn { background: var(--warn); } .av .dot.bad { background: var(--bad); } .av .dot.off { background: var(--text-3); }
+  .mem .n { font-weight: 550; display: flex; align-items: center; gap: 6px; }
+  .mem .st { margin-left: auto; font-size: 12px; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
+  .mem .full { width: 100%; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-2); }
+  .mem .full .meter { flex: 1; }
+  .badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 5px; background: var(--glass-2); color: var(--text-2); border: 1px solid var(--line); }
+  .badge.host { color: #ffcc66; background: rgba(255,204,102,.1); border-color: rgba(255,204,102,.2); }
+  .you { font-size: 11px; color: var(--text-3); }
+  .banner { border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; }
+  .banner.warn { background: rgba(255,214,10,.08); border: 1px solid rgba(255,214,10,.22); }
+  .banner.bad { background: rgba(255,69,58,.08); border: 1px solid rgba(255,69,58,.25); }
+  .banner.blue { background: rgba(10,132,255,.08); border: 1px solid rgba(10,132,255,.25); }
+  .banner .h { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .feed { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--text-2); }
+  .feed span.t { font: 500 11px var(--mono); color: var(--text-3); margin-right: 8px; }
+  .menu { position: absolute; width: 220px; border-radius: 12px; padding: 5px; background: rgba(36,37,41,.92); border: 1px solid var(--line-2);
+    box-shadow: 0 20px 50px rgba(0,0,0,.55); backdrop-filter: blur(30px); z-index: 5; }
+  .menu div { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border-radius: 7px; font-size: 13px; }
+  .menu div.hl { background: var(--accent); }
+  .menu div .k { margin-left: auto; color: var(--text-3); font: 11px var(--mono); }
+  .menu .sep { height: 1px; padding: 0; margin: 4px 6px; background: var(--line-2); }
+  .toggle { width: 38px; height: 22px; border-radius: 99px; background: var(--glass-3); position: relative; flex: none; }
+  .toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+  .toggle.on { background: var(--ok); } .toggle.on::after { left: 18px; }
+  .seg { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(255,255,255,.06); border: 1px solid var(--line); }
+  .seg span { height: 28px; padding: 0 14px; display: grid; place-items: center; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--text-2); }
+  .seg span.on { background: rgba(255,255,255,.14); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+
+  /* ---------- Tam pencere ekranlar (video gizli) ---------- */
+  .ambient { position: absolute; inset: 40px 0 0 0; background:
+      radial-gradient(40% 50% at 18% 20%, rgba(10,132,255,.32), transparent 70%),
+      radial-gradient(40% 45% at 85% 80%, rgba(191,90,242,.24), transparent 70%),
+      radial-gradient(30% 40% at 70% 15%, rgba(255,159,10,.12), transparent 70%), var(--bg); }
+  .glasscard { border-radius: 24px; background: rgba(30,31,36,.55); border: 1px solid rgba(255,255,255,.1);
+    box-shadow: 0 30px 80px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter: blur(40px) saturate(170%); }
+  .center-abs { position: absolute; left: 50%; top: calc(50% + 20px); transform: translate(-50%, -50%); }
+
+  /* ---------- Yön B: Cam Ada ---------- */
+  .b-bg { position: absolute; inset: 0; background:
+      radial-gradient(45% 55% at 30% 45%, rgba(233,150,80,.45), transparent 70%),
+      radial-gradient(40% 50% at 90% 15%, rgba(10,132,255,.28), transparent 70%),
+      radial-gradient(45% 50% at 75% 95%, rgba(191,90,242,.25), transparent 70%), #0d0e12; }
+  .b-island { position: absolute; border-radius: 22px; background: rgba(24,25,30,.5); border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 20px 60px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.1); backdrop-filter: blur(40px) saturate(180%); }
+
+  /* ---------- Yön C: Sinema ---------- */
+  .rail { position: absolute; top: 40px; right: 0; bottom: 0; width: 64px; background: var(--panel); border-left: 1px solid var(--line);
+    display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 8px; }
+  .rail .ri { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--text-2); position: relative; }
+  .rail .ri.on { background: var(--glass-3); color: var(--text); }
+  .rail .ri .cnt { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; padding: 0 4px; }
+  .stack { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+  .cbar { position: absolute; left: 0; bottom: 0; height: 64px; background: #000; display: flex; align-items: center; gap: 14px; padding: 0 20px; border-top: 1px solid rgba(255,255,255,.05); }
+
+  /* ---------- İkonlar ---------- */
+  .icons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .icard { border-radius: 18px; background: #16171a; border: 1px solid rgba(255,255,255,.08); padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+  .icard h3 { font-size: 15px; } .icard p { color: #aeaeb2; font-size: 12.5px; }
+  .sizes { display: flex; align-items: flex-end; gap: 16px; }
+  .taskbar { display: flex; align-items: center; gap: 6px; height: 48px; padding: 0 12px; border-radius: 12px; background: rgba(32,32,36,.9); border: 1px solid rgba(255,255,255,.06); }
+  .taskbar .slot { width: 40px; height: 40px; border-radius: 8px; display: grid; place-items: center; }
+  .taskbar .slot.on { background: rgba(255,255,255,.08); }
+  .taskbar .slot.dummy::after { content: ""; width: 22px; height: 22px; border-radius: 5px; background: #3a3b40; }
+
+  .legend { width: 1280px; margin: 0 auto 56px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .legend .card { background: #16171a; border-color: rgba(255,255,255,.08); padding: 20px; border-radius: 16px; }
+  .legend h3 { font-size: 15px; margin-bottom: 6px; } .legend p, .legend li { color: #aeaeb2; font-size: 12.5px; } .legend ul { padding-left: 16px; margin-top: 6px; }
+  .sw { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .sw span { width: 48px; height: 48px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); display: flex; align-items: flex-end; padding: 4px; font: 9px var(--mono); color: rgba(255,255,255,.8); }
+</style>
+</head>
+<body>
+
+<!-- İkon seti (Lucide tarzı çizgi ikonlar, 1.75 kalınlık) -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5ab0ff"/><stop offset="1" stop-color="#0a6cff"/></linearGradient>
+    <linearGradient id="g-sq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26272c"/><stop offset="1" stop-color="#0d0e10"/></linearGradient>
+    <linearGradient id="g-sq2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4c9dff"/><stop offset=".55" stop-color="#5e5ce6"/><stop offset="1" stop-color="#bf5af2"/></linearGradient>
+    <linearGradient id="g-hl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="g-cone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dfe8ff"/></linearGradient>
+    <linearGradient id="g-or" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb340"/><stop offset="1" stop-color="#ff5e3a"/></linearGradient>
+  </defs>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="3"/><path d="M5 15V6a3 3 0 0 1 3-3h7"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.3v13.4a1 1 0 0 0 1.5.9l10.6-6.7a1 1 0 0 0 0-1.8L9.5 4.4A1 1 0 0 0 8 5.3z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4.5" width="4" height="15" rx="1.2"/><rect x="14" y="4.5" width="4" height="15" rx="1.2"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-max" viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/></symbol>
+  <symbol id="i-cc" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 10.5a2 2 0 1 0 0 3M16 10.5a2 2 0 1 0 0 3"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20"/><circle cx="10" cy="8" r="3.5"/><path d="M20 20v-1.5a3.5 3.5 0 0 0-2.5-3.3M15.5 4.7a3.5 3.5 0 0 1 0 6.6"/></symbol>
+  <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 3v18M17 3v18M3 8h4M3 16h4M17 8h4M17 16h4"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+  <symbol id="i-wifioff" viewBox="0 0 24 24"><path d="M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5.2-2.8M19 13a10 10 0 0 0-2.3-1.7M2 8.8a15 15 0 0 1 4.2-2.6M22 8.8A15 15 0 0 0 11 4.5"/><circle cx="12" cy="20" r=".6"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8M21 3v5h-5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-chevd" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-win" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1.5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="m3 7 4.5 4L12 4l4.5 7L21 7l-2 12H5z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.7-8.7M17 6l3 3M14.5 8.5l2 2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-door" viewBox="0 0 24 24"><path d="M3 21h18M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17"/><circle cx="14.5" cy="12" r=".7"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.2L3 16M3 21v-5h5"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></symbol>
+  <symbol id="i-crosshair" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M22 12h-4M6 12H2M12 6V2M12 22v-4"/></symbol>
+
+  <!-- Uygulama ikonu adayları (glif) -->
+  <symbol id="logo-c" viewBox="0 0 24 24"><path d="M6 3.5v17a1 1 0 0 0 1.5.8l13-8.5a1 1 0 0 0 0-1.6l-13-8.5A1 1 0 0 0 6 3.5z" fill="url(#g-blue)"/><path d="M9.6 7.8v8.4l1.9-1.25V9.05zM13.3 10.2v3.6l1.9-1.2v-1.2z" fill="#fff"/></symbol>
+  <symbol id="logo-a" viewBox="0 0 24 24">
+    <path d="M4 5.5h16l-1.5 3H5.5z" fill="url(#g-blue)"/><path d="M6.6 10.2h10.8l-1.5 3H8.1z" fill="#fff"/><path d="M9.2 14.9h5.6l-2.2 4.4a.7.7 0 0 1-1.2 0z" fill="url(#g-blue)"/>
+  </symbol>
+</svg>
+
+<h1 class="page">KONİ — Arayüz mockupları</h1>
+<p class="lead"><b>Seçilen: Yön C · Sinema + İkon I3.</b> Aşağıda önce ikon, sonra C yönünde oda ekranı ve tüm durumları, ardından yönden bağımsız tam pencere ekranlar (giriş, ana ekran, ayarlar) ve en sonda seçilmeyen A/B yönleri var. Her çerçeve 1280×800'lük bir uygulama penceresidir. "mpv · native video" yazan alan web'in çizemediği gerçek video penceresidir; hiçbir menü, kart ya da bildirim onun üstüne binmez.</p>
+
+<!-- ======================================================= İKONLAR -->
+<section class="scene" id="icons">
+  <header><span class="id">İKON</span><h2>Uygulama ikonu: üç aday</h2><span class="note">Serkan I3'ü seçti · Windows 11 görev çubuğu ve 16/32/64/128 px</span></header>
+  <div class="icons">
+    <!-- I1 -->
+    <div class="icard">
+      <h3>I1 · Huni Koni</h3>
+      <div class="sizes">
+        <svg width="128" height="128" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="url(#g-sq)"/><rect x="4.5" y="4.5" width="119" height="119" rx="27.5" fill="none" stroke="#fff" stroke-opacity=".12"/><rect x="4" y="4" width="120" height="60" rx="28" fill="url(#g-hl)" opacity=".5"/><use href="#logo-a" x="24" y="22" width="80" height="80"/></svg>
+        <svg width="64" height="64" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="url(#g-sq)"/><rect x="4.5" y="4.5" width="119" height="119" rx="27.5" fill="none" stroke="#fff" stroke-opacity=".12"/><use href="#logo-a" x="24" y="22" width="80" height="80"/></svg>
+        <svg width="32" height="32" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="url(#g-sq)"/><use href="#logo-a" x="16" y="14" width="96" height="96"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24"><path d="M2 3.5h20l-2 4H4z" fill="#409cff"/><path d="M5.5 9.7h13l-2 4h-9z" fill="#fff"/><path d="M9 16h6l-2.4 5a.7.7 0 0 1-1.2 0z" fill="#409cff"/></svg>
+      </div>
+      <p>Referans ekran görüntüsündeki logo: ters koni üç banttan oluşur (mavi · beyaz · mavi), koyu "squircle" zemin üstünde. VLC'nin turuncu trafik konisiyle karışmaz. 16 px'te zemin kalkar, yalnızca glif kalır.</p>
+      <div class="taskbar"><span class="slot dummy"></span><span class="slot dummy"></span><span class="slot on"><svg width="26" height="26" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="url(#g-sq)"/><use href="#logo-a" x="16" y="14" width="96" height="96"/></svg></span><span class="slot dummy"></span></div>
+    </div>
+    <!-- I2 -->
+    <div class="icard">
+      <h3>I2 · Gradyan Cam</h3>
+      <div class="sizes">
+        <svg width="128" height="128" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="url(#g-sq2)"/><rect x="4" y="4" width="120" height="64" rx="28" fill="url(#g-hl)"/><rect x="4.5" y="4.5" width="119" height="119" rx="27.5" fill="none" stroke="#fff" stroke-opacity=".25"/>
+          <path d="M30 34h68l-6.5 12.5h-55z" fill="#fff"/><path d="M41 55h46l-6.5 12.5h-33z" fill="#fff" fill-opacity=".55"/><path d="M52 76h24l-9.2 18.6a3 3 0 0 1-5.4 0z" fill="#fff"/></svg>
+        <svg width="64" height="64" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="url(#g-sq2)"/><path d="M30 34h68l-6.5 12.5h-55z" fill="#fff"/><path d="M41 55h46l-6.5 12.5h-33z" fill="#fff" fill-opacity=".55"/><path d="M52 76h24l-9.2 18.6a3 3 0 0 1-5.4 0z" fill="#fff"/></svg>
+        <svg width="32" height="32" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="url(#g-sq2)"/><path d="M26 32h76l-7 14H33z" fill="#fff"/><path d="M38 55h52l-7 14H45z" fill="#fff" fill-opacity=".6"/><path d="M50 78h28l-10 20a3 3 0 0 1-5.4 0z" fill="#fff"/></svg>
+        <svg width="16" height="16" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="url(#g-sq2)"/><path d="M22 30h84l-8 16H30z" fill="#fff"/><path d="M48 76h32l-12 24a3 3 0 0 1-5 0z" fill="#fff"/></svg>
+      </div>
+      <p>Aynı huni şekli, bu sefer beyaz glif mavi → mor gradyan zeminde (macOS Big Sur / iOS ikon dili). Görev çubuğunda en çok dikkat çeken aday; koyu temalı arayüzle daha az bütünleşik.</p>
+      <div class="taskbar"><span class="slot dummy"></span><span class="slot dummy"></span><span class="slot on"><svg width="26" height="26" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="url(#g-sq2)"/><path d="M26 32h76l-7 14H33z" fill="#fff"/><path d="M38 55h52l-7 14H45z" fill="#fff" fill-opacity=".6"/><path d="M50 78h28l-10 20a3 3 0 0 1-5.4 0z" fill="#fff"/></svg></span><span class="slot dummy"></span></div>
+    </div>
+    <!-- I3 -->
+    <div class="icard">
+      <h3>I3 · Koni + Oynat <span class="tag ok" style="margin-left:6px">Seçildi</span></h3>
+      <div class="sizes">
+        <svg width="128" height="128" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="#0e0f12"/><rect x="4.5" y="4.5" width="119" height="119" rx="27.5" fill="none" stroke="#fff" stroke-opacity=".12"/>
+          <circle cx="64" cy="64" r="40" fill="url(#g-blue)" opacity=".18"/><path d="M46 34v60a4 4 0 0 0 6 3.5l46-30a4 4 0 0 0 0-7l-46-30A4 4 0 0 0 46 34z" fill="url(#g-blue)"/><path d="M46 52.5 74.5 64 46 75.5z" fill="#fff" fill-opacity=".0"/><path d="M58 48v32l6-3.9V51.9zM70 55.8v16.4l6-3.9v-8.6z" fill="#fff"/></svg>
+        <svg width="64" height="64" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="#0e0f12"/><path d="M46 34v60a4 4 0 0 0 6 3.5l46-30a4 4 0 0 0 0-7l-46-30A4 4 0 0 0 46 34z" fill="url(#g-blue)"/><path d="M58 48v32l6-3.9V51.9zM70 55.8v16.4l6-3.9v-8.6z" fill="#fff"/></svg>
+        <svg width="32" height="32" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="#0e0f12"/><path d="M42 30v68a4 4 0 0 0 6 3.5l52-34a4 4 0 0 0 0-7l-52-34A4 4 0 0 0 42 30z" fill="url(#g-blue)"/><path d="M58 46v36l8-5V51z" fill="#fff"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24"><path d="M6 3.5v17a1 1 0 0 0 1.5.8l13-8.5a1 1 0 0 0 0-1.6l-13-8.5A1 1 0 0 0 6 3.5z" fill="#409cff"/><path d="M10 8v8l2-1.3V9.3z" fill="#fff"/></svg>
+      </div>
+      <p>Koni yatırılıp "oynat" üçgenine dönüşür, içindeki beyaz şeritler koni bantlarını anımsatır. "Video uygulaması" olduğu ilk bakışta anlaşılır, ama koni fikri daha az belirgin.</p>
+      <div class="taskbar"><span class="slot dummy"></span><span class="slot dummy"></span><span class="slot on"><svg width="26" height="26" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="#0e0f12"/><path d="M42 30v68a4 4 0 0 0 6 3.5l52-34a4 4 0 0 0 0-7l-52-34A4 4 0 0 0 42 30z" fill="url(#g-blue)"/><path d="M58 46v36l8-5V51z" fill="#fff"/></svg></span><span class="slot dummy"></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================= YÖN C (SEÇİLDİ) -->
+<section class="scene" id="c-watch">
+  <header><span class="id">C1</span><h2>Yön C · Sinema — Oda, izleniyor (panel kapalı)</h2><span class="note">Seçilen yön · videoya en çok alan</span></header>
+  <div class="frame">
+    <div class="tb">
+      <div class="brand"><span class="mark"><svg width="14" height="14"><use href="#logo-c"/></svg></span>KONİ <span class="dim" style="font-weight:500;letter-spacing:0;margin-left:6px">/ Cuma Gecesi</span></div>
+      <div class="center"><span class="pill"><i></i>Birlikte izleniyor</span></div>
+      <div class="right"><span class="chip" style="margin-right:10px">K7Q-4ZP<svg class="i s"><use href="#i-copy"/></svg></span><div class="wc"><span><svg class="i s"><use href="#i-min"/></svg></span><span><svg class="i s"><use href="#i-win"/></svg></span><span><svg class="i s"><use href="#i-x"/></svg></span></div></div>
+    </div>
+    <div class="movie" style="top:40px;left:0;width:1216px;height:696px"></div>
+    <div class="cbar" style="width:1216px">
+      <span class="play"><svg class="i"><use href="#i-pause"/></svg></span>
+      <span class="mono muted" style="font-size:12px">01:24:10</span><div class="seek"><em style="width:74%"></em><b style="width:58%"></b></div><span class="mono muted" style="font-size:12px">2:06:28</span>
+      <span class="vol"><svg class="i s"><use href="#i-vol"/></svg><span class="bar"><b></b></span></span><span class="ib"><svg class="i s"><use href="#i-cc"/></svg></span><span class="ib"><svg class="i s"><use href="#i-max"/></svg></span>
+    </div>
+    <div class="rail">
+      <span class="ri on"><svg class="i l"><use href="#i-plus"/></svg></span>
+      <span class="ri"><svg class="i l"><use href="#i-users"/></svg><span class="cnt">3</span></span>
+      <span class="ri"><svg class="i l"><use href="#i-activity"/></svg></span>
+      <span class="ri"><svg class="i l"><use href="#i-gear"/></svg></span>
+      <div class="hair" style="width:32px;margin:6px 0"></div>
+      <div class="stack"><span class="av round" style="--h:212">S<i class="dot"></i></span><span class="av round" style="--h:150">Ş<i class="dot"></i></span><span class="av round" style="--h:20">F<i class="dot warn"></i></span></div>
+      <span class="ri" style="margin-top:auto;color:#ff6961"><svg class="i l"><use href="#i-out"/></svg></span>
+    </div>
+  </div>
+  <p class="desc">Sağda yalnızca 64 DIP'lik ikon rayı ve üye avatarları (durum noktasıyla). Bir ikona basınca 320 DIP'lik çekmece açılır ve video o kadar daralır (yerleşim değişikliği Rust'a tek mesajla gider, overlay yok). Kontrol barı tam genişlikte ince şerit. Seçilen yön · videoya en çok alanı verir; ama sık kullanılan "video ekle" ve üye durumu bir tık uzakta kalır.</p>
+</section>
+
+<section class="scene" id="c-drawer">
+  <header><span class="id">C2</span><h2>Oda · birisi bekleniyor (Kişiler çekmecesi)</h2><span class="note">Pile tıklayınca da açılır</span></header>
+  <div class="frame">
+    <div class="tb">
+      <div class="brand"><span class="mark"><svg width="14" height="14"><use href="#logo-c"/></svg></span>KONİ <span class="dim" style="font-weight:500;letter-spacing:0;margin-left:6px">/ Cuma Gecesi</span></div>
+      <div class="center"><span class="pill warn"><i></i>furkan bekleniyor <span class="sub">· %65</span></span></div>
+      <div class="right"><span class="chip" style="margin-right:10px">K7Q-4ZP<svg class="i s"><use href="#i-copy"/></svg></span><div class="wc"><span><svg class="i s"><use href="#i-min"/></svg></span><span><svg class="i s"><use href="#i-win"/></svg></span><span><svg class="i s"><use href="#i-x"/></svg></span></div></div>
+    </div>
+    <div class="movie" style="top:40px;left:0;width:896px;height:696px;filter:brightness(.7)"></div>
+    <div class="cbar" style="width:896px">
+      <span class="play" style="opacity:.5"><svg class="i"><use href="#i-play"/></svg></span>
+      <span class="mono muted" style="font-size:12px">01:24:10</span><div class="seek"><em style="width:58.5%"></em><b style="width:58%"></b></div><span class="mono muted" style="font-size:12px">2:06:28</span>
+      <span class="vol"><svg class="i s"><use href="#i-vol"/></svg><span class="bar"><b></b></span></span><span class="ib"><svg class="i s"><use href="#i-max"/></svg></span>
+    </div>
+    <aside class="side" style="right:64px;border-right:1px solid var(--line)">
+      <div class="head"><div style="flex:1"><div class="eyebrow">Kişiler</div><h3>Odadakiler (3)</h3></div><span class="ib"><svg class="i s"><use href="#i-x"/></svg></span></div>
+      <div class="sec"><div class="members">
+        <div class="mem"><span class="av" style="--h:212">S<i class="dot"></i></span><span class="n">serkan <span class="badge host">Host</span></span><span class="st">Hazır</span></div>
+        <div class="mem"><span class="av" style="--h:150">Ş<i class="dot"></i></span><span class="n">savaş</span><span class="st">Hazır</span></div>
+        <div class="mem tall"><span class="av" style="--h:20">F<i class="dot warn"></i></span><span class="n">furkan</span><span class="st" style="color:var(--warn)">Tamponluyor</span>
+          <div class="full"><div class="meter warn"><b style="width:65%"></b></div>%65 · 8 sn</div><div class="full">Son 4 dk'da 3 kez takıldı.</div><span class="btn sm block">furkan olmadan devam et</span></div>
+      </div></div>
+    </aside>
+    <div class="rail">
+      <span class="ri"><svg class="i l"><use href="#i-plus"/></svg></span>
+      <span class="ri on"><svg class="i l"><use href="#i-users"/></svg><span class="cnt">3</span></span>
+      <span class="ri"><svg class="i l"><use href="#i-activity"/></svg></span>
+      <span class="ri"><svg class="i l"><use href="#i-gear"/></svg></span>
+      <span class="ri" style="margin-top:auto;color:#ff6961"><svg class="i l"><use href="#i-out"/></svg></span>
+    </div>
+  </div>
+</section>
+
+<section class="scene" id="c-empty">
+  <header><span class="id">C3</span><h2>Oda · henüz video yok (Video ekle çekmecesi)</h2><span class="note">Odaya ilk girişte bu çekmece açık gelir</span></header>
+  <div class="frame">
+    <div class="tb"><div class="brand"><span class="mark"><svg width="14" height="14"><use href="#logo-c"/></svg></span>KONİ <span class="dim" style="font-weight:500;letter-spacing:0;margin-left:6px">/ Cuma Gecesi</span></div><div class="center"><span class="pill idle"><i></i>Video bekleniyor</span></div><div class="right"><span class="chip" style="margin-right:10px">K7Q-4ZP<svg class="i s"><use href="#i-copy"/></svg></span><div class="wc"><span><svg class="i s"><use href="#i-min"/></svg></span><span><svg class="i s"><use href="#i-win"/></svg></span><span><svg class="i s"><use href="#i-x"/></svg></span></div></div></div><div class="blackbox" style="top:40px;left:0;width:896px;height:760px"></div>
+<div class="empty" style="top:40px;left:0;width:896px;height:696px"><div class="logo"><svg width="38" height="38"><use href="#logo-c"/></svg></div><b>Oynatmaya hazır</b><span>Sağdaki kutuya bir link yapıştır ya da video dosyasını buraya sürükle.</span><div class="hints"><span class="pill idle" style="background:transparent"><span class="kbd">Ctrl V</span> link yapıştır</span><span class="pill idle" style="background:transparent"><svg class="i s"><use href="#i-file"/></svg> dosya sürükle</span></div></div><div class="cbar" style="width:896px"><span class="play" style="opacity:.5"><svg class="i"><use href="#i-play"/></svg></span><span class="mono muted" style="font-size:12px">--:--</span><div class="seek"></div><span class="mono muted" style="font-size:12px">--:--</span><span class="vol"><svg class="i s"><use href="#i-vol"/></svg><span class="bar"><b></b></span></span><span class="ib"><svg class="i s"><use href="#i-cc"/></svg></span><span class="ib"><svg class="i s"><use href="#i-max"/></svg></span></div><aside class="side" style="right:64px">
+      <div class="head" style="align-items:center"><div style="flex:1"><div class="eyebrow">Oda</div><h3>Video ekle</h3></div><span class="ib"><svg class="i s"><use href="#i-x"/></svg></span></div><div class="sec"><div class="row"><span class="input focus">https://youtu.be/Way9Dexny3w</span><span class="btn white">Aç</span></div><div class="dim" style="font-size:12px;margin-top:8px">YouTube, Vimeo, .mp4/.m3u8 linki ya da dosya.</div></div>
+<div class="sec" style="display:flex;flex-direction:column;gap:6px"><div class="row" style="height:48px;padding:0 10px;border-radius:12px;background:var(--glass);border:1px solid var(--line);gap:12px"><span class="ib" style="border:0"><svg class="i s"><use href="#i-file"/></svg></span><div style="flex:1"><div style="font-weight:550">Dosya seç</div><div class="dim" style="font-size:11.5px">Bilgisayarından video</div></div><span class=kbd>Ctrl O</span></div><div class="row" style="height:48px;padding:0 10px;border-radius:12px;background:var(--glass);border:1px solid var(--line);gap:12px"><span class="ib" style="border:0"><svg class="i s"><use href="#i-down"/></svg></span><div style="flex:1"><div style="font-weight:550">Herkes indirsin</div><div class="dim" style="font-size:11.5px">Herkes indirir, birlikte başlar</div></div></div><div class="row" style="height:48px;padding:0 10px;border-radius:12px;background:var(--glass);border:1px solid var(--line);gap:12px"><span class="ib" style="border:0"><svg class="i s"><use href="#i-cc"/></svg></span><div style="flex:1"><div style="font-weight:550">Altyazı ekle</div><div class="dim" style="font-size:11.5px">.srt .ass .vtt</div></div></div><div class="row" style="height:48px;padding:0 10px;border-radius:12px;background:var(--glass);border:1px solid var(--line);gap:12px"><span class="ib" style="border:0"><svg class="i s"><use href="#i-crosshair"/></svg></span><div style="flex:1"><div style="font-weight:550">Sayfadan yakala</div><div class="dim" style="font-size:11.5px">Desteklenmeyen sitede videoyu bul</div></div></div></div>
+<div class="sec"><div class="banner blue"><div class="h"><svg class="i s" style="color:var(--accent-2)"><use href="#i-users"/></svg>Arkadaşlarını çağır</div><span class="muted">Davet kodu: <b class="mono" style="color:var(--text)">K7Q-4ZP</b> · başlıktan kopyala</span></div></div></aside><div class="rail"><span class="ri on"><svg class="i l"><use href="#i-plus"/></svg></span><span class="ri"><svg class="i l"><use href="#i-users"/></svg><span class="cnt" style="">1</span></span><span class="ri"><svg class="i l"><use href="#i-activity"/></svg></span><span class="ri"><svg class="i l"><use href="#i-gear"/></svg></span><div class="hair" style="width:32px;margin:6px 0"></div><div class="stack" style=""><span class="av round" style="--h:212">S<i class="dot "></i></span></div><span class="ri" style="margin-top:auto;color:#ff6961"><svg class="i l"><use href="#i-out"/></svg></span></div>
+  </div>
+  <p class="desc">Video yokken "Video ekle" çekmecesi kendiliğinden açık. Seçenekler artık gizli bir "⋯" menüsünde değil, büyük satırlar halinde görünüyor. Video açılınca çekmece kapanır ve video tüm alana yayılır (C1). Davet kodu her zaman başlık çubuğunda.</p>
+</section>
+
+<section class="scene" id="c-feed">
+  <header><span class="id">C4</span><h2>Oda · Etkinlik çekmecesi</h2><span class="note">Şu an oynatılan + olay akışı</span></header>
+  <div class="frame">
+    <div class="tb"><div class="brand"><span class="mark"><svg width="14" height="14"><use href="#logo-c"/></svg></span>KONİ <span class="dim" style="font-weight:500;letter-spacing:0;margin-left:6px">/ Cuma Gecesi</span></div><div class="center"><span class="pill"><i></i>savaş durdurdu <span class="sub">· 01:24:10</span></span></div><div class="right"><span class="chip" style="margin-right:10px">K7Q-4ZP<svg class="i s"><use href="#i-copy"/></svg></span><div class="wc"><span><svg class="i s"><use href="#i-min"/></svg></span><span><svg class="i s"><use href="#i-win"/></svg></span><span><svg class="i s"><use href="#i-x"/></svg></span></div></div></div><div class="movie" style="top:40px;left:0;width:896px;height:696px"></div><div class="cbar" style="width:896px"><span class="play" style=""><svg class="i"><use href="#i-play"/></svg></span><span class="mono muted" style="font-size:12px">01:24:10</span><div class="seek"><em style="width:74%"></em><b style="width:58%"></b></div><span class="mono muted" style="font-size:12px">2:06:28</span><span class="vol"><svg class="i s"><use href="#i-vol"/></svg><span class="bar"><b></b></span></span><span class="ib"><svg class="i s"><use href="#i-cc"/></svg></span><span class="ib"><svg class="i s"><use href="#i-max"/></svg></span></div><aside class="side" style="right:64px">
+      <div class="head" style="align-items:center"><div style="flex:1"><div class="eyebrow">Oda</div><h3>Etkinlik</h3></div><span class="ib"><svg class="i s"><use href="#i-x"/></svg></span></div><div class="sec"><div class="card" style="display:flex;gap:12px;align-items:center;padding:10px"><span class="thumb" style="width:52px;height:52px;border-radius:10px;flex:none;background:linear-gradient(160deg,#e9a865,#5c2a0c)"></span><div style="flex:1;min-width:0"><div class="eyebrow">Şu an oynatılan</div><div style="font-weight:600;margin:2px 0 4px">Dune: Part Two (2024)</div><div class="row" style="gap:6px"><span class="tag ok">Senkron</span><span class="dim" style="font-size:11.5px">serkan · Akış</span></div></div></div></div>
+<div class="sec"><div class="label">Olaylar</div><div class="feed" style="gap:12px"><div style="display:flex;gap:10px;align-items:flex-start"><span class="t mono" style="font-size:11px;color:var(--text-3);width:36px;flex:none">21:06</span><span class="av round" style="--h:150;width:20px;height:20px;font-size:10px">Ş</span><span style="color:var(--text-2)"><b style="color:var(--text);font-weight:550">savaş</b> durdurdu · 01:24:10</span></div><div style="display:flex;gap:10px;align-items:flex-start"><span class="t mono" style="font-size:11px;color:var(--text-3);width:36px;flex:none">21:04</span><span class="av round" style="--h:20;width:20px;height:20px;font-size:10px">F</span><span style="color:var(--text-2)"><b style="color:var(--text);font-weight:550">furkan</b> odaya katıldı</span></div><div style="display:flex;gap:10px;align-items:flex-start"><span class="t mono" style="font-size:11px;color:var(--text-3);width:36px;flex:none">21:02</span><span class="av round" style="--h:212;width:20px;height:20px;font-size:10px">S</span><span style="color:var(--text-2)"><b style="color:var(--text);font-weight:550">serkan</b> oynattı · 01:20:44</span></div><div style="display:flex;gap:10px;align-items:flex-start"><span class="t mono" style="font-size:11px;color:var(--text-3);width:36px;flex:none">20:58</span><span class="av round" style="--h:212;width:20px;height:20px;font-size:10px">S</span><span style="color:var(--text-2)"><b style="color:var(--text);font-weight:550">serkan</b> Dune: Part Two açtı</span></div><div style="display:flex;gap:10px;align-items:flex-start"><span class="t mono" style="font-size:11px;color:var(--text-3);width:36px;flex:none">20:57</span><span class="av round" style="--h:150;width:20px;height:20px;font-size:10px">Ş</span><span style="color:var(--text-2)"><b style="color:var(--text);font-weight:550">savaş</b> odaya katıldı</span></div><div style="display:flex;gap:10px;align-items:flex-start"><span class="t mono" style="font-size:11px;color:var(--text-3);width:36px;flex:none">20:55</span><span class="av round" style="--h:212;width:20px;height:20px;font-size:10px">S</span><span style="color:var(--text-2)"><b style="color:var(--text);font-weight:550">serkan</b> odayı kurdu</span></div></div></div></aside><div class="rail"><span class="ri"><svg class="i l"><use href="#i-plus"/></svg></span><span class="ri"><svg class="i l"><use href="#i-users"/></svg><span class="cnt" style="">3</span></span><span class="ri on"><svg class="i l"><use href="#i-activity"/></svg></span><span class="ri"><svg class="i l"><use href="#i-gear"/></svg></span><div class="hair" style="width:32px;margin:6px 0"></div><div class="stack" style=""><span class="av round" style="--h:212">S<i class="dot "></i></span><span class="av round" style="--h:150">Ş<i class="dot "></i></span><span class="av round" style="--h:20">F<i class="dot "></i></span></div><span class="ri" style="margin-top:auto;color:#ff6961"><svg class="i l"><use href="#i-out"/></svg></span></div>
+  </div>
+  <p class="desc">Son olay başlıktaki pilde 4 saniye görünür; tam akış Etkinlik çekmecesinde. "Şu an oynatılan" kartı da burada (kim açtı, kaynak, senkron durumu).</p>
+</section>
+
+<section class="scene" id="c-download">
+  <header><span class="id">C5</span><h2>Oda · Herkes indirsin</h2><span class="note">Kişiler çekmecesi kendiliğinden açılır</span></header>
+  <div class="frame">
+    <div class="tb"><div class="brand"><span class="mark"><svg width="14" height="14"><use href="#logo-c"/></svg></span>KONİ <span class="dim" style="font-weight:500;letter-spacing:0;margin-left:6px">/ Cuma Gecesi</span></div><div class="center"><span class="pill" style="border-color:rgba(10,132,255,.4)"><i style="background:var(--accent);box-shadow:0 0 8px var(--accent)"></i>İndiriliyor <span class="sub">· 2/3 hazır</span></span></div><div class="right"><span class="chip" style="margin-right:10px">K7Q-4ZP<svg class="i s"><use href="#i-copy"/></svg></span><div class="wc"><span><svg class="i s"><use href="#i-min"/></svg></span><span><svg class="i s"><use href="#i-win"/></svg></span><span><svg class="i s"><use href="#i-x"/></svg></span></div></div></div><div class="blackbox" style="top:40px;left:0;width:896px;height:760px"></div>
+<div class="empty" style="top:40px;left:0;width:896px;height:696px"><div style="position:relative;width:120px;height:120px;margin-bottom:12px"><svg width="120" height="120" viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8"/><circle cx="60" cy="60" r="52" fill="none" stroke="#0a84ff" stroke-width="8" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="78" transform="rotate(-90 60 60)"/></svg><div style="position:absolute;inset:0;display:grid;place-items:center;font-size:26px;font-weight:650;letter-spacing:-.02em">2/3</div></div><b>Herkes indiriyor</b><span>Dune: Part Two · 1080p · 2,4 GB<br>Herkes hazır olunca 3 saniyelik geri sayımla birlikte başlar.</span><div class="hints"><span class="btn sm">Hazır olanlarla başla</span></div></div><div class="cbar" style="width:896px"><span class="play" style="opacity:.5"><svg class="i"><use href="#i-play"/></svg></span><span class="mono muted" style="font-size:12px">--:--</span><div class="seek"></div><span class="mono muted" style="font-size:12px">--:--</span><span class="vol"><svg class="i s"><use href="#i-vol"/></svg><span class="bar"><b></b></span></span><span class="ib"><svg class="i s"><use href="#i-cc"/></svg></span><span class="ib"><svg class="i s"><use href="#i-max"/></svg></span></div><aside class="side" style="right:64px">
+      <div class="head" style="align-items:center"><div style="flex:1"><div class="eyebrow">Kişiler</div><h3>Odadakiler (3)</h3></div><span class="ib"><svg class="i s"><use href="#i-x"/></svg></span></div><div class="sec"><div class="members"><div class="mem tall"><span class="av" style="--h:212">S<i class="dot"></i></span><span class="n">serkan <span class="badge host">Host</span></span><span class="st" style="color:var(--ok)"><svg class="i s"><use href="#i-check"/></svg>İndirdi</span><div class="full"><div class="meter ok"><b style="width:100%"></b></div>2,4 GB</div></div><div class="mem tall"><span class="av" style="--h:150">Ş<i class="dot"></i></span><span class="n">savaş</span><span class="st" style="color:var(--ok)"><svg class="i s"><use href="#i-check"/></svg>İndirdi</span><div class="full"><div class="meter ok"><b style="width:100%"></b></div>2,4 GB</div></div><div class="mem tall"><span class="av" style="--h:20">F<i class="dot"></i></span><span class="n">furkan</span><span class="st">%41</span><div class="full"><div class="meter"><b style="width:41%"></b></div>6,2 MB/s · 3:40 kaldı</div></div></div></div></aside><div class="rail"><span class="ri"><svg class="i l"><use href="#i-plus"/></svg></span><span class="ri on"><svg class="i l"><use href="#i-users"/></svg><span class="cnt" style="background:var(--accent)">2/3</span></span><span class="ri"><svg class="i l"><use href="#i-activity"/></svg></span><span class="ri"><svg class="i l"><use href="#i-gear"/></svg></span><div class="hair" style="width:32px;margin:6px 0"></div><div class="stack" style=""><span class="av round" style="--h:212">S<i class="dot "></i></span><span class="av round" style="--h:150">Ş<i class="dot "></i></span><span class="av round" style="--h:20">F<i class="dot "></i></span></div><span class="ri" style="margin-top:auto;color:#ff6961"><svg class="i l"><use href="#i-out"/></svg></span></div>
+  </div>
+  <p class="desc">İndirme başlayınca Kişiler çekmecesi açılır; herkesin barı, hızı, kalan süresi orada. Video yüzeyi gizli, ortada ilerleme halkası; herkes hazır olunca 3-2-1 ve video görünür. Raydaki rozet "2/3".</p>
+</section>
+
+<section class="scene" id="c-detached">
+  <header><span class="id">C6</span><h2>Oda · bağlantı koptu ve ayrı izleme</h2><span class="note">Panel kapalıyken uyarılar başlıkta ve kontrol barında</span></header>
+  <div class="frame">
+    <div class="tb"><div class="brand"><span class="mark"><svg width="14" height="14"><use href="#logo-c"/></svg></span>KONİ <span class="dim" style="font-weight:500;letter-spacing:0;margin-left:6px">/ Cuma Gecesi</span></div><div class="center"><span class="pill bad"><i></i>Bağlantı koptu <span class="sub">· yeniden deneniyor (2)</span></span></div><div class="right"><span class="chip" style="margin-right:10px">K7Q-4ZP<svg class="i s"><use href="#i-copy"/></svg></span><div class="wc"><span><svg class="i s"><use href="#i-min"/></svg></span><span><svg class="i s"><use href="#i-win"/></svg></span><span><svg class="i s"><use href="#i-x"/></svg></span></div></div></div><div class="movie" style="top:40px;left:0;width:1216px;height:696px"></div><div class="cbar" style="width:1216px"><span class="play" style=""><svg class="i"><use href="#i-pause"/></svg></span><span class="mono muted" style="font-size:12px">01:24:10</span><div class="seek"><em style="width:74%"></em><b style="width:58%"></b><span class="mk" style="left:63%"></span></div><span class="mono muted" style="font-size:12px">2:06:28</span><span class="row" style="gap:8px;padding:0 6px 0 12px;height:34px;border-radius:10px;background:rgba(255,214,10,.1);border:1px solid rgba(255,214,10,.25);font-size:12px;white-space:nowrap"><svg class="i s" style="color:var(--warn)"><use href="#i-sync"/></svg>4:12 geridesin<span class="btn white sm">Odayla senkronla</span></span><span class="vol"><svg class="i s"><use href="#i-vol"/></svg><span class="bar"><b></b></span></span><span class="ib"><svg class="i s"><use href="#i-cc"/></svg></span><span class="ib"><svg class="i s"><use href="#i-max"/></svg></span></div><div class="rail"><span class="ri"><svg class="i l"><use href="#i-plus"/></svg></span><span class="ri"><svg class="i l"><use href="#i-users"/></svg><span class="cnt" style="background:var(--text-3)">3</span></span><span class="ri"><svg class="i l"><use href="#i-activity"/></svg></span><span class="ri"><svg class="i l"><use href="#i-gear"/></svg></span><div class="hair" style="width:32px;margin:6px 0"></div><div class="stack" style="opacity:.45"><span class="av round" style="--h:212">S<i class="dot off"></i></span><span class="av round" style="--h:150">Ş<i class="dot off"></i></span><span class="av round" style="--h:20">F<i class="dot off"></i></span></div><span class="ri" style="margin-top:auto;color:#ff6961"><svg class="i l"><use href="#i-out"/></svg></span></div>
+  </div>
+  <p class="desc">Kırmızı pil: bağlantı koptu, video yerelde sürüyor, 70 sn yeniden deneniyor. Kontrol barında sarı kapsül: odadan geridesin + "Odayla senkronla". Seek barındaki sarı çizgi odanın konumu. Raydaki avatarlar soluk.</p>
+</section>
+
+<section class="scene" id="c-settings">
+  <header><span class="id">C7</span><h2>Oda · ayarlar çekmecesi</h2><span class="note">Host olmayan salt-okunur görür</span></header>
+  <div class="frame">
+    <div class="tb"><div class="brand"><span class="mark"><svg width="14" height="14"><use href="#logo-c"/></svg></span>KONİ <span class="dim" style="font-weight:500;letter-spacing:0;margin-left:6px">/ Cuma Gecesi</span></div><div class="center"><span class="pill"><i></i>Birlikte izleniyor</span></div><div class="right"><span class="chip" style="margin-right:10px">K7Q-4ZP<svg class="i s"><use href="#i-copy"/></svg></span><div class="wc"><span><svg class="i s"><use href="#i-min"/></svg></span><span><svg class="i s"><use href="#i-win"/></svg></span><span><svg class="i s"><use href="#i-x"/></svg></span></div></div></div><div class="movie" style="top:40px;left:0;width:896px;height:696px"></div><div class="cbar" style="width:896px"><span class="play" style=""><svg class="i"><use href="#i-pause"/></svg></span><span class="mono muted" style="font-size:12px">01:24:10</span><div class="seek"><em style="width:74%"></em><b style="width:58%"></b></div><span class="mono muted" style="font-size:12px">2:06:28</span><span class="vol"><svg class="i s"><use href="#i-vol"/></svg><span class="bar"><b></b></span></span><span class="ib"><svg class="i s"><use href="#i-cc"/></svg></span><span class="ib"><svg class="i s"><use href="#i-max"/></svg></span></div><aside class="side" style="right:64px">
+      <div class="head" style="align-items:center"><div style="flex:1"><div class="eyebrow">Oda</div><h3>Oda ayarları</h3></div><span class="ib"><svg class="i s"><use href="#i-x"/></svg></span></div><div class="sec"><div class="label">Kontrol</div><div class="card"><div class="row"><div style="flex:1"><div style="font-weight:550">Yalnızca hostlar kontrol eder</div><div class="dim" style="font-size:12px">Oynat, durdur, atla ve video açma</div></div><span class="toggle on"></span></div></div></div>
+<div class="sec"><div class="label">Yardımcı hostlar</div><div class="members"><div class="mem"><span class="av" style="--h:150">Ş</span><span class="n">savaş</span><span class="st"><span class="btn sm">Yardımcı yap</span></span></div><div class="mem"><span class="av" style="--h:20">F</span><span class="n">furkan <span class="badge">Yardımcı</span></span><span class="st"><span class="btn sm ghost">Kaldır</span></span></div></div></div>
+<div class="sec"><div class="label">Altyazı</div><div class="card" style="display:flex;flex-direction:column;gap:10px"><div class="row"><span style="flex:1">Gecikme</span><span class="btn sm sq" style="width:26px">−</span><span class="mono">+0,15 s</span><span class="btn sm sq" style="width:26px">+</span></div><div class="dim" style="font-size:12px"><span class="kbd">G</span> / <span class="kbd">H</span> ile 50 ms</div></div></div>
+<div class="sec"><div class="label">Senkron ayrıntıları</div><div class="card mono" style="font-size:11.5px;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;color:var(--text-2)"><span>Durum</span><span style="color:var(--text)">Synced</span><span>RTT</span><span style="color:var(--text)">57 ms</span><span>Tampon</span><span style="color:var(--text)">42.0 s</span><span>Stall</span><span style="color:var(--text)">0</span></div></div></aside><div class="rail"><span class="ri"><svg class="i l"><use href="#i-plus"/></svg></span><span class="ri"><svg class="i l"><use href="#i-users"/></svg><span class="cnt" style="">3</span></span><span class="ri"><svg class="i l"><use href="#i-activity"/></svg></span><span class="ri on"><svg class="i l"><use href="#i-gear"/></svg></span><div class="hair" style="width:32px;margin:6px 0"></div><div class="stack" style=""><span class="av round" style="--h:212">S<i class="dot "></i></span><span class="av round" style="--h:150">Ş<i class="dot "></i></span><span class="av round" style="--h:20">F<i class="dot "></i></span></div><span class="ri" style="margin-top:auto;color:#ff6961"><svg class="i l"><use href="#i-out"/></svg></span></div>
+  </div>
+  <p class="desc">Politika anahtarı, yardımcı hostlar, altyazı gecikmesi ve teknik senkron tablosu. Çekmeceler aynı anda yalnızca bir tane açık; aynı ikona ya da ✕'e basınca kapanır, video yeniden genişler.</p>
+</section>
+
+<!-- ======================================================= TAM PENCERE EKRANLAR -->
+<section class="scene" id="a-login">
+  <header><span class="id">E1</span><h2>Giriş · ilk açılış</h2><span class="note">Video gizli (mode: hidden), tüm pencere web</span></header>
+  <div class="frame">
+    <div class="tb"><div class="brand"><span class="mark"><svg width="14" height="14"><use href="#logo-c"/></svg></span>KONİ</div><div class="right"><div class="wc"><span><svg class="i s"><use href="#i-min"/></svg></span><span><svg class="i s"><use href="#i-win"/></svg></span><span><svg class="i s"><use href="#i-x"/></svg></span></div></div></div>
+    <div class="ambient"></div>
+    <div class="glasscard center-abs" style="width:400px;padding:32px">
+      <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;margin-bottom:24px">
+        <svg width="64" height="64" viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="28" fill="#0e0f12"/><rect x="4.5" y="4.5" width="119" height="119" rx="27.5" fill="none" stroke="#fff" stroke-opacity=".14"/><path d="M46 34v60a4 4 0 0 0 6 3.5l46-30a4 4 0 0 0 0-7l-46-30A4 4 0 0 0 46 34z" fill="url(#g-blue)"/><path d="M58 48v32l6-3.9V51.9zM70 55.8v16.4l6-3.9v-8.6z" fill="#fff"/></svg>
+        <h2 style="font-size:22px;letter-spacing:-.02em;margin-top:10px">KONİ'ye hoş geldin</h2><span class="muted">Arkadaşlarınla aynı anda izle.</span></div>
+      <div style="display:flex;justify-content:center;margin-bottom:18px"><div class="seg"><span class="on">Giriş yap</span><span>Davet kodum var</span></div></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span class="input lg filled"><svg class="i s dim"><use href="#i-user"/></svg>serkan</span>
+        <span class="input lg focus"><svg class="i s dim"><use href="#i-key"/></svg>••••••••••</span>
+        <span class="btn blue lg block" style="margin-top:6px">Giriş yap</span>
+      </div>
+      <div class="row" style="justify-content:space-between;margin-top:18px;font-size:12px"><span class="dim"><svg class="i s" style="vertical-align:-3px"><use href="#i-globe"/></svg> koni.example.com</span><span class="muted">Sunucuyu değiştir</span></div>
+    </div>
+  </div>
+  <p class="desc">Tek kart, iki sekme. "Davet kodum var" sekmesi: kullanıcı adı + şifre + hesap davet kodu → Kayıt ol. Sunucu adresi varsayılan olarak gizli; yalnızca altta küçük bir satır. Hatalar alanın altında kırmızı tek satır ("Şifre yanlış", "Bu davet kodu kullanılmış"). Oturum Windows Kimlik Bilgisi Yöneticisi'nde kalır; sonraki açılışta bu ekran atlanır.</p>
+</section>
+
+<section class="scene" id="a-lobby">
+  <header><span class="id">E2</span><h2>Ana ekran · oda kur / katıl</h2><span class="note">Video gizli</span></header>
+  <div class="frame">
+    <div class="tb"><div class="brand"><span class="mark"><svg width="14" height="14"><use href="#logo-c"/></svg></span>KONİ</div><div class="right"><span class="avatar-btn">S</span><div class="wc"><span><svg class="i s"><use href="#i-min"/></svg></span><span><svg class="i s"><use href="#i-win"/></svg></span><span><svg class="i s"><use href="#i-x"/></svg></span></div></div></div>
+    <div class="ambient"></div>
+    <div class="center-abs" style="width:760px">
+      <h2 style="font-size:30px;letter-spacing:-.025em">Selam serkan 👋</h2>
+      <p class="muted" style="font-size:15px;margin:6px 0 28px">Bu akşam ne izliyoruz?</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="glasscard" style="padding:22px;border-radius:20px">
+          <div style="width:40px;height:40px;border-radius:12px;background:rgba(10,132,255,.18);color:var(--accent-2);display:grid;place-items:center;margin-bottom:14px"><svg class="i l"><use href="#i-plus"/></svg></div>
+          <h3 style="font-size:17px">Oda kur</h3><p class="muted" style="margin:4px 0 16px">Oda kur, kodu arkadaşlarına gönder.</p>
+          <div class="row"><span class="input lg filled">Cuma Gecesi</span><span class="btn white lg">Kur</span></div>
+        </div>
+        <div class="glasscard" style="padding:22px;border-radius:20px">
+          <div style="width:40px;height:40px;border-radius:12px;background:rgba(48,209,88,.16);color:var(--ok);display:grid;place-items:center;margin-bottom:14px"><svg class="i l"><use href="#i-door"/></svg></div>
+          <h3 style="font-size:17px">Odaya katıl</h3><p class="muted" style="margin:4px 0 16px">Arkadaşının gönderdiği kodu yapıştır.</p>
+          <div class="row"><span class="input lg mono">K7Q-4ZP</span><span class="btn lg">Katıl</span></div>
+        </div>
+      </div>
+      <div style="margin-top:28px"><div class="label">Son odalar</div>
+        <div style="display:flex;gap:10px">
+          <div class="card" style="display:flex;align-items:center;gap:10px;flex:1;padding:10px 12px"><span class="av" style="--h:212">C</span><div style="flex:1"><div style="font-weight:600">Cuma Gecesi</div><div class="dim" style="font-size:12px">dün · 3 kişi</div></div><svg class="i s dim"><use href="#i-chev"/></svg></div>
+          <div class="card" style="display:flex;align-items:center;gap:10px;flex:1;padding:10px 12px"><span class="av" style="--h:280">D</span><div style="flex:1"><div style="font-weight:600">Dizi Kulübü</div><div class="dim" style="font-size:12px">3 gün önce · 4 kişi</div></div><svg class="i s dim"><use href="#i-chev"/></svg></div>
+          <div class="card" style="display:flex;align-items:center;gap:10px;flex:1;padding:10px 12px;border-style:dashed;background:transparent"><span class="av" style="background:var(--glass-2)"><svg class="i s"><use href="#i-film"/></svg></span><div style="flex:1"><div style="font-weight:600">Tek başına izle</div><div class="dim" style="font-size:12px">oda olmadan oynatıcı</div></div><svg class="i s dim"><use href="#i-chev"/></svg></div>
+        </div></div>
+    </div>
+  </div>
+  <p class="desc">İki büyük kart: Oda kur / Odaya katıl. Panoda geçerli bir davet kodu varsa "Odaya katıl" alanı kendiliğinden dolar. Son odalar yalnızca bu bilgisayarda tutulur (kod + ad + tarih). Sağ üstteki avatar menüsü: Ayarlar, Çıkış yap. "Tek başına izle" oda olmadan oynatıcıyı açar (bugünkü solo mod).</p>
+</section>
+
+<section class="scene" id="a-settings">
+  <header><span class="id">E3</span><h2>Uygulama ayarları</h2><span class="note">Ana ekrandaki avatar menüsünden; video gizli</span></header>
+  <div class="frame">
+    <div class="tb"><div class="brand"><span class="mark"><svg width="14" height="14"><use href="#logo-c"/></svg></span>KONİ</div><div class="right"><span class="avatar-btn">S</span><div class="wc"><span><svg class="i s"><use href="#i-min"/></svg></span><span><svg class="i s"><use href="#i-win"/></svg></span><span><svg class="i s"><use href="#i-x"/></svg></span></div></div></div>
+    <div class="ambient" style="opacity:.6"></div>
+    <div style="position:absolute;top:40px;left:0;bottom:0;width:240px;padding:20px 12px;border-right:1px solid var(--line);background:rgba(17,18,20,.7)">
+      <div class="row" style="gap:8px;margin:0 8px 18px;color:var(--text-2)"><svg class="i s" style="transform:rotate(180deg)"><use href="#i-chev"/></svg>Ana ekran</div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div class="row" style="height:34px;padding:0 10px;border-radius:9px;background:var(--glass-3)"><svg class="i s"><use href="#i-user"/></svg>Hesap</div>
+        <div class="row" style="height:34px;padding:0 10px;border-radius:9px;color:var(--text-2)"><svg class="i s"><use href="#i-play"/></svg>Oynatma</div>
+        <div class="row" style="height:34px;padding:0 10px;border-radius:9px;color:var(--text-2)"><svg class="i s"><use href="#i-cc"/></svg>Altyazı</div>
+        <div class="row" style="height:34px;padding:0 10px;border-radius:9px;color:var(--text-2)"><svg class="i s"><use href="#i-globe"/></svg>Sunucu</div>
+        <div class="row" style="height:34px;padding:0 10px;border-radius:9px;color:var(--text-2)"><svg class="i s"><use href="#i-info"/></svg>Hakkında</div></div>
+    </div>
+    <div style="position:absolute;top:40px;left:240px;right:0;bottom:0;padding:32px 48px;max-width:760px">
+      <h2 style="font-size:24px;letter-spacing:-.02em;margin-bottom:20px">Hesap</h2>
+      <div class="glasscard" style="border-radius:16px;padding:0;overflow:hidden">
+        <div class="row" style="padding:16px;gap:14px"><span class="avatar-btn" style="width:48px;height:48px;font-size:18px;margin:0">S</span><div style="flex:1"><div style="font-weight:600;font-size:15px">serkan</div><div class="dim" style="font-size:12px">koni.example.com · 29 Eki 2026'dan beri</div></div><span class="btn danger">Çıkış yap</span></div>
+        <div class="hair"></div>
+        <div class="row" style="padding:14px 16px"><span style="flex:1">Avatar rengi</span><span style="display:flex;gap:6px"><i style="width:20px;height:20px;border-radius:50%;background:#0a84ff;outline:2px solid #fff;outline-offset:2px"></i><i style="width:20px;height:20px;border-radius:50%;background:#30d158"></i><i style="width:20px;height:20px;border-radius:50%;background:#ff9f0a"></i><i style="width:20px;height:20px;border-radius:50%;background:#bf5af2"></i><i style="width:20px;height:20px;border-radius:50%;background:#ff375f"></i></span></div>
+      </div>
+      <h2 style="font-size:24px;letter-spacing:-.02em;margin:32px 0 20px">Oynatma</h2>
+      <div class="glasscard" style="border-radius:16px;padding:0;overflow:hidden">
+        <div class="row" style="padding:14px 16px"><div style="flex:1"><div>Donanım hızlandırma</div><div class="dim" style="font-size:12px">GPU ile çöz (hwdec=auto-safe)</div></div><span class="toggle on"></span></div><div class="hair"></div>
+        <div class="row" style="padding:14px 16px"><div style="flex:1"><div>Varsayılan kalite</div><div class="dim" style="font-size:12px">Link açarken odaya önerilen en yüksek çözünürlük</div></div><span class="btn sm">1080p <svg class="i s"><use href="#i-chevd"/></svg></span></div><div class="hair"></div>
+        <div class="row" style="padding:14px 16px"><div style="flex:1"><div>yt-dlp</div><div class="dim" style="font-size:12px">2026.10.22 · bugün kontrol edildi</div></div><span class="btn sm"><svg class="i s"><use href="#i-refresh"/></svg>Şimdi güncelle</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="desc">macOS Sistem Ayarları düzeni: solda bölümler, sağda gruplu "inset" listeler. Bölümler: Hesap, Oynatma, Altyazı (yazı boyutu, varsayılan dil), Sunucu (adres, bağlantı testi), Hakkında (sürüm, lisanslar/LGPL, güncelleme).</p>
+</section>
+
+<section class="scene" id="a-fullscreen">
+  <header><span class="id">E4</span><h2>Tam ekran</h2><span class="note">Yalnızca mpv; bildirimler mpv OSD ile</span></header>
+  <div class="frame" style="background:#000">
+    <div class="movie" style="inset:0"></div>
+    <div style="position:absolute;left:32px;top:28px;font:600 22px var(--font);color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.7)">savaş durdurdu · 01:24:10</div>
+    <div style="position:absolute;right:32px;bottom:28px;font:500 13px var(--font);color:rgba(255,255,255,.8);text-shadow:0 2px 6px rgba(0,0,0,.7)">Çıkmak için Esc</div>
+  </div>
+  <p class="desc">Web katmanı gizlenir; olaylar mpv'nin <span class="mono">show-text</span> OSD'siyle 3 saniye görünür (mpv'nin kendi çizimi, overlay değil). Esc ya da çift tık kokpite döner.</p>
+</section>
+
+<section class="scene" id="tokens">
+  <header><span class="id">SİSTEM</span><h2>Tasarım sistemi özeti</h2></header>
+  <div class="legend" style="width:auto;margin:0">
+    <div class="card"><h3>Renk</h3>
+      <div class="sw"><span style="background:#0b0c0e">bg</span><span style="background:#111214">panel</span><span style="background:rgba(255,255,255,.08)">glass</span><span style="background:#f5f5f7;color:#000">text</span><span style="background:#a1a1a6;color:#000">text-2</span></div>
+      <div class="sw"><span style="background:#0a84ff">accent</span><span style="background:#30d158;color:#000">ok</span><span style="background:#ffd60a;color:#000">warn</span><span style="background:#ff453a">bad</span><span style="background:#ffcc66;color:#000">host</span></div>
+      <p style="margin-top:10px">Apple'ın koyu sistem renkleri. Vurgu tek: mavi. Birincil buton beyaz (referanstaki "Aç").</p></div>
+    <div class="card"><h3>Tipografi</h3>
+      <div style="font-size:28px;font-weight:650;letter-spacing:-.025em">Başlık 28</div><div style="font-size:17px;font-weight:650;letter-spacing:-.015em">Oda adı 17</div><div style="font-size:13px">Gövde 13 · Inter</div><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#6e6e73">Üst etiket 11</div><div class="mono" style="font-size:12px;color:#a1a1a6">01:24:10 · K7Q-4ZP · mono</div>
+      <p style="margin-top:8px">SF Pro Windows'ta lisanslı değil; en yakın muadil Inter (OFL) uygulamaya gömülür. Zaman ve kodlar JetBrains Mono.</p></div>
+    <div class="card"><h3>Biçim</h3><ul><li>4 pt ızgara: 4 · 8 · 12 · 16 · 24 · 32</li><li>Köşe: 6 · 10 · 14 · 20 · tam yuvarlak</li><li>Cam: %4–12 beyaz + 1 px %7–12 çizgi + blur 24–40 px</li><li>İkonlar: Lucide (ISC), 1.75 çizgi, 14/16/20 px</li><li>Hareket: 160–220 ms, ease-out; büyük animasyon yok</li></ul></div>
+  </div>
+</section>
+
+<!-- ======================================================= SEÇİLMEYEN YÖNLER -->
+<section class="scene" id="a-watch">
+  <header><span class="id">A1</span><h2>Yön A · Stüdyo — Oda, izleniyor</h2><span class="note">Seçilmedi · referansa en yakın yön</span></header>
+  <div class="frame">
+    <div class="tb">
+      <div class="brand"><span class="mark"><svg width="14" height="14"><use href="#logo-c"/></svg></span>KONİ</div>
+      <div class="center"><span class="pill"><i></i>Birlikte izleniyor</span></div>
+      <div class="right"><div class="wc"><span><svg class="i s"><use href="#i-min"/></svg></span><span><svg class="i s"><use href="#i-win"/></svg></span><span><svg class="i s"><use href="#i-x"/></svg></span></div></div>
+    </div>
+    <div class="movie" style="top:40px;left:0;width:960px;height:664px"></div>
+    <div class="strip" style="left:0;bottom:0;width:960px;height:96px">
+      <div class="dock">
+        <div class="seekrow"><span>01:24:10</span><div class="seek"><em style="width:74%"></em><b style="width:58%"></b></div><span>-00:42:18</span></div>
+        <div class="ctl"><span class="play"><svg class="i"><use href="#i-pause"/></svg></span>
+          <span class="vol"><svg class="i s"><use href="#i-vol"/></svg><span class="bar"><b></b></span></span>
+          <span style="flex:1"></span>
+          <span class="ib"><svg class="i s"><use href="#i-cc"/></svg></span><span class="ib"><svg class="i s"><use href="#i-max"/></svg></span></div>
+      </div>
+    </div>
+    <aside class="side">
+      <div class="head"><div style="flex:1"><div class="eyebrow">Oda</div><h3>Cuma Gecesi</h3></div>
+        <span class="chip">K7Q-4ZP<svg class="i s" style="color:var(--text-2)"><use href="#i-copy"/></svg></span><span class="ib"><svg class="i s"><use href="#i-gear"/></svg></span></div>
+      <div class="sec"><div class="label">Yeni video ekle</div>
+        <div class="row"><span class="input">Link yapıştır ya da sürükle…</span><span class="btn white">Aç</span><span class="btn sq"><svg class="i"><use href="#i-more"/></svg></span></div></div>
+      <div class="sec"><div class="card now"><div class="eyebrow">Şu an oynatılan</div><div class="t">Dune: Part Two (2024)</div>
+        <div class="meta"><span>Ekleyen <b>serkan</b> · Akış</span><span class="tag ok"><svg class="i s"><use href="#i-check"/></svg>Senkron</span></div></div></div>
+      <div class="sec"><div class="label">Odadakiler (3)</div>
+        <div class="members">
+          <div class="mem"><span class="av" style="--h:212">S<i class="dot"></i></span><span class="n">serkan <span class="badge host">Host</span></span><span class="you">sen</span><span class="st">Hazır</span></div>
+          <div class="mem"><span class="av" style="--h:150">Ş<i class="dot"></i></span><span class="n">savaş</span><span class="st">+12 ms</span></div>
+          <div class="mem"><span class="av" style="--h:20">F<i class="dot"></i></span><span class="n">furkan <span class="badge">Yardımcı</span></span><span class="st">−8 ms</span></div>
+        </div></div>
+      <div class="sec"><div class="label">Son olaylar <span class="dim" style="font-weight:500">Tümü</span></div>
+        <div class="feed"><div><span class="t">21:04</span>savaş odaya katıldı</div><div><span class="t">21:02</span>serkan oynattı · 01:20:44</div></div></div>
+      <div class="foot"><span class="btn block"><svg class="i s"><use href="#i-out"/></svg>Odadan ayrıl</span></div>
+    </aside>
+  </div>
+  <p class="desc">Düz koyu zemin, ince çizgilerle ayrılmış sabit sağ panel (320 DIP). Kontrol barı videonun altındaki 96 DIP'lik siyah şeritte ortalanmış yüzen bir kapsül: şerit video ile aynı siyahta olduğu için bar videonun üstünde yüzüyormuş gibi görünür, ama video alanına girmez. Durum pili başlık çubuğunun ortasında; son olay birkaç saniye orada da yazar.</p>
+</section>
+
+<section class="scene" id="b-watch">
+  <header><span class="id">B1</span><h2>Yön B · Cam Ada — Oda, izleniyor</h2><span class="note">Seçilmedi</span></header>
+  <div class="frame">
+    <div class="b-bg"></div>
+    <div class="tb" style="background:transparent;border:0">
+      <div class="brand"><span class="mark" style="background:rgba(255,255,255,.08)"><svg width="14" height="14"><use href="#logo-c"/></svg></span>KONİ</div>
+      <div class="center" style="display:flex;gap:10px;align-items:center"><span class="pill" style="background:rgba(255,255,255,.1)"><i></i>Birlikte izleniyor <span class="sub">· Cuma Gecesi</span></span></div>
+      <div class="right"><div style="display:flex;margin-right:12px"><span class="av round" style="--h:212;border:2px solid #222;width:26px;height:26px">S</span><span class="av round" style="--h:150;border:2px solid #222;width:26px;height:26px;margin-left:-8px">Ş</span><span class="av round" style="--h:20;border:2px solid #222;width:26px;height:26px;margin-left:-8px">F</span></div><div class="wc"><span><svg class="i s"><use href="#i-min"/></svg></span><span><svg class="i s"><use href="#i-win"/></svg></span><span><svg class="i s"><use href="#i-x"/></svg></span></div></div>
+    </div>
+    <div class="movie" style="top:52px;left:16px;width:908px;height:620px;border-radius:2px"></div>
+    <div class="b-island" style="left:196px;bottom:16px;width:548px;padding:10px 14px 12px">
+      <div class="dock" style="all:unset;display:block">
+        <div class="seekrow" style="display:flex;align-items:center;gap:12px;font:500 11px var(--mono);color:var(--text-2)"><span>01:24:10</span><div class="seek"><em style="width:74%"></em><b style="width:58%"></b></div><span>-00:42:18</span></div>
+        <div class="ctl" style="display:flex;align-items:center;gap:10px;margin-top:10px"><span class="play"><svg class="i"><use href="#i-pause"/></svg></span><span class="vol"><svg class="i s"><use href="#i-vol"/></svg><span class="bar"><b></b></span></span><span style="flex:1"></span><span class="ib"><svg class="i s"><use href="#i-cc"/></svg></span><span class="ib"><svg class="i s"><use href="#i-max"/></svg></span></div>
+      </div>
+    </div>
+    <div class="b-island" style="top:52px;right:16px;bottom:16px;width:324px;display:flex;flex-direction:column;padding:6px 0">
+      <div style="padding:12px 16px;display:flex;align-items:flex-start;gap:8px"><div style="flex:1"><div class="eyebrow">Oda</div><h3 style="font-size:19px;letter-spacing:-.02em">Cuma Gecesi</h3></div><span class="chip" style="background:rgba(255,255,255,.08)">K7Q-4ZP<svg class="i s"><use href="#i-copy"/></svg></span><span class="ib" style="background:rgba(255,255,255,.08)"><svg class="i s"><use href="#i-gear"/></svg></span></div>
+      <div style="padding:0 16px"><div class="row"><span class="input" style="background:rgba(0,0,0,.25);border-radius:12px"><svg class="i s"><use href="#i-link"/></svg>Video ekle…</span><span class="btn white" style="border-radius:12px">Aç</span></div></div>
+      <div style="padding:14px 16px 0"><div class="card" style="display:flex;gap:12px;align-items:center;background:rgba(255,255,255,.07);border-radius:16px;padding:10px"><span class="now thumb" style="width:52px;height:52px;border-radius:10px;background:linear-gradient(160deg,#e9a865,#5c2a0c)"></span><div style="flex:1;min-width:0"><div class="eyebrow">Şu an</div><div style="font-weight:600;margin:2px 0 4px">Dune: Part Two</div><span class="tag ok">Senkron</span></div></div></div>
+      <div style="padding:16px 16px 0"><div class="label">Odadakiler</div>
+        <div class="members">
+          <div class="mem" style="background:transparent;border:0;height:40px;padding:0 4px"><span class="av round" style="--h:212">S<i class="dot" style="border-color:#2a2420"></i></span><span class="n">serkan <span class="badge host">Host</span></span><span class="st">Hazır</span></div>
+          <div class="mem" style="background:transparent;border:0;height:40px;padding:0 4px"><span class="av round" style="--h:150">Ş<i class="dot" style="border-color:#2a2420"></i></span><span class="n">savaş</span><span class="st">+12 ms</span></div>
+          <div class="mem" style="background:transparent;border:0;height:40px;padding:0 4px"><span class="av round" style="--h:20">F<i class="dot" style="border-color:#2a2420"></i></span><span class="n">furkan</span><span class="st">−8 ms</span></div>
+        </div></div>
+      <div style="margin-top:auto;padding:12px 16px"><span class="btn block ghost" style="background:rgba(255,255,255,.06)">Odadan ayrıl</span></div>
+    </div>
+  </div>
+  <p class="desc">Pencere zemini, oynatılan videonun kapak renklerinden üretilen bulanık bir "ambiyans" gradyanı (ya da Windows 11 Mica/Acrylic). Video kenarlardan 16 DIP içeride bir karo; panel ve kontrol barı yüzen cam adalar. Bar videonun altındaki boşlukta durur, video dikdörtgenine girmez. En şık yön, ama: Windows 10'da Acrylic yavaş, ambiyans zemini kapak resmi yoksa sönük kalır, video alanı A'dan ~%6 küçük.</p>
+</section>
+
+<!-- Yön karşılaştırma -->
+<div class="legend">
+  <div class="card"><h3>A · Stüdyo</h3><p>Referans ekran görüntüsüyle aynı iskelet. Her şey tek bakışta görünür, Windows 10/11'de aynı görünür, uygulaması en az risklidir.</p><ul><li>Video: 960×664 (1280×800'de)</li><li>Cam: dock, kartlar, menüler</li><li>Yeni Rust işi: üst çubuk payı</li></ul></div>
+  <div class="card"><h3>B · Cam Ada</h3><p>En "Apple" görünen. Ambiyans zemini ya da Mica gerekir; video kenarlardan içeride bir karo olur.</p><ul><li>Video: 908×620</li><li>Cam: tüm yüzeyler</li><li>Yeni Rust işi: üst çubuk + kenar payı, Mica denemesi</li></ul></div>
+  <div class="card"><h3>C · Sinema ✓ seçildi</h3><p>Videoya en çok alan. Panel çekmeceye taşınır; sık işler bir tık uzakta.</p><ul><li>Video: 1216×696 (çekmece kapalı)</li><li>Cam: menü ve çekmece</li><li>Yeni Rust işi: çekmeceyle yerleşim değişimi</li></ul></div>
+</div>
+
+</body>
+</html>

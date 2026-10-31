@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 128 128">
+  <!-- KONİ uygulama ikonu (I3 · Koni + Oynat). Kaynak budur; PNG/ICO'lar `npm run tauri icon` ile üretilir. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a1b20"/><stop offset="1" stop-color="#0b0c0e"/></linearGradient>
+    <linearGradient id="cone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5ab0ff"/><stop offset="1" stop-color="#0a6cff"/></linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#0a84ff" stop-opacity=".28"/><stop offset="1" stop-color="#0a84ff" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)"/>
+  <rect x="4.5" y="4.5" width="119" height="119" rx="27.5" fill="none" stroke="#fff" stroke-opacity=".12"/>
+  <circle cx="66" cy="64" r="46" fill="url(#glow)"/>
+  <path d="M42 30v68a4 4 0 0 0 6 3.5l52-34a4 4 0 0 0 0-7l-52-34A4 4 0 0 0 42 30z" fill="url(#cone)"/>
+  <path d="M56 46v36l7-4.5V50.5zM70 55.2v17.6l7-4.6v-8.4z" fill="#fff"/>
+</svg>

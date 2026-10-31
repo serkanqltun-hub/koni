@@ -1,0 +1,96 @@
+name: libmpv (LGPL, Windows x64)
+
+# Yalnızca elle çalışır (Actions → "libmpv (LGPL, Windows x64)" → Run workflow): ~20 dk
+# sürer ve libmpv nadiren değişir. PR ya da etiket bunu tetiklemez.
+on:
+  workflow_dispatch:
+    inputs:
+      mpv_ref:
+        description: mpv git tag
+        default: v0.40.0
+      ffmpeg_ref:
+        description: FFmpeg git tag
+        default: n7.1.1
+      release:
+        description: Doluysa paket bu adla GitHub Release olarak yayınlanır (ör. libmpv-v0.40.0-r2)
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: msys2 {0}
+    env:
+      MPV_REF: ${{ inputs.mpv_ref || 'v0.40.0' }}
+      FFMPEG_REF: ${{ inputs.ffmpeg_ref || 'n7.1.1' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git base-devel
+            mingw-w64-x86_64-toolchain mingw-w64-x86_64-meson mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf mingw-w64-x86_64-nasm mingw-w64-x86_64-python
+            mingw-w64-x86_64-libass mingw-w64-x86_64-libplacebo mingw-w64-x86_64-dav1d
+            mingw-w64-x86_64-zlib mingw-w64-x86_64-lcms2 mingw-w64-x86_64-vulkan-headers
+            mingw-w64-x86_64-shaderc mingw-w64-x86_64-spirv-cross
+
+      - name: Build LGPL libmpv
+        run: tools/libmpv/build.sh "$PWD/out"
+
+      - name: Verify (LGPL-only, exports)
+        run: tools/libmpv/verify.sh "$PWD/out/libmpv-lgpl-win64"
+
+      - name: Smoke test (load DLL, create mpv context)
+        shell: pwsh
+        run: |
+          $dir = Join-Path $PWD 'out/libmpv-lgpl-win64'
+          $env:PATH = "$dir;$env:PATH"
+          Add-Type -TypeDefinition @"
+          using System; using System.Runtime.InteropServices;
+          public static class M {
+            [DllImport("$($dir.Replace('\','/'))/libmpv-2.dll")] public static extern uint mpv_client_api_version();
+            [DllImport("$($dir.Replace('\','/'))/libmpv-2.dll")] public static extern IntPtr mpv_create();
+            [DllImport("$($dir.Replace('\','/'))/libmpv-2.dll")] public static extern int mpv_initialize(IntPtr h);
+            [DllImport("$($dir.Replace('\','/'))/libmpv-2.dll")] public static extern void mpv_terminate_destroy(IntPtr h);
+          }
+          "@
+          "client api: 0x{0:x}" -f [M]::mpv_client_api_version()
+          $h = [M]::mpv_create()
+          if ($h -eq [IntPtr]::Zero) { throw 'mpv_create failed' }
+          $rc = [M]::mpv_initialize($h)
+          [M]::mpv_terminate_destroy($h)
+          if ($rc -lt 0) { throw "mpv_initialize failed: $rc" }
+
+      - name: Zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path out/libmpv-lgpl-win64 -DestinationPath out/libmpv-lgpl-win64.zip
+          (Get-FileHash out/libmpv-lgpl-win64.zip -Algorithm SHA256).Hash.ToLower() + '  libmpv-lgpl-win64.zip' | Set-Content out/libmpv-lgpl-win64.zip.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-lgpl-win64
+          path: |
+            out/libmpv-lgpl-win64.zip
+            out/libmpv-lgpl-win64.zip.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish release
+        if: inputs.release != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${{ inputs.release }}" out/libmpv-lgpl-win64.zip out/libmpv-lgpl-win64.zip.sha256
+          --target "${{ github.sha }}"
+          --title "libmpv LGPL ${{ inputs.release }}" --notes "LGPL build of mpv $env:MPV_REF / FFmpeg $env:FFMPEG_REF. See NOTICE.md inside the zip."

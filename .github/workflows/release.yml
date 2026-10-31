@@ -1,0 +1,170 @@
+name: release
+
+# Windows installer + portable zip, built here and attached to a GitHub release.
+# Otomatik: main'de client/src-tauri/tauri.conf.json "version" değişince v<version>
+# etiketi ve release'i bu iş akışı kendisi oluşturur (o sürüm zaten yayınlıysa atlar).
+# Elle: v* etiketi itmek ya da var olan etiketle çalıştırmak da çalışır.
+# Release notes: docs/releases/<tag>.md.
+on:
+  push:
+    branches: [main]
+    paths:
+      - client/src-tauri/tauri.conf.json
+      - .github/workflows/release.yml
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Sürüm etiketi (ör. v0.0.1)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+
+env:
+  VITE_KONI_SERVER: ${{ vars.KONI_SERVER }}
+  # main'e push'ta sürüm tauri.conf.json'dan gelir (aşağıda TAG ortam değişkeni ezilir).
+  ON_MAIN: ${{ github.ref == 'refs/heads/main' }}
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    outputs:
+      skip: ${{ steps.ver.outputs.skip }}
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      # LGPL libmpv package, published by workflow "libmpv (LGPL, Windows x64)" (docs/LIBMPV.md).
+      LIBMPV_RELEASE: libmpv-v0.40.0-r2
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Tag matches app version
+        id: ver
+        run: |
+          $v = (Get-Content client/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          "version=$v" >> $env:GITHUB_OUTPUT
+          if ($env:ON_MAIN -eq "true") {
+            "TAG=v$v" >> $env:GITHUB_ENV
+            # Zincirin son halkası public koni-releases'teki release (latest.json ile);
+            # o varsa sürüm tam yayınlıdır, yeniden derleme.
+            $assets = gh release view "v$v" -R Savas07/koni-releases --json assets --jq '[.assets[].name | select(. == "latest.json")] | length' 2>$null
+            $skip = ($LASTEXITCODE -eq 0 -and [int]$assets -ge 1)
+            "skip=$($skip.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+            if ($skip) { Write-Host "v$v zaten yayınlı, atlanıyor" }
+            exit 0
+          }
+          if ("v$v" -ne $env:TAG) { throw "etiket $env:TAG, tauri.conf.json sürümü v$v" }
+      - uses: actions/setup-node@v4
+        if: steps.ver.outputs.skip != 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.ver.outputs.skip != 'true'
+      - uses: Swatinem/rust-cache@v2
+        if: steps.ver.outputs.skip != 'true'
+        with:
+          workspaces: client
+      - run: npm ci
+        if: steps.ver.outputs.skip != 'true'
+        working-directory: client
+      - name: Fetch LGPL libmpv
+        if: steps.ver.outputs.skip != 'true'
+        run: gh release download $env:LIBMPV_RELEASE -p libmpv-lgpl-win64.zip -D $env:RUNNER_TEMP
+      - name: Build installer + portable zip
+        if: steps.ver.outputs.skip != 'true'
+        env:
+          # Güncelleme imzası (KONI_<sürüm>_x64-setup.exe.sig), docs/UPDATES.md.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: ./scripts/build-installer.ps1 -Libmpv "$env:RUNNER_TEMP/libmpv-lgpl-win64.zip" -Portable
+        working-directory: client
+      - name: Publish
+        if: steps.ver.outputs.skip != 'true'
+        run: |
+          $files = Get-ChildItem client/target/release/bundle/nsis -File |
+            Where-Object { $_.Extension -in ".exe", ".zip" } | ForEach-Object FullName
+          if ($files.Count -ne 2) { throw "beklenen 2 dosya, bulunan: $files" }
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG @files --clobber
+          } else {
+            $notes = "docs/releases/$env:TAG.md"
+            $notesArg = if (Test-Path $notes) { @("--notes-file", $notes) } else { @("--generate-notes") }
+            gh release create $env:TAG @files --target $env:GITHUB_SHA --prerelease --title "KONİ $($env:TAG.TrimStart('v')) (Windows)" @notesArg
+          }
+          if ($LASTEXITCODE -ne 0) { throw "gh release failed" }
+      - name: Stage auto-update files (latest.json)
+        if: steps.ver.outputs.skip != 'true'
+        run: |
+          $v = "${{ steps.ver.outputs.version }}"
+          $nsis = "client/target/release/bundle/nsis"
+          $setup = "KONI_${v}_x64-setup.exe"
+          $sig = Join-Path $nsis "$setup.sig"
+          if (-not (Test-Path $sig)) { throw "güncelleme imzası yok: $sig" }
+          $out = Join-Path $env:RUNNER_TEMP "koni-releases"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          Copy-Item (Join-Path $nsis $setup), $sig, (Join-Path $nsis "KONI_${v}_x64-portable.zip") $out
+          $notesFile = "docs/releases/v$v.md"
+          $notes = if (Test-Path $notesFile) { (Get-Content $notesFile -Raw -Encoding utf8).Trim() } else { "KONİ $v" }
+          $utf8 = New-Object System.Text.UTF8Encoding $false
+          [IO.File]::WriteAllText((Join-Path $out "notes.md"), $notes, $utf8)
+          $latest = [ordered]@{
+            version   = $v
+            notes     = $notes
+            pub_date  = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            platforms = @{ "windows-x86_64" = @{
+              signature = (Get-Content $sig -Raw).Trim()
+              url       = "https://github.com/Savas07/koni-releases/releases/download/v$v/$setup"
+            } }
+          } | ConvertTo-Json -Depth 4
+          [IO.File]::WriteAllText((Join-Path $out "latest.json"), $latest, $utf8)
+          Get-ChildItem $out | Format-Table Name, Length
+      - uses: actions/upload-artifact@v4
+        if: steps.ver.outputs.skip != 'true'
+        with:
+          name: koni-releases
+          path: ${{ runner.temp }}/koni-releases
+          if-no-files-found: error
+          retention-days: 7
+
+  # Public Savas07/koni-releases: kurulum + latest.json oraya gider, uygulama
+  # güncellemeyi oradan alır (bu repo private). Deploy key yalnızca o repoya yazar.
+  # `incoming` = o reponun main'i + dosyalar (tek commit, her sürümde üzerine yazılır);
+  # publish.yml commit'in içinde olmalı ki push o iş akışını tetiklesin.
+  public:
+    needs: windows
+    if: needs.windows.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: koni-releases
+          path: out
+      - name: Push to Savas07/koni-releases (incoming)
+        env:
+          DEPLOY_KEY: ${{ secrets.KONI_RELEASES_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 600 /dev/null "$HOME/deploy_key"
+          printf '%s\n' "$DEPLOY_KEY" | tr -d '\r' > "$HOME/deploy_key"
+          export GIT_SSH_COMMAND="ssh -i $HOME/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          git clone -q --depth 1 --branch main git@github.com:Savas07/koni-releases.git repo
+          cp out/* repo/
+          cd repo
+          git checkout -q -b incoming
+          git add -A
+          git -c user.name=koni-release -c user.email=koni-release@users.noreply.github.com \
+            commit -q -m "KONİ $(jq -r .version latest.json)"
+          git push -f origin incoming
