@@ -15,7 +15,7 @@
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, bugReport,
     type SyncStatus, type ServerMsg, type Member, type MediaEvent, type LinkEvent, type DlStatus, type Policy,
     type SnifferEvent, type UpdateInfo, type FunMsg, type Movie, syncSetView, type RoomView,
-    debridOpen, type Source, playerMusicView, playerPlay, playerCover, relayOn, setRelay,
+    debridOpen, type Source, playerMusicView, playerPlay, playerCover, relayOn, setRelay, lobbyRemoteState,
   } from "./lib/player";
   import BrowseView from "./lib/BrowseView.svelte";
   import TitleBar from "./lib/TitleBar.svelte";
@@ -24,7 +24,7 @@
   import HomeView from "./lib/HomeView.svelte";
   import AdminView from "./lib/AdminView.svelte";
   import Avatar from "./lib/Avatar.svelte";
-  import { pic, social, startSocial, stopSocial } from "./lib/social.svelte";
+  import { onRemote, pic, social, startSocial, stopSocial, type RemoteOp } from "./lib/social.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
   import { DEFAULT_SERVER, normServer } from "./lib/server";
   import { loadRecent, rememberRoom, forgetRoom, type RecentRoom } from "./lib/recent";
@@ -858,6 +858,20 @@
     playerSetVolume(v).catch((e) => add(`Ses: ${String(e)}`, true, () => t("Ses: {e}", { e: tx(String(e)) })));
   }
 
+  /** Telefon kumandası (p0.24): masaüstündeki düğmeye basılmış gibi; odada senkron korunur. */
+  function onRemoteCmd(m: RemoteOp) {
+    const dur = st?.duration;
+    if (m.op === "toggle" && (dur != null || nowMedia)) togglePause();
+    else if (m.op === "seek" && dur != null) seekTo(Math.max(0, Math.min(dur - 1, (st?.timePos ?? 0) + m.by)));
+    else if (m.op === "vol") setVolume(Math.max(0, Math.min(130, volume + m.by)));
+    setTimeout(remoteState, m.op === "status" ? 0 : 500);
+  }
+  function remoteState() {
+    const dur = st?.duration ?? null;
+    const title = nowMedia?.title || (dur != null ? soloTitle || t("Video") : "");
+    lobbyRemoteState({ title, paused: room ? !roomRunning : (st?.paused ?? true), pos: st?.timePos ?? null, dur, vol: volume }).catch(() => {});
+  }
+
   function continueWithout(id: string) {
     delete offers[id];
     run("Onsuz devam", syncContinueWithout(id), true);
@@ -1111,6 +1125,7 @@
         if (!pollErrLogged) { pollErrLogged = true; add(`player_state: ${String(e)}`, true); }
       }
     }, 250);
+    onRemote(onRemoteCmd);
     const unlisten = [
       listen<SyncStatus>("sync://status", (e) => (sync = e.payload)),
       listen<ServerMsg>("sync://server", (e) => onServer(e.payload)),
@@ -1163,6 +1178,7 @@
       }),
     ];
     return () => {
+      onRemote(null);
       clearInterval(id);
       clearInterval(updateTimer);
       unlisten.forEach((p) => p.then((f) => f()));

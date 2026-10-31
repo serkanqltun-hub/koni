@@ -8,7 +8,7 @@ import (
 )
 
 // Protocol version, see docs/PROTOCOL.md.
-const ProtocolVersion = "p0.23"
+const ProtocolVersion = "p0.24"
 
 // Inbound is the union of all client→server messages; fields are used per type "t".
 type Inbound struct {

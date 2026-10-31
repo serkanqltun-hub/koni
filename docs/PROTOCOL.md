@@ -1,6 +1,6 @@
 # KONİ — WebSocket Protokolü (Faz 0)
 
-> Sürüm: **p0.19** (taslak) · Kaynak: [design/sync.md §4](design/sync.md), hesaplar [design/accounts.md §5.1](design/accounts.md), keşif [design/discovery.md §7](design/discovery.md)
+> Sürüm: **p0.24** (taslak) · Kaynak: [design/sync.md §4](design/sync.md), hesaplar [design/accounts.md §5.1](design/accounts.md), keşif [design/discovery.md §7](design/discovery.md)
 > Kapsam: hesap (davet kodu + kullanıcı adı + argon2id şifre, oturum belirteci), oda oluştur/katıl, play/pause/seek, oda medyası (`media`), HOLD/countdown, Host Only + yardımcı host, ping/saat senkronu, yeniden bağlanma (`resume`), kronik stall → "olmadan devam et" / DETACHED, "Herkes İndirsin" bariyeri.
 > Henüz yok: admin araçları.
 >
@@ -23,6 +23,7 @@
 > p0.19: adminler (§3.0f): `admin` el sıkışması (odalar, üyeler, oda kapatma, ban, davet hakkı), `profile op=upload` (admin görseli), `profile.admin|canInvite|taken`, `hello.admin`, `members[].admin`, arkadaş/presence satırlarında `admin`; `error.code=forbidden|room_closed|banned|no_invites|avatar_taken`. Yalnızca ekleme.
 > p0.22: "Açık odalar" (§3.0e): `presence.rooms` (girebileceğin açık odalar: senin çıktığın ve karşılıklı arkadaşının içinde olduğu), `presence.friends[].invite`; bir odada bulunmuş hesap oda açık kaldıkça çağrısız geri girer. Oda içinde `close_room` (yalnızca host) → herkese `error` (`room_ended`); host değilse `denied` (`not_host`). Tek seferlik `feed` (§3.0e) → ana ekran "Etkinlik" sekmesi. `watch` olayına `title`. Yalnızca ekleme.
 > p0.23: profil listeleri (§3.0g): tek seferlik `lists` el sıkışması (İzleyeceklerim / İzlediklerim, arkadaşın listeleri, ortak liste, künyede kimler istiyor). Odada `debrid` film (`file` = `movie:tt…|…`) %80'i geçince odadakilerin İzlediklerim'ine kiminle izlendiğiyle girer. `night_pick` artık `itemId` yerine `imdb` (`tt…`) da alır (listeden öneri). `error.code=bad_entry`. Yalnızca ekleme.
+> p0.24: telefon kumandası (§3.0h): `remote` bağlantısı ve `remote` / `remote_state` mesajları; `/ws` adresine tarayıcıyla düz `GET` kumanda sayfasını döner. Yalnızca ekleme; p0.23 sunucusu `remote`'a `error` (`not_joined`) döner.
 >
 > p0.13: oda modu: `cmd` `set_view` (§3.3), `view` mesajı (§4.17), `snapshot.view` (§4.1). Yalnızca ekleme; p0.12 sunucusu `set_view`'a `denied` (`bad_op`) döner, istemci `view` yoksa Sinema varsayar.
 >
@@ -173,6 +174,24 @@ Cevap (ardından bağlantı kapanır):
 - Ban: hesap, oturumları, arkadaşlıkları, davetleri ve istatistikleri silinir; odadaysa `error` (`banned`) alıp çıkar. Onu davet eden admin değilse davet hakkını kaybeder (`profile op=invite` → `no_invites`) ve kullanılmamış kodları silinir.
 - `profile op=upload` (yalnızca admin): `image` base64 JPEG/PNG/WebP, en fazla 180 KiB. Görsel `ad-…` kimliğiyle ortak seçiciye eklenir ve adminin fotoğrafı olur.
 - Bir admin hangi fotoğrafı kullanıyorsa (hazır ya da yüklenmiş) başkası onu seçemez: `profile.taken` listesi, seçerse `error` (`avatar_taken`). Admin değiştirince fotoğraf herkese açılır. Daha önce seçmiş olan üye fotoğrafını korur.
+
+### 3.0h `remote` — telefon kumandası (p0.24)
+Tarayıcıda `https://<sunucu>/ws` açılınca (WebSocket yükseltmesi olmayan `GET`) sunucu küçük bir kumanda sayfası döner; ayrı bir yol ya da nginx ayarı gerekmez. Sayfa hesapla `login` olur (`device: "KONİ remote"`), belirteci telefonda saklar, sonra açık kalan bir bağlantı kurar:
+```json
+{ "t": "remote", "auth": "<oturum belirteci>" }
+```
+Cevap `{ "t": "remote", "protocol": "p0.24", "name": "Ad#1234" }`. Sonra telefon:
+```json
+{ "t": "remote", "op": "toggle" | "seek" | "vol" | "status", "by": 10 }
+```
+- `seek`: saniye, ±600'e kırpılır; `vol`: ses puanı, ±100'e kırpılır. Bilinmeyen `op` yok sayılır.
+- Sunucu komutu aynı hesabın açık lobilerine (§3.0e, masaüstü uygulaması) aynen iletir. Hiç lobi yoksa telefona `{ "t": "remote_state", "online": false }` döner.
+- Masaüstü komutu kendi düğmesine basılmış gibi uygular (odada `cmd play/pause/seek`, yani herkes senkron kalır; ses yereldir) ve lobiden durum gönderir:
+```json
+{ "t": "remote_state", "title": "Film", "paused": false, "pos": 812.4, "dur": 6120, "vol": 80 }
+```
+  Sunucu bunu `online: true` ekleyip hesabın açık kumandalarına iletir (`title` en fazla 200 karakter).
+- Telefon ~4 sn'de bir `status` gönderir; bu hem durumu tazeler hem bağlantıyı canlı tutar.
 
 ### 3.1 `create_room`
 ```json

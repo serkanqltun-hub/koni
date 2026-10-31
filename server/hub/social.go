@@ -192,9 +192,11 @@ type roomCall struct {
 type social struct {
 	mu    sync.Mutex
 	conns map[int64]map[*lobbyConn]struct{}
-	calls map[int64][]roomCall // target account → pending calls
-	poke  chan struct{}
-	start sync.Once
+	// phone remotes (remote.go), per account
+	remotes map[int64]map[*lobbyConn]struct{}
+	calls   map[int64][]roomCall // target account → pending calls
+	poke    chan struct{}
+	start   sync.Once
 }
 
 func (h *Hub) pokePresence() {
@@ -466,6 +468,8 @@ func (h *Hub) Lobby(ctx context.Context, c *websocket.Conn, in Inbound) {
 		if json.Unmarshal(data, &m) == nil && m.T == "decline" {
 			h.dropCall(u.ID, m.Invite)
 			h.pokePresence()
+		} else if m.T == "remote_state" {
+			h.remoteReport(u.ID, data)
 		}
 	}
 }

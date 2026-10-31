@@ -592,6 +592,14 @@ pub fn lobby_start(app: AppHandle, url: String) -> CmdResult {
     Ok(())
 }
 
+/// Telefon kumandasına oynatıcının durumu (PROTOCOL §3.0h, p0.24).
+#[tauri::command]
+pub fn lobby_remote_state(state: serde_json::Value) {
+    let mut v = state;
+    v["t"] = "remote_state".into();
+    lobby::send(v.to_string());
+}
+
 /// Gelen çağrıyı geri çevir.
 #[tauri::command]
 pub fn lobby_decline(invite: String) {

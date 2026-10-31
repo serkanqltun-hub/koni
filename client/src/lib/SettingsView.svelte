@@ -59,6 +59,12 @@
     ["G / H", "Altyazı 50 ms erken / geç"],
   ];
   let relay = $state(relayOn());
+  // Telefon kumandası (p0.24): santralin adresi tarayıcıda açılınca kumanda sayfası gelir.
+  const remoteUrl = $derived(server.replace(/^ws/i, "http"));
+  let copied = $state(false);
+  function copyRemote() {
+    navigator.clipboard.writeText(remoteUrl).then(() => { copied = true; setTimeout(() => (copied = false), 1500); }, () => {});
+  }
 </script>
 
 <div class="screen ambient settings">
@@ -85,6 +91,12 @@
           <div class="grow"><b>{t("Bağlantıyı sunucu üzerinden yönlendir")}</b><small>{t("Bazı servislere doğrudan ulaşılamıyorsa bağlantı KONİ sunucusu üzerinden kurulur. Video sunucudan geçmez.")}</small></div>
           <input type="checkbox" role="switch" bind:checked={relay} onchange={() => setRelay(relay).catch(() => {})} />
         </div>
+        {#if account && remoteUrl}
+          <div class="item">
+            <div class="grow"><b>{t("Telefondan kumanda")}</b><small>{t("Telefonunun tarayıcısında bu adresi aç ve KONİ hesabınla giriş yap: oynat/duraklat, ileri/geri ve ses. Odadaysan herkeste aynı anda olur.")}</small><small class="mono sel">{remoteUrl}</small></div>
+            <button onclick={copyRemote}>{copied ? t("Kopyalandı") : t("Kopyala")}</button>
+          </div>
+        {/if}
         <div class="item"><small class="grow">{t('Başka bir sunucuya geçmek için çıkış yap; giriş ekranının altındaki "Kendi sunucunu kur" ile adresi yaz.')}</small></div>
       </div>
     {:else if section === "debrid"}
@@ -143,5 +155,6 @@
     width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-weight: 650; font-size: 18px;
     background: linear-gradient(135deg, #0a84ff, #5e5ce6);
   }
+  .sel { display: block; margin-top: 4px; color: var(--text-2); user-select: text; overflow-wrap: anywhere; }
   kbd { font: 500 11px var(--font-mono); padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line-2); color: var(--text-2); }
 </style>

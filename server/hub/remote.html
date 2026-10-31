@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0f">
+<meta name="robots" content="noindex">
+<title>KONİ</title>
+<style>
+  :root { color-scheme: dark; --bg: #0b0b0f; --card: #17171d; --line: #2a2a33; --text: #f2f2f7; --dim: #8e8e98; --accent: #0a84ff; --red: #ff453a; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 420px; margin: 0 auto; min-height: 100%; padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 18px; }
+  header { display: flex; align-items: center; justify-content: space-between; }
+  .logo { font-weight: 800; letter-spacing: .08em; }
+  .who { color: var(--dim); font-size: 14px; }
+  .link { background: none; border: 0; color: var(--dim); font: inherit; font-size: 14px; text-decoration: underline; padding: 4px; }
+  form, .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  input { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; color: var(--text); font: inherit; padding: 13px 14px; }
+  button.main { background: var(--accent); border: 0; border-radius: 12px; color: #fff; font: inherit; font-weight: 600; padding: 13px; }
+  .err { color: var(--red); font-size: 14px; min-height: 1em; }
+  .status { color: var(--dim); font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+  .dot.on { background: #30d158; }
+  .title { font-size: 19px; font-weight: 600; overflow-wrap: anywhere; min-height: 1.4em; }
+  .bar { height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+  .time { display: flex; justify-content: space-between; color: var(--dim); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .pad { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 12px; align-items: center; }
+  .pad button, .vol button { background: var(--card); border: 1px solid var(--line); border-radius: 20px; color: var(--text); font: inherit; font-weight: 600; height: 76px; touch-action: manipulation; }
+  .pad button:active, .vol button:active { transform: scale(.96); background: var(--line); }
+  .pad .play { height: 110px; border-radius: 50%; aspect-ratio: 1; justify-self: center; background: var(--accent); border: 0; color: #fff; }
+  .pad .play svg { width: 44px; height: 44px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row button { height: 56px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); color: var(--text); font: inherit; touch-action: manipulation; }
+  .vol { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; }
+  .vol span { color: var(--dim); font-variant-numeric: tabular-nums; min-width: 4ch; text-align: center; }
+  [disabled] { opacity: .4; }
+  .hide { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header><span class="logo">KONİ</span><span class="who" id="who"></span></header>
+
+  <form id="login" class="hide">
+    <div id="l-head" style="font-weight:600"></div>
+    <input id="user" autocomplete="username" autocapitalize="off" spellcheck="false" required>
+    <input id="pass" type="password" autocomplete="current-password" required>
+    <button class="main" id="l-btn"></button>
+    <div class="err" id="l-err"></div>
+  </form>
+
+  <section id="remote" class="hide" style="display:flex;flex-direction:column;gap:18px">
+    <div class="card">
+      <div class="status"><span class="dot" id="dot"></span><span id="st"></span></div>
+      <div class="title" id="title"></div>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="time"><span id="pos">--:--</span><span id="dur">--:--</span></div>
+    </div>
+    <div class="pad">
+      <button data-op="seek" data-by="-10">−10</button>
+      <button class="play" data-op="toggle" id="play" aria-label="play/pause"></button>
+      <button data-op="seek" data-by="10">+10</button>
+    </div>
+    <div class="row">
+      <button data-op="seek" data-by="-60">−1:00</button>
+      <button data-op="seek" data-by="60">+1:00</button>
+    </div>
+    <div class="vol">
+      <button data-op="vol" data-by="-10">🔉 −</button>
+      <span id="vol">–</span>
+      <button data-op="vol" data-by="10">🔊 +</button>
+    </div>
+    <button class="link" id="out" style="align-self:center"></button>
+  </section>
+</main>
+<script>
+"use strict";
+const TR = (navigator.language || "").toLowerCase().startsWith("tr");
+const T = TR ? {
+  head: "KONİ hesabınla giriş yap", user: "Kullanıcı adı (Ad#1234)", pass: "Şifre", go: "Giriş yap",
+  online: "Bilgisayardaki KONİ bağlı", offline: "Bilgisayardaki KONİ açık değil ya da çevrimdışı", conn: "Bağlanıyor…",
+  nothing: "Şu an oynayan bir şey yok", out: "Bu telefondan çıkış yap", fail: "Bağlanamadı",
+  bad_login: "Kullanıcı adı ya da şifre yanlış", rate_limited: "Çok fazla deneme, biraz sonra tekrar dene",
+} : {
+  head: "Sign in with your KONİ account", user: "Username (Name#1234)", pass: "Password", go: "Sign in",
+  online: "KONİ on your computer is connected", offline: "KONİ on your computer is not open or offline", conn: "Connecting…",
+  nothing: "Nothing is playing right now", out: "Sign out on this phone", fail: "Could not connect",
+  bad_login: "Wrong username or password", rate_limited: "Too many tries, try again later",
+};
+const $ = (id) => document.getElementById(id);
+const WS = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws";
+const KEY = "koni.remote";
+const PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>';
+const PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
+$("l-head").textContent = T.head; $("user").placeholder = T.user; $("pass").placeholder = T.pass;
+$("l-btn").textContent = T.go; $("out").textContent = T.out;
+
+let ws = null, poll = null, retry = null;
+
+function fmt(s) {
+  if (s == null || !isFinite(s) || s < 0) return "--:--";
+  s = Math.floor(s);
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), p = (n) => String(n).padStart(2, "0");
+  return h ? h + ":" + p(m) + ":" + p(s % 60) : p(m) + ":" + p(s % 60);
+}
+
+/** One-shot account call (same as the desktop app's login). */
+function oneShot(msg) {
+  return new Promise((ok, no) => {
+    const s = new WebSocket(WS);
+    s.onopen = () => s.send(JSON.stringify(msg));
+    s.onmessage = (e) => { ok(JSON.parse(e.data)); s.close(); };
+    s.onerror = () => no(new Error(T.fail));
+  });
+}
+
+$("login").onsubmit = async (e) => {
+  e.preventDefault();
+  $("l-err").textContent = "";
+  $("l-btn").disabled = true;
+  try {
+    const r = await oneShot({ t: "login", username: $("user").value.trim(), password: $("pass").value, device: "KONİ remote" });
+    if (r.t === "auth" && r.token) {
+      localStorage.setItem(KEY, r.token);
+      $("pass").value = "";
+      connect();
+    } else {
+      $("l-err").textContent = T[r.code] || r.message || T.fail;
+    }
+  } catch (err) {
+    $("l-err").textContent = T.fail;
+  } finally {
+    $("l-btn").disabled = false;
+  }
+};
+
+$("out").onclick = () => {
+  const tok = localStorage.getItem(KEY);
+  localStorage.removeItem(KEY);
+  if (tok) oneShot({ t: "logout", auth: tok }).catch(() => {});
+  stop();
+  showLogin();
+};
+
+function showLogin() {
+  $("login").classList.remove("hide");
+  $("remote").classList.add("hide");
+  $("who").textContent = "";
+}
+
+function stop() {
+  clearInterval(poll); clearTimeout(retry);
+  if (ws) { ws.onclose = null; ws.close(); ws = null; }
+}
+
+function send(op, by) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "remote", op, by: by || 0 }));
+}
+
+function connect() {
+  stop();
+  const tok = localStorage.getItem(KEY);
+  if (!tok) return showLogin();
+  $("login").classList.add("hide");
+  $("remote").classList.remove("hide");
+  render(null);
+  const s = new WebSocket(WS);
+  ws = s;
+  s.onopen = () => s.send(JSON.stringify({ t: "remote", auth: tok }));
+  s.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.t === "remote") {
+      $("who").textContent = m.name || "";
+      send("status");
+      poll = setInterval(() => send("status"), 4000);
+    } else if (m.t === "remote_state") {
+      render(m);
+    } else if (m.t === "error") {
+      if (m.code === "bad_token" || m.code === "banned") { localStorage.removeItem(KEY); stop(); showLogin(); }
+    }
+  };
+  s.onclose = () => {
+    clearInterval(poll);
+    if (ws !== s) return;
+    ws = null;
+    render(null);
+    if (!document.hidden) retry = setTimeout(connect, 2000);
+  };
+}
+
+function render(m) {
+  const on = !!(m && m.online), has = on && !!m.title;
+  $("dot").classList.toggle("on", on);
+  $("st").textContent = !m ? T.conn : on ? T.online : T.offline;
+  $("title").textContent = has ? m.title : on ? T.nothing : "";
+  $("play").innerHTML = on && !m.paused && has ? PAUSE : PLAY;
+  $("pos").textContent = fmt(has ? m.pos : null);
+  $("dur").textContent = fmt(has ? m.dur : null);
+  $("bar").style.width = has && m.dur ? Math.min(100, (m.pos || 0) / m.dur * 100) + "%" : "0";
+  $("vol").textContent = on ? "%" + m.vol : "–";
+  for (const b of document.querySelectorAll("[data-op]")) b.disabled = !on || (b.dataset.op !== "vol" && !has);
+}
+
+for (const b of document.querySelectorAll("[data-op]")) {
+  b.onclick = () => {
+    send(b.dataset.op, Number(b.dataset.by || 0));
+    if (navigator.vibrate) navigator.vibrate(15);
+  };
+}
+
+// Phones pause background tabs: reconnect when the page is shown again.
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && (!ws || ws.readyState > 1) && localStorage.getItem(KEY)) connect();
+});
+
+connect();
+</script>
+</body>
+</html>

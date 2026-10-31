@@ -16,7 +16,7 @@ const (
 	readIdle      = 20 * time.Second // clients ping every 3 s; silence means a dead link
 )
 
-// Handler returns the HTTP mux: /ws, /healthz, /avatars and /auth. The server accepts no file uploads.
+// Handler returns the HTTP mux: /ws (a plain GET there is the phone remote page), /healthz, /avatars and /auth. The server accepts no file uploads.
 func (h *Hub) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
@@ -33,6 +33,10 @@ func writeJSON(ctx context.Context, c *websocket.Conn, v any) error {
 }
 
 func (h *Hub) serveWS(w http.ResponseWriter, req *http.Request) {
+	if req.Method == http.MethodGet && !isUpgrade(req) {
+		serveRemotePage(w) // a phone browser opening the address: the remote page
+		return
+	}
 	// Desktop client (non-browser) → no Origin; allow any origin pattern.
 	c, err := websocket.Accept(w, req, &websocket.AcceptOptions{InsecureSkipVerify: true})
 	if err != nil {
@@ -84,6 +88,11 @@ func (h *Hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		return
 	case "admin":
 		writeJSON(ctx, c, h.Admin(in))
+		c.Close(websocket.StatusNormalClosure, "")
+		return
+	case "remote":
+		// phone remote: stays open while the page is shown (p0.24)
+		h.Remote(ctx, c, in)
 		c.Close(websocket.StatusNormalClosure, "")
 		return
 	case "hello":
@@ -153,7 +162,7 @@ func (h *Hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			sess.Handle(Inbound{T: "?"}) // yields bad_message to this member
 			continue
 		}
-		if m.T == "create_room" || m.T == "join" || m.T == "resume" || m.T == "register" || m.T == "login" || m.T == "logout" || m.T == "friends" || m.T == "feed" || m.T == "lists" || m.T == "profile" || m.T == "hello" || m.T == "admin" {
+		if m.T == "create_room" || m.T == "join" || m.T == "resume" || m.T == "register" || m.T == "login" || m.T == "logout" || m.T == "friends" || m.T == "feed" || m.T == "lists" || m.T == "profile" || m.T == "hello" || m.T == "remote" || m.T == "admin" {
 			m.T = "?"
 		}
 		if m.T == "call" { // ask a mutual friend in (p0.18): answered to this member only
