@@ -2,6 +2,9 @@
 //! `libloading`; nothing is linked at build time.
 
 mod ffi;
+mod render;
+
+pub use render::{GetProcAddress, RenderContext};
 
 use std::ffi::{c_char, c_int, c_void, CStr, CString};
 use std::path::PathBuf;

@@ -1,0 +1,9 @@
+# KONİ 1.0.3
+
+**Windows 10/11 x64** ve artık **macOS 11+ (Apple Silicon: M1 ve sonrası)**. Kurulu KONİ kendiliğinden güncellenir.
+
+**İndir**: https://github.com/Savas07/koni-releases/releases/latest
+
+**Yeni**
+- **macOS sürümü**: `KONI_1.0.3_aarch64.dmg` dosyasını aç, KONİ'yi Uygulamalar klasörüne sürükle. Odalar, oynatıcı, müzik, Keşfet ve telefondan kumanda Windows'taki gibi çalışır. "TV'ye yansıt" düğmesi Mac'te yok (macOS'un kendi AirPlay menüsü kullanılabilir).
+- **İlk açılış (Mac)**: uygulama Apple sertifikasıyla imzalı değil. macOS 15 ve sonrasında ilk denemeden sonra Sistem Ayarları → Gizlilik ve Güvenlik → "Yine de Aç"; macOS 14 ve öncesinde sağ tık → Aç. Bir kez yapılır, sonraki güncellemeler kendiliğinden gelir.

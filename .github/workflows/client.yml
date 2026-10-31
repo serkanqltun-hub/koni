@@ -15,6 +15,8 @@ concurrency:
 
 permissions:
   contents: read
+  # macOS işi libmpv paketini son başarılı libmpv iş akışı çalıştırmasından da alabilir.
+  actions: read
 
 jobs:
   rust-linux:
@@ -93,3 +95,83 @@ jobs:
           path: client/out/*
           retention-days: 7
           if-no-files-found: error
+
+  # macOS (Apple Silicon): derleme, test, libmpv smoke (render API dahil). Uygulama paketi
+  # (.app/.dmg) ve açılış denemesi yalnızca elle ya da PR'da "macos" etiketiyle: uzun sürer.
+  macos:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: client
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # LGPL libmpv package, workflow "libmpv (LGPL, macOS arm64)" (docs/LIBMPV.md).
+      LIBMPV_MAC_RELEASE: libmpv-macos-v0.40.0-r1
+      BUNDLE: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'macos') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: client
+
+      - run: npm ci
+      - run: npm run build
+
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+
+      - name: Fetch LGPL libmpv
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/libmpv"; mkdir -p "$d"
+          if ! gh release download "$LIBMPV_MAC_RELEASE" -R "$GITHUB_REPOSITORY" -p libmpv-lgpl-macos-arm64.zip -D "$d"; then
+            # Release henüz yoksa: son başarılı derlemenin artifact'i.
+            id="$(gh run list -R "$GITHUB_REPOSITORY" -w libmpv-lgpl-macos.yml -s success -L 1 --json databaseId -q '.[0].databaseId')"
+            gh run download "$id" -R "$GITHUB_REPOSITORY" -n libmpv-lgpl-macos-arm64 -D "$d"
+          fi
+          ditto -x -k "$d/libmpv-lgpl-macos-arm64.zip" "$d"
+          echo "LIBMPV_ZIP=$d/libmpv-lgpl-macos-arm64.zip" >> "$GITHUB_ENV"
+          echo "LIBMPV_DYLIB=$d/libmpv-lgpl-macos-arm64/libmpv.2.dylib" >> "$GITHUB_ENV"
+
+      - name: FFI smoke test
+        run: |
+          cargo run -p koni-player --example smoke -- --lib "$LIBMPV_DYLIB"
+          cargo run -p koni-player --example smoke -- --lib "$LIBMPV_DYLIB" --render-sw
+
+      - name: Build KONI.app + dmg
+        if: env.BUNDLE == 'true'
+        run: ./scripts/build-macos.sh "$LIBMPV_ZIP"
+
+      # Mac cihaz olmadan yapılabilecek en iyi deneme: uygulama açılıyor mu, libmpv ve
+      # OpenGL yüzeyi hazır mı (günlük), pencere nasıl görünüyor (ekran görüntüsü).
+      - name: Launch test
+        if: env.BUNDLE == 'true'
+        run: |
+          set -uo pipefail
+          mkdir -p out
+          APP=target/release/bundle/macos/KONI.app
+          "$APP/Contents/MacOS/koni" > out/koni.log 2>&1 &
+          pid=$!
+          sleep 20
+          screencapture -x out/screenshot.png || true
+          alive=0; kill -0 "$pid" 2>/dev/null && alive=1
+          kill "$pid" 2>/dev/null || true
+          cat out/koni.log
+          [ "$alive" = 1 ] || { echo "KONI exited early"; exit 1; }
+          if grep -E "libmpv yüklenemedi|couldn't load libmpv|video yüzeyi|video surface" out/koni.log; then exit 1; fi
+          cp target/release/bundle/dmg/*.dmg out/
+
+      - uses: actions/upload-artifact@v4
+        if: always() && env.BUNDLE == 'true'
+        with:
+          name: koni-macos-dev
+          path: client/out/*
+          retention-days: 7

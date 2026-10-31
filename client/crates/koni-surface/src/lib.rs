@@ -3,6 +3,9 @@
 //! Platform-neutral part: [`LayoutConfig`], the pure [`video_rect`] layout
 //! function and the [`VideoSurface`] trait (docs/design/client.md §3.3).
 //!
+//! macOS part (`cfg(target_os = "macos")`): [`MacVideoSurface`], an OpenGL view
+//! drawn through libmpv's render API (see `macos.rs`).
+//!
 //! Windows part (`cfg(windows)`): [`Win32ChildSurface`], a native child HWND
 //! inside the Tauri main window that libmpv renders into via `wid`
 //! (docs/design/client.md §3.2). The parent window is subclassed so the video box follows
@@ -17,6 +20,10 @@ use serde::{Deserialize, Serialize};
 mod win32;
 #[cfg(windows)]
 pub use win32::Win32ChildSurface;
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "macos")]
+pub use macos::{gl_vendor, MacVideoSurface};
 
 /// Which layout the video box uses.
 ///
@@ -137,6 +144,9 @@ pub fn video_rect(client_w: i32, client_h: i32, scale: f64, layout: &LayoutConfi
 pub enum MpvTarget {
     /// Native window id for mpv's `wid` option (HWND on Windows).
     Wid(i64),
+    /// No `wid`: mpv runs with `vo=libmpv` and the surface draws through the render
+    /// API (macOS).
+    RenderApi,
 }
 
 /// Errors from creating / driving a video surface.

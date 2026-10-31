@@ -322,11 +322,46 @@ pub fn load(mpv: &Player, s: &Stream) -> Result<(), String> {
 }
 
 /// Exe'nin yanında paketlenmiş `yt-dlp.exe` (varsa).
+#[cfg(not(target_os = "macos"))]
 fn bundled_ytdlp() -> Option<std::path::PathBuf> {
     std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|d| d.join("yt-dlp.exe")))
         .filter(|p| p.exists())
+}
+
+/// macOS: uygulama verisi klasörü (`spawn_ytdlp_update` ayarlar).
+#[cfg(target_os = "macos")]
+static DATA_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+/// macOS: `KONI.app/Contents/Resources/yt-dlp` ilk kullanımda uygulama verisine
+/// kopyalanır. Paketin içindeki dosya değişirse uygulamanın imzası bozulur; kopya ise
+/// `yt-dlp -U` ile kendini güncelleyebilir.
+#[cfg(target_os = "macos")]
+fn bundled_ytdlp() -> Option<std::path::PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    let dest = DATA_DIR.get()?.join("bin").join("yt-dlp");
+    if dest.exists() {
+        return Some(dest);
+    }
+    let src = std::env::current_exe()
+        .ok()?
+        .parent()?
+        .join("../Resources/yt-dlp");
+    if !src.exists() {
+        return None;
+    }
+    std::fs::create_dir_all(dest.parent()?).ok()?;
+    let tmp = dest.with_extension("tmp");
+    std::fs::copy(&src, &tmp).ok()?;
+    std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755)).ok()?;
+    // İndirilen uygulamanın karantina işareti kopyaya geçmesin.
+    let _ = std::process::Command::new("/usr/bin/xattr")
+        .args(["-d", "com.apple.quarantine"])
+        .arg(&tmp)
+        .output();
+    std::fs::rename(&tmp, &dest).ok()?;
+    Some(dest)
 }
 
 /// Önce exe'nin yanındaki `yt-dlp.exe`, yoksa PATH'teki `yt-dlp`.
@@ -346,6 +381,8 @@ fn ytdlp_config() -> YtDlpConfig {
 /// kendisi doğrular). PATH'teki yt-dlp kullanıcınındır, dokunulmaz.
 pub fn spawn_ytdlp_update(state_dir: std::path::PathBuf) {
     const EVERY: std::time::Duration = std::time::Duration::from_secs(24 * 3600);
+    #[cfg(target_os = "macos")]
+    let _ = DATA_DIR.set(state_dir.clone());
     let Some(bin) = bundled_ytdlp() else { return };
     let stamp = state_dir.join("ytdlp-update.stamp");
     let fresh = std::fs::metadata(&stamp)

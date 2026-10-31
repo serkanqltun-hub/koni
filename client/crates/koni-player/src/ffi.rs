@@ -55,9 +55,9 @@ type FnWaitEvent = unsafe extern "C" fn(*mut MpvHandle, c_double) -> *mut MpvEve
 type FnErrorString = unsafe extern "C" fn(c_int) -> *const c_char;
 type FnFree = unsafe extern "C" fn(*mut c_void);
 
-/// Resolved libmpv entry points. `_lib` keeps the library mapped for the pointers' lifetime.
+/// Resolved libmpv entry points. `lib` keeps the library mapped for the pointers' lifetime.
 pub struct Api {
-    _lib: Arc<Library>,
+    pub(crate) lib: Arc<Library>,
     pub create: FnCreate,
     pub initialize: FnInitialize,
     pub terminate_destroy: FnTerminateDestroy,
@@ -94,7 +94,7 @@ impl Api {
             wait_event: sym!("mpv_wait_event"),
             error_string: sym!("mpv_error_string"),
             free: sym!("mpv_free"),
-            _lib: lib,
+            lib,
         })
     }
 }

@@ -213,6 +213,8 @@ export const playerState = () => invoke<PlayerState>("player_state");
 export const setLayout = (layout: LayoutConfig) => invoke<void>("set_layout", { layout });
 export const setFullscreen = (on: boolean) => invoke<void>("set_fullscreen", { on });
 export const openCastPanel = () => invoke<void>("open_cast_panel");
+/** macOS: "TV'ye yansıt" (Windows Yayınla paneli) yok; AirPlay Denetim Merkezi'nden açılır. */
+export const isMac = /Macintosh|Mac OS X/.test(navigator.userAgent);
 
 // ---------------------------------------------------------------- Oda senkronu
 
