@@ -1,0 +1,20 @@
+[
+  {"id": "comfort", "label": "Rahatlatan", "emoji": "🧸", "genres": [35, 16, 10751], "without": [27], "voteGte": 7},
+  {"id": "kahkaha", "label": "Kahkaha", "emoji": "😂", "genres": [35], "voteGte": 6.5},
+  {"id": "gerilim", "label": "Gerilim", "emoji": "🔪", "genres": [53], "voteGte": 6.5},
+  {"id": "korku", "label": "Korku", "emoji": "👻", "genres": [27], "voteGte": 6.2},
+  {"id": "mindfuck", "label": "Kafa yakan", "emoji": "🌀", "genres": [9648, 53, 878], "keywords": ["plot twist", "nonlinear timeline", "mind bending"]},
+  {"id": "cyberpunk", "label": "Cyberpunk", "emoji": "🌃", "genres": [878], "keywords": ["cyberpunk", "dystopia"]},
+  {"id": "uzay", "label": "Uzay", "emoji": "🚀", "genres": [878], "keywords": ["space", "astronaut", "outer space"]},
+  {"id": "klostrofobik", "label": "Klostrofobik", "emoji": "📦", "keywords": ["claustrophobia", "single location", "trapped"]},
+  {"id": "soygun", "label": "Soygun", "emoji": "💰", "keywords": ["heist"]},
+  {"id": "romantik", "label": "Romantik", "emoji": "💕", "genres": [10749], "voteGte": 6.5},
+  {"id": "aglatan", "label": "Ağlatan", "emoji": "😭", "genres": [18], "keywords": ["tearjerker"], "voteGte": 7},
+  {"id": "aksiyon", "label": "Aksiyon", "emoji": "💥", "genres": [28], "voteGte": 6.5},
+  {"id": "animasyon", "label": "Animasyon", "emoji": "🎨", "genres": [16], "voteGte": 7},
+  {"id": "belgesel", "label": "Belgesel", "emoji": "🎥", "genres": [99], "voteGte": 7, "voteCountGte": 100},
+  {"id": "90lar", "label": "90'lar", "emoji": "📼", "from": "1990-01-01", "to": "1999-12-31"},
+  {"id": "klasik", "label": "Kült klasik", "emoji": "🏛️", "to": "1985-12-31", "voteGte": 7.5, "voteCountGte": 1000},
+  {"id": "kisa", "label": "Kısa ve öz", "emoji": "⏱️", "runtimeLte": 95, "voteGte": 6.5},
+  {"id": "yerli", "label": "Türk sineması", "emoji": "🇹🇷", "language": "tr", "voteCountGte": 50}
+]

@@ -1,0 +1,40 @@
+# /etc/systemd/system/koni.service
+# KONİ Santral. Listens only on loopback; nginx terminates TLS in front of it.
+[Unit]
+Description=KONİ Santral (WebSocket sync server)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=koni
+Group=koni
+# -db: hesaplar + olay günlüğü (SQLite). /var/lib/koni systemd tarafından koni sahipliğinde açılır.
+# Hata bildirimleri -db'nin yanına, /var/lib/koni/reports/ altına yazılır (ProtectSystem=strict'te yazılabilir).
+ExecStart=/opt/koni/koni-server -addr 127.0.0.1:8080 -db /var/lib/koni/koni.db
+# İsteğe bağlı servis anahtarları (KONI_TMDB_KEY, KONI_OMDB_KEY, KONI_OS_KEY, KONI_OS_USER,
+# KONI_OS_PASS): root:koni 0640. Dosya yoksa keşif ve altyazı araması kapalı çalışır.
+EnvironmentFile=-/etc/koni/env
+StateDirectory=koni
+StateDirectoryMode=0700
+Restart=on-failure
+RestartSec=2
+
+# Hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

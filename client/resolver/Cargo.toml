@@ -1,0 +1,12 @@
+[package]
+name = "koni-resolver"
+version = "0.0.1"
+edition = "2021"
+description = "KONİ: classify pasted URLs and resolve playable stream URLs via yt-dlp"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+url = "2"
