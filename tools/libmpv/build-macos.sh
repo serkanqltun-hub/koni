@@ -79,7 +79,7 @@ cd "$WORK/ffmpeg"
   --enable-securetransport --enable-zlib --enable-iconv --enable-libdav1d \
   --disable-indevs --enable-indev=lavfi --disable-outdevs \
   --extra-cflags="-O2 -mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET" \
-  --extra-ldflags="-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET"
+  --extra-ldflags="-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET" --extra-libs="-liconv"
 make -j"$JOBS"
 make install
 
