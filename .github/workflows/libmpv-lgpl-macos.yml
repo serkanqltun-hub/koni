@@ -54,8 +54,9 @@ jobs:
           if strings -a "$PKG"/*.dylib | grep -i -E 'libx264|libx265|libxvid|libfdk'; then
             echo "FAIL: GPL/nonfree codec library found"; fail=1
           fi
+          nm -gU "$PKG/libmpv.2.dylib" > "$RUNNER_TEMP/syms.txt"
           for sym in mpv_create mpv_initialize mpv_command mpv_render_context_create mpv_render_context_render; do
-            nm -gU "$PKG/libmpv.2.dylib" | grep -q "_$sym\$" || { echo "FAIL: missing export $sym"; fail=1; }
+            grep -q "_$sym\$" "$RUNNER_TEMP/syms.txt" || { echo "FAIL: missing export $sym"; fail=1; }
           done
           # Only @rpath (inside the package) or the OS itself.
           for f in "$PKG"/*.dylib; do

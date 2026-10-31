@@ -130,7 +130,7 @@ for f in "$PKG"/*.dylib; do
   codesign --force --sign - "$f"
 done
 # Hard guard: an mpv without an audio output plays silently.
-strings -a "$PKG/libmpv.2.dylib" | grep -q coreaudio || { echo "ERROR: no coreaudio output" >&2; exit 1; }
+grep -q "#define HAVE_COREAUDIO 1" "$WORK/mpv/build/config.h" || { echo "ERROR: no coreaudio output" >&2; exit 1; }
 
 # --- licence / attribution / source offer ------------------------------------
 cp "$HERE/NOTICE-macos.md" "$PKG/NOTICE.md"
