@@ -2146,6 +2146,8 @@ dependencies = [
 name = "koni-surface"
 version = "1.0.2"
 dependencies = [
+ "koni-player",
+ "objc2",
  "raw-window-handle",
  "serde",
  "serde_json",

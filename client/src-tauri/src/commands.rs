@@ -345,7 +345,7 @@ pub fn player_state(state: State<'_, AppState>) -> CmdResult<PlayerSnapshot> {
 pub fn set_layout(app: AppHandle, state: State<'_, AppState>, layout: LayoutConfig) -> CmdResult {
     *state.layout.lock().unwrap() = layout.clone();
     on_main(&app, move |_surface| {
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         {
             use koni_surface::VideoSurface;
             _surface.apply_layout(&layout);
@@ -355,8 +355,13 @@ pub fn set_layout(app: AppHandle, state: State<'_, AppState>, layout: LayoutConf
 
 #[tauri::command]
 pub fn set_fullscreen(app: AppHandle, on: bool) -> CmdResult {
+    // macOS: pencereyi Tauri tam ekrana alır, yüzey yalnızca yerleşimi değiştirir.
+    #[cfg(target_os = "macos")]
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.set_fullscreen(on);
+    }
     on_main(&app, move |_surface| {
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         {
             use koni_surface::VideoSurface;
             let res = if on {

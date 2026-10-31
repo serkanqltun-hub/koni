@@ -28,14 +28,16 @@ use koni_player::{Player, PlayerOptions};
 use koni_surface::LayoutConfig;
 use tauri::Manager;
 
-/// Platforma göre video yüzeyi. Windows dışı platformlarda henüz yok.
+/// Platforma göre video yüzeyi: Windows'ta child HWND, macOS'ta OpenGL görünümü.
 #[cfg(windows)]
 pub type Surface = koni_surface::Win32ChildSurface;
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+pub type Surface = koni_surface::MacVideoSurface;
+#[cfg(not(any(windows, target_os = "macos")))]
 pub type Surface = NoSurface;
 
-/// Windows dışı derlemeler için yer tutucu (macOS Faz 2'de gelecek).
-#[cfg(not(windows))]
+/// Gömülü video yüzeyi olmayan platformlar için yer tutucu.
+#[cfg(not(any(windows, target_os = "macos")))]
 pub struct NoSurface;
 
 #[derive(Default)]
@@ -93,10 +95,23 @@ pub fn run() {
                 ) {
                     sniffer::place(&handle);
                 }
+                // macOS: görünüm kenar boşluklarını kendisi korur; çizim boyutu burada güncellenir.
+                #[cfg(target_os = "macos")]
+                if matches!(e, tauri::WindowEvent::Resized(_)) {
+                    use koni_surface::VideoSurface;
+                    let state = handle.state::<AppState>();
+                    if let Ok(mut s) = state.surface.try_lock() {
+                        if let Some(s) = s.as_mut() {
+                            s.on_parent_resized(0, 0, 1.0);
+                        }
+                    };
+                }
             });
             let state = app.state::<AppState>();
             let wid = init_surface(&window, &state);
             init_player(app.handle(), &state, wid);
+            #[cfg(target_os = "macos")]
+            attach_player(&state);
             if let Ok(dir) = app.path().app_data_dir() {
                 media::spawn_ytdlp_update(dir);
             }
@@ -185,9 +200,9 @@ pub fn run() {
         .expect("KONİ başlatılamadı");
 }
 
-/// Child video penceresini oluşturur ve mpv'ye verilecek `wid`'i döner.
-/// `setup` ana thread'de çalışır, Win32 çağrıları için doğru yer.
-#[cfg(windows)]
+/// Video yüzeyini oluşturur; Windows'ta mpv'ye verilecek `wid`'i döner (macOS'ta
+/// `None`: mpv render API ile çizer). `setup` ana thread'de çalışır, doğru yer.
+#[cfg(any(windows, target_os = "macos"))]
 fn init_surface(window: &tauri::WebviewWindow, state: &AppState) -> Option<i64> {
     use koni_surface::{MpvTarget, VideoSurface};
     use raw_window_handle::HasWindowHandle;
@@ -200,14 +215,29 @@ fn init_surface(window: &tauri::WebviewWindow, state: &AppState) -> Option<i64> 
             return None;
         }
     };
-    match Surface::create(handle, &layout) {
+    // macOS: wry pencerenin içerik görünümünü değiştirir; yüzey NSWindow üzerinden yerleşir.
+    #[cfg(target_os = "macos")]
+    let created = {
+        let _ = handle;
+        match window.ns_window() {
+            // SAFETY: Tauri'nin canlı NSWindow'u, ana thread'de.
+            Ok(w) => unsafe { Surface::create_in_window(w, &layout) },
+            Err(e) => Err(koni_surface::SurfaceError::UnsupportedHandle(e.to_string())),
+        }
+    };
+    #[cfg(windows)]
+    let created = Surface::create(handle, &layout);
+    match created {
         Ok(mut surface) => {
             if let (Ok(size), Ok(scale)) = (window.inner_size(), window.scale_factor()) {
                 surface.on_parent_resized(size.width as i32, size.height as i32, scale);
             }
-            let MpvTarget::Wid(wid) = surface.mpv_target();
+            let wid = match surface.mpv_target() {
+                MpvTarget::Wid(wid) => Some(wid),
+                MpvTarget::RenderApi => None,
+            };
             *state.surface.lock().unwrap() = Some(surface);
-            Some(wid)
+            wid
         }
         Err(e) => {
             eprintln!("[koni] video yüzeyi oluşturulamadı: {e}");
@@ -216,17 +246,23 @@ fn init_surface(window: &tauri::WebviewWindow, state: &AppState) -> Option<i64> 
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 fn init_surface(_window: &tauri::WebviewWindow, _state: &AppState) -> Option<i64> {
     eprintln!("[koni] bu platformda gömülü video yüzeyi yok; mpv kendi penceresini açar");
     None
 }
 
 fn init_player(app: &tauri::AppHandle, state: &AppState, wid: Option<i64>) {
+    // macOS: yüzey varsa kareleri render API ile kendimiz çizeriz.
+    let render_api = cfg!(target_os = "macos") && state.surface.lock().unwrap().is_some();
     let opts = PlayerOptions {
         wid,
         lib_path: libmpv_next_to_exe(),
-        ..Default::default()
+        extra_options: if render_api {
+            vec![("vo".into(), "libmpv".into())]
+        } else {
+            Vec::new()
+        },
     };
     match Player::new(opts) {
         Ok(player) => {
@@ -242,13 +278,39 @@ fn init_player(app: &tauri::AppHandle, state: &AppState, wid: Option<i64>) {
     }
 }
 
-/// Exe'nin yanındaki libmpv DLL'i varsa onu kullan (LGPL: kullanıcı değiştirebilir).
+/// macOS: player hazırsa yüzeye bağla; olmazsa video yok ama uygulama açılır.
+#[cfg(target_os = "macos")]
+fn attach_player(state: &AppState) {
+    let Some(player) = state.player.lock().unwrap().clone() else {
+        return;
+    };
+    if let Some(surface) = state.surface.lock().unwrap().as_mut() {
+        match surface.attach_player(player) {
+            Ok(()) => eprintln!("[koni] OpenGL: {:?}", koni_surface::gl_vendor()),
+            Err(e) => {
+                let msg = tr!(
+                    "video yüzeyi bağlanamadı: {e}",
+                    "couldn't attach the video surface: {e}"
+                );
+                eprintln!("[koni] {msg}");
+                *state.player_error.lock().unwrap() = Some(msg);
+            }
+        }
+    }
+}
+
+/// Paketlenmiş libmpv varsa onu kullan (LGPL: kullanıcı değiştirebilir): Windows'ta
+/// exe'nin yanında, macOS'ta `KONI.app/Contents/Frameworks` içinde.
 pub(crate) fn libmpv_next_to_exe() -> Option<std::path::PathBuf> {
     let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    ["libmpv-2.dll", "mpv-2.dll"]
-        .iter()
-        .map(|n| dir.join(n))
-        .find(|p| p.exists())
+    #[cfg(target_os = "macos")]
+    let (dir, names) = (
+        dir.join("../Frameworks"),
+        ["libmpv.2.dylib", "libmpv.dylib"],
+    );
+    #[cfg(not(target_os = "macos"))]
+    let names = ["libmpv-2.dll", "mpv-2.dll"];
+    names.iter().map(|n| dir.join(n)).find(|p| p.exists())
 }
 
 /// mpv olay kuyruğunu boşaltır (`wait_event` tek thread'den çağrılmalı).

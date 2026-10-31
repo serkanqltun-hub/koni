@@ -2,6 +2,7 @@
 //! `Savas07/koni-releases` reposundan okunur, NSIS kurulumu indirilir ve imzası
 //! `tauri.conf.json` içindeki açık anahtarla doğrulanır. Windows'ta kurulum
 //! sessizce (`passive`) çalışır, uygulama kapanır ve kurulum bitince yeniden açılır.
+//! macOS'ta `KONI.app.tar.gz` indirilir, uygulama yerinde değiştirilir ve yeniden başlar.
 
 use crate::i18n::trs;
 use serde::Serialize;
@@ -18,7 +19,11 @@ pub struct UpdateInfo {
 }
 
 /// NSIS kurulumu exe'nin yanına `uninstall.exe` koyar; yoksa taşınabilir kopyadır.
+/// macOS'ta taşınabilir sürüm yok: güncelleyici `KONI.app`'in yerine yenisini koyar.
 fn is_portable() -> bool {
+    if cfg!(target_os = "macos") {
+        return false;
+    }
     std::env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(|d| !d.join("uninstall.exe").exists()))
