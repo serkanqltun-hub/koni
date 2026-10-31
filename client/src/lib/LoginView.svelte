@@ -45,7 +45,9 @@
   const bare = $derived(username.trim().replace(/#.*$/, ""));
   const ready = $derived(!!username.trim() && password.length > 0 && (mode === "login" || codeOk));
 
+  /** Sunucu yoksa (varsayılan adres boş) adres kutusu açık gelir. */
   let editing = $state(false);
+  const noServer = $derived(!server);
   /** Varsayılan sunucunun adresi ekranda gösterilmez; yalnızca kendi sunucusu yazılınca görünür. */
   const custom = $derived(server !== DEFAULT_SERVER);
   let serverIn = $state("");
@@ -122,14 +124,14 @@
         {:else}{t("Zaten hesabın var mı?")} <button type="button" class="link" onclick={() => (mode = "login")}>{t("Giriş yap")}</button>{/if}
       </small>
     {/if}
-    {#if editing}
+    {#if editing || noServer}
       <div class="srv edit">
         <!-- svelte-ignore a11y_autofocus -->
         <input placeholder={t("Sunucunun adresi, ör. koni.ornek.com")} bind:value={serverIn} spellcheck="false" autofocus
           onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveServer(serverIn); } else if (e.key === "Escape") editing = false; }} />
         <button type="button" disabled={!serverIn.trim()} onclick={() => saveServer(serverIn)}>{t("Bağlan")}</button>
-        {#if custom}<button type="button" class="link" onclick={() => saveServer("")}>{t("Davetli girişe dön")}</button>
-        {:else}<button type="button" class="link" onclick={() => (editing = false)}>{t("Vazgeç")}</button>{/if}
+        {#if custom && DEFAULT_SERVER}<button type="button" class="link" onclick={() => saveServer("")}>{t("Davetli girişe dön")}</button>
+        {:else if !noServer}<button type="button" class="link" onclick={() => (editing = false)}>{t("Vazgeç")}</button>{/if}
       </div>
       <small class="srv">{t("Kurulum rehberi: GitHub'da serkanqltun-hub/koni → docs/SELF-HOSTING.md")}</small>
     {:else if custom}

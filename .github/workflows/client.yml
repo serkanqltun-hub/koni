@@ -16,9 +16,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  VITE_KONI_SERVER: ${{ vars.KONI_SERVER }}
-
 jobs:
   rust-linux:
     runs-on: ubuntu-latest

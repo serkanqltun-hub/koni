@@ -25,7 +25,6 @@ concurrency:
   group: release-${{ inputs.tag || github.ref_name }}
 
 env:
-  VITE_KONI_SERVER: ${{ vars.KONI_SERVER }}
   # main'e push'ta sürüm tauri.conf.json'dan gelir (aşağıda TAG ortam değişkeni ezilir).
   ON_MAIN: ${{ github.ref == 'refs/heads/main' }}
 

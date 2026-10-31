@@ -1,6 +1,6 @@
 // Santral adresi. Herkes kendi sunucusunu kurabilir (docs/SELF-HOSTING.md); varsayılan
-// derlemede VITE_KONI_SERVER ile gelir (CI: repo değişkeni KONI_SERVER). Boşsa giriş
-// ekranı sunucu adresini sorar.
+// derlemede VITE_KONI_SERVER ile verilebilir. Resmi derlemede boştur: adres davet
+// linkinden (`?s=`) gelir ya da giriş ekranında yazılır.
 export const DEFAULT_SERVER: string = import.meta.env.VITE_KONI_SERVER || "";
 
 /** "koni.ornek.com", "https://koni.ornek.com", "localhost:8080" → `wss://…/ws` / `ws://…/ws`. */

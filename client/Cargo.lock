@@ -2098,7 +2098,7 @@ dependencies = [
 
 [[package]]
 name = "koni"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "base64 0.23.1",
  "futures-util",
@@ -2125,7 +2125,7 @@ dependencies = [
 
 [[package]]
 name = "koni-player"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "libloading 0.9.0",
  "serde",
@@ -2144,7 +2144,7 @@ dependencies = [
 
 [[package]]
 name = "koni-surface"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "raw-window-handle",
  "serde",
