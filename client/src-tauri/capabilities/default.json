@@ -30,6 +30,7 @@
     "allow-player-set-track",
     "allow-set-layout",
     "allow-set-fullscreen",
+    "allow-open-cast-panel",
     "allow-sync-connect",
     "allow-sync-play",
     "allow-sync-pause",

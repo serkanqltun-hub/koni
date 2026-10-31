@@ -19,6 +19,7 @@ const COMMANDS: &[&str] = &[
     "player_set_track",
     "set_layout",
     "set_fullscreen",
+    "open_cast_panel",
     "sync_connect",
     "sync_play",
     "sync_pause",
