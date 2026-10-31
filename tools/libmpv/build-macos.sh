@@ -98,7 +98,7 @@ meson setup build --prefix="$PREFIX" --libdir=lib --buildtype=release \
   -Dauto_features=disabled \
   -Dzlib=enabled -Diconv=enabled -Dlibavdevice=enabled \
   -Dcocoa=enabled -Dgl=enabled -Dgl-cocoa=enabled -Dvideotoolbox-gl=enabled \
-  -Dcoreaudio=enabled -Daudiounit=enabled \
+  -Dcoreaudio=enabled \
   -Dswift-build=disabled -Dmacos-cocoa-cb=disabled -Dmacos-media-player=disabled \
   -Dmacos-touchbar=disabled \
   -Dlua=disabled -Djavascript=disabled \
