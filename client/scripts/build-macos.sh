@@ -28,13 +28,14 @@ DYLIB="$(find "$SRC" -name libmpv.2.dylib | head -n1)"
 [ -n "$DYLIB" ] || { echo "libmpv.2.dylib not found in $LIBMPV" >&2; exit 1; }
 PKG="$(dirname "$DYLIB")"
 [ -f "$PKG/NOTICE.md" ] || { echo "NOTICE.md missing: not the LGPL package?" >&2; exit 1; }
-# dylibs → Contents/Frameworks; NOTICE.md, LICENSES/, source/, BUILDINFO.txt, REBUILD.md →
+# dylibs → Contents/Frameworks; NOTICE.md, LICENSES/, BUILDINFO.txt, REBUILD.md, SOURCE.txt →
 # Contents/Resources/libmpv (LGPL).
 # Debug symbols are stripped (smaller download; GitHub caps release files kept in git at
 # 100 MB). The source tarballs stay in the libmpv release; SOURCE.txt points there (LGPL).
 cp "$PKG"/*.dylib "$VENDOR/lib/"
 chmod u+w "$VENDOR"/lib/*.dylib
 strip -x "$VENDOR"/lib/*.dylib
+codesign --force --sign - "$VENDOR"/lib/*.dylib
 for f in NOTICE.md REBUILD.md BUILDINFO.txt LICENSES; do
   [ -e "$PKG/$f" ] && cp -R "$PKG/$f" "$VENDOR/licenses/"
 done
