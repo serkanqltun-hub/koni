@@ -119,6 +119,7 @@ pub fn run() {
             commands::player_state,
             commands::set_layout,
             commands::set_fullscreen,
+            commands::open_cast_panel,
             commands::sync_connect,
             commands::sync_play,
             commands::sync_pause,

@@ -283,5 +283,7 @@ const en: Record<string, string> = {
   "Odadakilerden kaçı birlikte izliyor": "How many in the room are watching together",
   "Senkron {n}/{total}": "In sync {n}/{total}",
   "Tam ekran (F)": "Fullscreen (F)",
+  "TV'ye yansıt": "Cast to TV",
+  "Yayınla paneli açılamadı": "Couldn't open the Cast panel",
 };
 export default en;
