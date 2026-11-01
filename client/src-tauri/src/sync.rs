@@ -547,7 +547,15 @@ impl MediaSync {
                             if latest.load(Ordering::SeqCst) != generation {
                                 return Ok(None); // oda bu arada başka medyaya geçti
                             }
-                            media::load(&mpv, &s).map(|()| Some(s.title))
+                            media::load(&mpv, &s)?;
+                            // Çözüldü ama oynatıcı akışı açamazsa (site bu bağlantıya izin
+                            // vermedi, bağlantı kesildi) üye "hazır" görünüp sonsuza dek
+                            // tamponluyor sayılıyordu: oda onu bekledi, kimse izleyemedi.
+                            // Açılmazsa hata olur, oda bu üyesiz devam eder.
+                            if !wait_started(&mpv, &latest, generation)? {
+                                return Ok(None);
+                            }
+                            Ok(Some(s.title))
                         });
                     if latest.load(Ordering::SeqCst) != generation {
                         return;
@@ -684,6 +692,30 @@ fn wait_opened(mpv: &Mpv, path: &str) -> Result<(), String> {
     Err(trs(
         "oynatıcı indirilen dosyayı açamadı",
         "the player couldn't open the downloaded file",
+    )
+    .into())
+}
+
+/// Bağlantı akışı açılıp konum okunana dek bekler (en çok 25 sn). Oda bu arada başka
+/// medyaya geçtiyse `false`; süre dolarsa hata.
+fn wait_started(mpv: &Mpv, latest: &AtomicU64, generation: u64) -> Result<bool, String> {
+    let deadline = Instant::now() + Duration::from_secs(25);
+    while Instant::now() < deadline {
+        if latest.load(Ordering::SeqCst) != generation {
+            return Ok(false);
+        }
+        if mpv.time_pos().is_some() {
+            return Ok(true);
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    if latest.load(Ordering::SeqCst) != generation {
+        return Ok(false);
+    }
+    log_err("stop", mpv.command(&["stop"]));
+    Err(trs(
+        "video açılamadı: site bu bağlantıdan oynatmaya izin vermedi ya da bağlantı çok yavaş",
+        "couldn't open the video: the site didn't allow playback from this connection, or the connection is too slow",
     )
     .into())
 }
