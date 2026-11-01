@@ -58,6 +58,11 @@ chmod 755 "$VENDOR/yt-dlp"
   echo '    "macOS": {'
   echo '      "minimumSystemVersion": "11.0",'
   echo '      "signingIdentity": "-",'
+  # Hardened runtime turns on library validation: the app may then load only dylibs
+  # with its own Team ID, and an ad hoc signature has none, so libmpv fails to load on
+  # a real Mac (CI runners have SIP off and don't show it). It's only needed for
+  # notarization, which we don't do.
+  echo '      "hardenedRuntime": false,'
   printf '      "frameworks": ['
   sep=""
   for f in "$VENDOR"/lib/*.dylib; do
@@ -78,6 +83,9 @@ CARGO_PROFILE_RELEASE_STRIP=true npm run tauri -- build "${configs[@]}"
 
 APP="$CLIENT/target/release/bundle/macos/KONI.app"
 codesign --verify --deep --strict "$APP"
+# Must be plain ad hoc, without the "runtime" flag (see hardenedRuntime above).
+cs="$(codesign -dv "$APP" 2>&1 | grep '^CodeDirectory')"; echo "$cs"
+if echo "$cs" | grep -q runtime; then echo "ERROR: hardened runtime is on" >&2; exit 1; fi
 # Every dylib the app ships must resolve inside the bundle or the OS.
 for f in "$APP"/Contents/Frameworks/*.dylib; do
   if otool -L "$f" | tail -n +2 | awk '{print $1}' | grep -v -E '^(@rpath/|/usr/lib/|/System/)'; then
