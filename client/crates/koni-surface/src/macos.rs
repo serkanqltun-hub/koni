@@ -121,18 +121,27 @@ impl Shared {
         };
         // Always ask, even when not drawing: mpv expects update() after each callback.
         let frame = rc.needs_frame();
+        if !(frame || force) {
+            return;
+        }
         let (w, h) = inner.px;
-        if !(frame || force) || !inner.shown || w <= 0 || h <= 0 {
+        let visible = inner.shown && w > 0 && h > 0;
+        // Hidden (Keşfet, lobby, music scene): still consume the frame. With the render
+        // API mpv waits up to 200 ms per frame for a render + swap; skipping them while
+        // hidden made playback crawl and the room saw this member as buffering.
+        if !visible && !frame {
             return;
         }
         // SAFETY: our context, on the main thread.
         unsafe { CGLSetCurrentContext(inner.cgl) };
-        if let Err(e) = rc.render_gl(0, w, h) {
+        if let Err(e) = rc.render_gl(0, w.max(1), h.max(1)) {
             eprintln!("[koni] video çizilemedi: {e}");
             return;
         }
-        // SAFETY: as above.
-        unsafe { CGLFlushDrawable(inner.cgl) };
+        if visible {
+            // SAFETY: as above.
+            unsafe { CGLFlushDrawable(inner.cgl) };
+        }
         rc.report_swap();
     }
 }
