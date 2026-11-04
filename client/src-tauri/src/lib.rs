@@ -139,6 +139,8 @@ pub fn run() {
             commands::sync_play,
             commands::sync_pause,
             commands::sync_seek,
+            commands::sync_toggle,
+            commands::sync_seek_by,
             commands::sync_close,
             commands::sync_leave,
             commands::sync_continue_without,

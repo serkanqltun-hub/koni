@@ -24,6 +24,8 @@ const COMMANDS: &[&str] = &[
     "sync_play",
     "sync_pause",
     "sync_seek",
+    "sync_toggle",
+    "sync_seek_by",
     "sync_close",
     "sync_leave",
     "sync_continue_without",

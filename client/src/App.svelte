@@ -10,7 +10,7 @@
     playerSetVolume, playerAddSubtitle, playerSubDelay, playerTracks, playerSetTrack,
     type Tracks, type TrackKind,
     playerState, setLayout, setFullscreen, openCastPanel, isMac, type PlayerState,
-    syncConnect, syncPlay, syncPause, syncSeek, syncLeave, syncContinueWithout, syncResync, syncDownload,
+    syncConnect, syncSeek, syncToggle, syncSeekBy, syncLeave, syncContinueWithout, syncResync, syncDownload,
     syncSetCohost, syncSetPolicy, accountGet, accountLogin, accountRegister, accountLogout, snifferClose,
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, bugReport,
     type SyncStatus, type ServerMsg, type Member, type MediaEvent, type LinkEvent, type DlStatus, type Policy,
@@ -740,7 +740,14 @@
 
   function togglePause() {
     if (!inRoom) return run("Oynat/Duraklat", playerTogglePause());
-    return run("Oynat/Duraklat", roomRunning ? syncPause() : syncPlay(), true);
+    return run("Oynat/Duraklat", syncToggle(), true);
+  }
+  /** ±sn sar; odada oda konumundan (yerel konum geride kalmış olabilir). */
+  function seekBy(by: number) {
+    if (inRoom) return run("Atla", syncSeekBy(by), true);
+    const dur = st?.duration;
+    if (dur == null) return;
+    return seekTo(Math.max(0, Math.min(dur - 1, (st?.timePos ?? 0) + by)));
   }
   function seekTo(v: number) {
     if (inRoom) return run("Atla", syncSeek(v), true);
@@ -862,7 +869,7 @@
   function onRemoteCmd(m: RemoteOp) {
     const dur = st?.duration;
     if (m.op === "toggle" && (dur != null || nowMedia)) togglePause();
-    else if (m.op === "seek" && dur != null) seekTo(Math.max(0, Math.min(dur - 1, (st?.timePos ?? 0) + m.by)));
+    else if (m.op === "seek" && dur != null) seekBy(m.by);
     else if (m.op === "vol") setVolume(Math.max(0, Math.min(130, volume + m.by)));
     setTimeout(remoteState, m.op === "status" ? 0 : 500);
   }
@@ -1811,7 +1818,7 @@
     {/if}
     <div class="mid">
       <div class="ctl">
-        {#if roomView === "watch"}<button class="cb" title={t("10 sn geri")} disabled={!st?.duration} onclick={() => seekTo(Math.max(0, (st?.timePos ?? 0) - 10))}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg><small>10</small></button>{/if}
+        {#if roomView === "watch"}<button class="cb" title={t("10 sn geri")} disabled={!st?.duration} onclick={() => seekBy(-10)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg><small>10</small></button>{/if}
         <button class="play" title={playing ? t("Duraklat (Boşluk)") : t("Oynat (Boşluk)")} onclick={togglePause}>
           {#if playing}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4.5" width="4" height="15" rx="1.2" /><rect x="14" y="4.5" width="4" height="15" rx="1.2" /></svg>
@@ -1819,7 +1826,7 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.3v13.4a1 1 0 0 0 1.5.9l10.6-6.7a1 1 0 0 0 0-1.8L9.5 4.4A1 1 0 0 0 8 5.3z" /></svg>
           {/if}
         </button>
-        {#if roomView === "watch"}<button class="cb" title={t("10 sn ileri")} disabled={!st?.duration} onclick={() => seekTo(Math.min(st?.duration ?? 0, (st?.timePos ?? 0) + 10))}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" /></svg><small>10</small></button>{/if}
+        {#if roomView === "watch"}<button class="cb" title={t("10 sn ileri")} disabled={!st?.duration} onclick={() => seekBy(10)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" /></svg><small>10</small></button>{/if}
         {#if roomView === "watch" && (room ? roomMedia || st?.duration != null : soloMedia || st?.duration != null)}
           <button class="cb" title={room ? t("Videoyu kapat (herkes için)") : t("Videoyu kapat")} disabled={room?.policy === "host_only" && !amControl}
             onclick={closeVideo}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /></svg></button>

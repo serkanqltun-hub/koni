@@ -32,7 +32,12 @@ use crate::{debrid, download, media, page, AppState};
 pub enum UiCmd {
     Play,
     Pause,
+    /// Oynat/duraklat: karar arayüzün son gördüğüne göre değil, odanın o anki
+    /// durumuna göre verilir (arayüz geç güncellenirse ters komut gitmesin).
+    Toggle,
     Seek(f64),
+    /// ±N sn sar: oda konumuna göre (arayüzdeki konum geride kalmış olabilir).
+    SeekBy(f64),
     /// Odadaki medyayı herkes için kapat (`cmd close`).
     Close,
     /// Dosya yeni yüklendi: oynatıcıyı oda konumuna hizala. DETACHED iken yapılmaz;
@@ -1098,7 +1103,28 @@ async fn run(
             Step::Ui(Some(cmd)) => match cmd {
                 UiCmd::Play => vec![EngineEvent::Send(engine.user_play(&player))],
                 UiCmd::Pause => vec![EngineEvent::Send(engine.user_pause(&player))],
+                UiCmd::Toggle => {
+                    let running = engine
+                        .room()
+                        .is_some_and(|r| matches!(r.mode, RoomMode::Playing | RoomMode::Countdown));
+                    let msg = if running {
+                        engine.user_pause(&player)
+                    } else {
+                        engine.user_play(&player)
+                    };
+                    vec![EngineEvent::Send(msg)]
+                }
                 UiCmd::Seek(pos) => vec![EngineEvent::Send(engine.user_seek(pos))],
+                UiCmd::SeekBy(by) => {
+                    let base = engine
+                        .room_position(clock.now())
+                        .unwrap_or_else(|| player.position());
+                    let mut to = (base + by).max(0.0);
+                    if let Some(d) = player.duration().filter(|d| *d > 1.0) {
+                        to = to.min(d - 1.0);
+                    }
+                    vec![EngineEvent::Send(engine.user_seek(to))]
+                }
                 UiCmd::Close => {
                     room_media.clear(app, &player.mpv, true);
                     let msg = engine.user_close();

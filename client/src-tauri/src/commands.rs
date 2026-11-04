@@ -15,6 +15,9 @@ use crate::{account, lobby, sniffer, AppState};
 
 type CmdResult<T = ()> = Result<T, String>;
 
+/// mpv'ye dokunan komutlar `#[tauri::command(async)]`: düz komutlar ana thread'de
+/// çalışır, macOS'ta görüntü de ana thread'de çizilir. Ana thread mpv'yi beklerken mpv
+/// de çizimi bekler; görüntü takılır, arayüz ve oda komutları gecikir.
 fn player(state: &State<'_, AppState>) -> CmdResult<Arc<Player>> {
     if let Some(p) = state.player.lock().unwrap().as_ref() {
         return Ok(p.clone());
@@ -217,22 +220,22 @@ pub fn browse_nav(app: AppHandle, action: String) -> CmdResult {
     sniffer::nav(&app, &action)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn player_play(state: State<'_, AppState>) -> CmdResult {
     player(&state)?.play().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn player_pause(state: State<'_, AppState>) -> CmdResult {
     player(&state)?.pause().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn player_toggle_pause(state: State<'_, AppState>) -> CmdResult {
     player(&state)?.toggle_pause().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn player_seek(state: State<'_, AppState>, seconds: f64) -> CmdResult {
     if !seconds.is_finite() || seconds < 0.0 {
         return Err(tr!(
@@ -245,7 +248,7 @@ pub fn player_seek(state: State<'_, AppState>, seconds: f64) -> CmdResult {
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn player_set_speed(state: State<'_, AppState>, speed: f64) -> CmdResult {
     if !(0.25..=4.0).contains(&speed) {
         return Err(tr!("geçersiz hız: {speed}", "invalid speed: {speed}"));
@@ -253,7 +256,7 @@ pub fn player_set_speed(state: State<'_, AppState>, speed: f64) -> CmdResult {
     player(&state)?.set_speed(speed).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn player_set_volume(state: State<'_, AppState>, volume: f64) -> CmdResult {
     if !(0.0..=130.0).contains(&volume) {
         return Err(tr!("geçersiz ses: {volume}", "invalid volume: {volume}"));
@@ -264,7 +267,7 @@ pub fn player_set_volume(state: State<'_, AppState>, volume: f64) -> CmdResult {
 }
 
 /// Yerel altyazı dosyasını ekler ve seçer; dosya adını döndürür.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn player_add_subtitle(state: State<'_, AppState>, path: String) -> CmdResult<String> {
     let path = path.trim().trim_matches('"').to_string();
     if !std::path::Path::new(&path).is_file() {
@@ -280,7 +283,7 @@ pub fn player_add_subtitle(state: State<'_, AppState>, path: String) -> CmdResul
 }
 
 /// Altyazı gecikmesini `delta` sn kaydırır (g/h: ∓0.05); yeni değeri döndürür.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn player_sub_delay(state: State<'_, AppState>, delta: f64) -> CmdResult<f64> {
     if !delta.is_finite() || delta.abs() > 10.0 {
         return Err(tr!("geçersiz gecikme: {delta}", "invalid delay: {delta}"));
@@ -304,14 +307,14 @@ pub fn player_sub_delay(state: State<'_, AppState>, delta: f64) -> CmdResult<f64
 }
 
 /// Kalite · ses · altyazı listesi (`tracks::Tracks`).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn player_tracks(state: State<'_, AppState>) -> CmdResult<crate::tracks::Tracks> {
     let p = player(&state)?;
     Ok(crate::tracks::list(&p))
 }
 
 /// Müzik modu: çalan görüntülü dosyada video yerine görselleştirici (`lounge`).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn player_music_view(state: State<'_, AppState>, on: bool) -> CmdResult {
     let p = player(&state)?;
     crate::lounge::set_music_view(&p, on);
@@ -319,7 +322,7 @@ pub fn player_music_view(state: State<'_, AppState>, on: bool) -> CmdResult {
 }
 
 /// Müzik ekranı: çalan akışın yt-dlp kapağı (yoksa `None`).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn player_cover(state: State<'_, AppState>) -> CmdResult<Option<String>> {
     let p = player(&state)?;
     Ok(crate::tracks::cover(&p))
@@ -335,7 +338,7 @@ pub async fn player_set_track(app: AppHandle, kind: String, key: String) -> CmdR
         .map_err(|e| e.to_string())?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn player_state(state: State<'_, AppState>) -> CmdResult<PlayerSnapshot> {
     Ok(player(&state)?.snapshot())
 }
@@ -880,7 +883,7 @@ pub async fn queue_add(app: AppHandle, src: String, title: Option<String>) -> Cm
 
 /// Oynatılan yerel dosyanın OpenSubtitles özeti (`moviehash`); akışta ya da çok
 /// küçük dosyada `null`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn subs_hash(state: State<'_, AppState>) -> CmdResult<Option<String>> {
     let Some(path) = player(&state)?.get_property_string("path") else {
         return Ok(None);
@@ -892,7 +895,7 @@ pub fn subs_hash(state: State<'_, AppState>) -> CmdResult<Option<String>> {
 }
 
 /// Odaya gelen altyazı metnini önbelleğe yazar, ekler ve seçer.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn player_add_subtitle_text(app: AppHandle, name: String, text: String) -> CmdResult<String> {
     let dir = app
         .path()
@@ -932,6 +935,24 @@ pub fn sync_pause(state: State<'_, AppState>) -> CmdResult {
     sync_send(&state, UiCmd::Pause)
 }
 
+/// Odada oynat/duraklat: oda oynuyorsa durdurur, değilse başlatır.
+#[tauri::command]
+pub fn sync_toggle(state: State<'_, AppState>) -> CmdResult {
+    sync_send(&state, UiCmd::Toggle)
+}
+
+/// Odada oda konumundan `seconds` kadar ileri (+) ya da geri (−) sar.
+#[tauri::command]
+pub fn sync_seek_by(state: State<'_, AppState>, seconds: f64) -> CmdResult {
+    if !seconds.is_finite() {
+        return Err(tr!(
+            "geçersiz konum: {seconds}",
+            "invalid position: {seconds}"
+        ));
+    }
+    sync_send(&state, UiCmd::SeekBy(seconds))
+}
+
 #[tauri::command]
 pub fn sync_seek(state: State<'_, AppState>, seconds: f64) -> CmdResult {
     if !seconds.is_finite() || seconds < 0.0 {
@@ -944,7 +965,7 @@ pub fn sync_seek(state: State<'_, AppState>, seconds: f64) -> CmdResult {
 }
 
 /// Odada çalanı herkes için kapat (oda açık kalır).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn sync_close(state: State<'_, AppState>) -> CmdResult {
     crate::tracks::clear();
     if let Ok(mpv) = player(&state) {
@@ -1080,7 +1101,7 @@ pub fn sync_download(state: State<'_, AppState>, url: String) -> CmdResult {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn sync_leave(state: State<'_, AppState>) -> CmdResult {
     if let Some(h) = state.sync.lock().unwrap().take() {
         let _ = h.tx.send(UiCmd::Leave);
