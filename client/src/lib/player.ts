@@ -307,6 +307,10 @@ export const syncConnect = (url: string, username: string, roomName: string | nu
 export const syncPlay = () => invoke<void>("sync_play");
 export const syncPause = () => invoke<void>("sync_pause");
 export const syncSeek = (seconds: number) => invoke<void>("sync_seek", { seconds });
+/** Odada oynat/duraklat: karar odanın o anki durumuna göre Rust tarafında verilir. */
+export const syncToggle = () => invoke<void>("sync_toggle");
+/** Odada oda konumundan ±sn sar. */
+export const syncSeekBy = (seconds: number) => invoke<void>("sync_seek_by", { seconds });
 /** Odada çalanı herkes için kapat (oda açık kalır, p0.21). */
 export const syncClose = () => invoke<void>("sync_close");
 /** Host: üyeyi yardımcı host yap / al. */

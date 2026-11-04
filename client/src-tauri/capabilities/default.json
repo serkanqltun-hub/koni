@@ -35,6 +35,8 @@
     "allow-sync-play",
     "allow-sync-pause",
     "allow-sync-seek",
+    "allow-sync-toggle",
+    "allow-sync-seek-by",
     "allow-sync-close",
     "allow-sync-leave",
     "allow-sync-continue-without",
