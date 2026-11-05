@@ -129,6 +129,10 @@ pub struct SyncEngine {
     catch_up_target: Option<f64>,
     /// Oynatıcıya en son uygulanan hız.
     speed: f64,
+    /// Müzik profili ([`SyncEngine::set_music`]).
+    music: bool,
+    /// TV modu ([`SyncEngine::set_tv`]).
+    tv: bool,
 }
 
 fn report_state(s: LocalState) -> Option<ReportState> {
@@ -186,6 +190,8 @@ impl SyncEngine {
             ahead_resume_ms: None,
             catch_up_target: None,
             speed: 1.0,
+            music: false,
+            tv: false,
             cfg,
         }
     }
@@ -197,18 +203,40 @@ impl SyncEngine {
     /// ([`SyncConfig::lounge`]); `false` varsayılana döner. Değişince hız kontrolcüsü
     /// sıfırlanır; diğer eşikler (stall, rezerv) aynı kalır.
     pub fn set_music(&mut self, music: bool) {
-        let base = if music {
+        self.music = music;
+        self.retune();
+    }
+    /// TV modu: oynatıcı ağdaki bir TV, hızı ayarlanamaz. Hız 1.0'da kalır;
+    /// `hard_desync_sec`'ten fazla geride kalınca ileri seek, öndeyken bekleme
+    /// (geri seek yine yok).
+    pub fn set_tv(&mut self, tv: bool) {
+        self.tv = tv;
+        self.retune();
+    }
+    fn retune(&mut self) {
+        let base = if self.music {
             SyncConfig::lounge()
         } else {
             SyncConfig::default()
         };
-        if self.cfg.deadband_sec == base.deadband_sec && self.cfg.max_speed == base.max_speed {
+        let (min, max, skip) = if self.tv {
+            (1.0, 1.0, base.hard_desync_sec)
+        } else {
+            (base.min_speed, base.max_speed, base.skip_forward_sec)
+        };
+        let c = &self.cfg;
+        if c.deadband_sec == base.deadband_sec
+            && c.min_speed == min
+            && c.max_speed == max
+            && c.skip_forward_sec == skip
+        {
             return;
         }
         self.cfg.deadband_sec = base.deadband_sec;
         self.cfg.deadband_exit_sec = base.deadband_exit_sec;
-        self.cfg.min_speed = base.min_speed;
-        self.cfg.max_speed = base.max_speed;
+        self.cfg.min_speed = min;
+        self.cfg.max_speed = max;
+        self.cfg.skip_forward_sec = skip;
         self.controller = SpeedController::new(&self.cfg);
     }
     pub fn state(&self) -> LocalState {
@@ -1137,6 +1165,26 @@ mod tests {
         h.run(2000.0);
         assert!(h.drift().abs() < 0.01, "drift {}", h.drift());
         assert!(h.p.seeks.is_empty());
+        h.assert_clean();
+    }
+
+    #[test]
+    fn tv_mode_no_speed_seeks_past_hard_desync() {
+        let mut h = H::joined_playing();
+        h.e.set_tv(true);
+        // 2 s geride: hız düzeltmesi yok, seek yok.
+        h.p.pos -= 2.0;
+        h.run(1000.0);
+        assert_eq!(h.p.speed, 1.0);
+        assert_eq!(h.p.seeks, vec![100.0]);
+        // 4 s geride: oda konumuna ileri seek.
+        h.p.pos -= 2.0;
+        h.run(250.0);
+        assert_eq!(h.p.seeks.len(), 2);
+        assert!(h.drift().abs() < 0.3, "drift {}", h.drift());
+        assert_eq!(h.p.speed, 1.0);
+        h.e.set_tv(false);
+        assert_eq!(h.e.config().skip_forward_sec, 30.0);
         h.assert_clean();
     }
 

@@ -343,6 +343,11 @@ fn spawn_event_pump(app: tauri::AppHandle, player: Arc<Player>) {
                 Some(koni_player::PlayerEvent::Shutdown) => break,
                 Some(koni_player::PlayerEvent::FileLoaded) => {
                     eprintln!("[koni] dosya yüklendi");
+                    // Yeni dosya açıldı: TV'deki eski video kapanır.
+                    if cast::linked().is_some() {
+                        cast::send(cast::Control::Stop);
+                        cast::link(None);
+                    }
                     tracks::on_file_loaded(&player);
                     let music = lounge::on_file_loaded(&player);
                     let state = app.state::<AppState>();
