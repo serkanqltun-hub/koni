@@ -162,6 +162,8 @@
   let nightOpen = $state(false);
   /** Keşfet'teki "Ne izlesek?" kısayolu: Sinema'ya geçilince açılır. */
   let nightAfterView = false;
+  /** Profildeki "İkinizin de listesinde" yolundan açılan Ne izlesek: havuz anahtarı açık gelir. */
+  let nightLists = $state(false);
   function openNight() {
     if (!room || fullscreen) return;
     if (roomView !== "watch") applyView("watch");
@@ -1133,7 +1135,7 @@
     const mode = newMode, calls = pendingCalls;
     newMode = null;
     pendingCalls = [];
-    if (mode === "night") { nightAfterView = true; pickView("watch"); }
+    if (mode === "night") { nightLists = calls.length > 0; nightAfterView = true; pickView("watch"); }
     else if (mode && mode !== "browse") pickView(mode);
     const friends = social.presence?.friends ?? [];
     for (const c of calls) {
@@ -1967,8 +1969,8 @@
   {/if}
 
   {#if nightOpen && room}
-    <NightView me={sync?.me ?? null} canControl={funControl} {hue} onClose={() => (nightOpen = false)}
-      people={Object.keys(members).length} away={reconnecting !== null || Object.values(members).some((m) => m.away)}
+    <NightView me={sync?.me ?? null} canControl={funControl} {hue} onClose={() => { nightOpen = false; nightLists = false; }}
+      people={Object.keys(members).length} poolDefault={nightLists} away={reconnecting !== null || Object.values(members).some((m) => m.away)}
       onError={(m) => add(m, true)} onFind={playMatch} />
   {/if}
   <nav class="rail">
