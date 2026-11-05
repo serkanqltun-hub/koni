@@ -7,7 +7,7 @@ use std::sync::Arc;
 use koni_player::{Player, PlayerSnapshot};
 use koni_surface::{LayoutConfig, LayoutMode};
 use koni_sync::protocol::{ClientMsg, Policy, SubFile};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::media::{self, Source};
 use crate::sync::{self, Entry, UiCmd, Who};
@@ -47,13 +47,28 @@ pub async fn player_load(app: AppHandle, src: String) -> CmdResult<Option<String
             if !std::path::Path::new(&path).is_file() {
                 return Err(tr!("dosya bulunamadı: {path}", "file not found: {path}"));
             }
-            mpv.load(&path).map_err(|e| e.to_string())?;
-            crate::tracks::clear();
             let name = media::file_name(&path);
+            // İndirilmiş (çevrimdışı) video: ayrı ses dosyası da birlikte açılır.
+            let title = match crate::download::saved_for(std::path::Path::new(&path)) {
+                Some(s) => {
+                    let st = media::Stream::plain(
+                        path.clone(),
+                        s.audio.map(|a| a.display().to_string()),
+                        s.title.clone(),
+                    );
+                    media::load(&mpv, &st)?;
+                    s.title
+                }
+                None => {
+                    mpv.load(&path).map_err(|e| e.to_string())?;
+                    crate::tracks::clear();
+                    name.clone()
+                }
+            };
             if let Some(tx) = room {
-                tx.send(UiCmd::OpenedFile(name.clone())).map_err(closed)?;
+                tx.send(UiCmd::OpenedFile(name)).map_err(closed)?;
             }
-            Ok(Some(name))
+            Ok(Some(title))
         }
     }
 }
@@ -1080,6 +1095,90 @@ pub async fn media_list(src: String) -> CmdResult<Vec<koni_resolver::Hit>> {
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+// ---- İndir, sonra izle (tek başına) ---------------
+
+/// Çevrimdışı indirmeler (`%LOCALAPPDATA%\app.koni.desktop\offline`); oda önbelleğinden
+/// ayrı, oda indirmeleri bunları silmez.
+fn offline_dir(app: &AppHandle) -> CmdResult<std::path::PathBuf> {
+    Ok(app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("offline"))
+}
+
+/// Süren çevrimdışı indirmeler (adres, iş). İş düşünce yt-dlp durur.
+static OFFLINE_JOBS: std::sync::Mutex<Vec<(String, crate::download::Job)>> =
+    std::sync::Mutex::new(Vec::new());
+
+#[derive(serde::Serialize, Clone)]
+struct OfflineProgress {
+    url: String,
+    state: koni_sync::protocol::DlState,
+    pct: f64,
+    speed: f64,
+    eta: f64,
+    error: String,
+}
+
+/// Linki bu bilgisayara indirir (oda "Herkes İndirsin" yolu, tek kişi). İlerleme
+/// `offline://progress` olayıyla gelir.
+#[tauri::command]
+pub fn offline_download(app: AppHandle, url: String) -> CmdResult {
+    use koni_sync::protocol::DlState;
+    let Source::Web(url) = Source::parse(&url)? else {
+        return Err(trs(
+            "indirmek için web adresi gerekli",
+            "a web address is needed to download",
+        )
+        .into());
+    };
+    let cache = offline_dir(&app)?;
+    let mut jobs = OFFLINE_JOBS.lock().unwrap();
+    if jobs.iter().any(|(u, _)| *u == url) {
+        return Ok(());
+    }
+    let (u, a) = (url.clone(), app.clone());
+    let report = move |p: crate::download::Progress| {
+        if matches!(p.state, DlState::Ready | DlState::Failed) {
+            OFFLINE_JOBS.lock().unwrap().retain(|(x, _)| *x != u);
+        }
+        let _ = a.emit(
+            "offline://progress",
+            OfflineProgress {
+                url: u.clone(),
+                state: p.state,
+                pct: p.pct,
+                speed: p.speed,
+                eta: p.eta,
+                error: p.error,
+            },
+        );
+    };
+    let job = crate::download::start(media::ytdlp_bin(), cache, url.clone(), report, |res| {
+        res.map(|_| ())
+    });
+    jobs.push((url, job));
+    Ok(())
+}
+
+/// Süren indirmeyi durdurur (yarım dosya kalır, yeniden başlatınca kaldığı yerden sürer).
+#[tauri::command]
+pub fn offline_cancel(url: String) -> CmdResult {
+    OFFLINE_JOBS.lock().unwrap().retain(|(u, _)| *u != url);
+    Ok(())
+}
+
+#[tauri::command(async)]
+pub fn offline_list(app: AppHandle) -> CmdResult<Vec<crate::download::Saved>> {
+    Ok(crate::download::list(&offline_dir(&app)?))
+}
+
+#[tauri::command(async)]
+pub fn offline_delete(app: AppHandle, key: String) -> CmdResult {
+    crate::download::remove(&offline_dir(&app)?, &key)
 }
 
 /// "Odayla Senkronla" (DETACHED'dan dönüş).

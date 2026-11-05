@@ -19,6 +19,8 @@ use koni_sync::protocol::DlState;
 const CACHE_QUOTA: u64 = 50 * 1024 * 1024 * 1024;
 /// Klasördeki son kullanım damgası (LRU).
 const USED_STAMP: &str = "used";
+/// Biten indirmenin künyesi (`Saved`).
+const INFO: &str = "info.json";
 /// İlerleme raporu sıklığı (durum değişimi hemen gider).
 const REPORT_EVERY: Duration = Duration::from_secs(1);
 
@@ -50,6 +52,62 @@ pub struct Files {
     pub video: PathBuf,
     pub audio: Option<PathBuf>,
     pub title: String,
+}
+
+/// Biten indirmenin künyesi: çevrimdışı raf bunu listeler; ayrı ses dosyası da buradan
+/// bulunur (dosya yolundan açılınca `player_load`).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Saved {
+    /// Klasör adı (silmek için).
+    #[serde(default)]
+    pub key: String,
+    pub title: String,
+    pub url: String,
+    pub video: PathBuf,
+    pub audio: Option<PathBuf>,
+    /// Bitiş zamanı (Unix ms).
+    pub at: u64,
+    /// Klasördeki dosyaların toplamı (listelerken hesaplanır).
+    #[serde(default)]
+    pub size: u64,
+}
+
+/// Önbellekteki biten indirmeler, yeniden eskiye.
+pub fn list(cache: &Path) -> Vec<Saved> {
+    let Ok(rd) = std::fs::read_dir(cache) else {
+        return Vec::new();
+    };
+    let mut out: Vec<Saved> = rd
+        .filter_map(Result::ok)
+        .filter_map(|e| {
+            let dir = e.path();
+            let mut s: Saved = serde_json::from_slice(&std::fs::read(dir.join(INFO)).ok()?).ok()?;
+            if !s.video.is_file() {
+                return None;
+            }
+            s.key = e.file_name().to_string_lossy().into_owned();
+            s.size = dir_size(&dir);
+            Some(s)
+        })
+        .collect();
+    out.sort_by_key(|s| std::cmp::Reverse(s.at));
+    out
+}
+
+/// `path` bir indirmenin görüntü dosyasıysa künyesi (ses ayrı dosyaysa birlikte açılır).
+pub fn saved_for(path: &Path) -> Option<Saved> {
+    let s: Saved = serde_json::from_slice(&std::fs::read(path.parent()?.join(INFO)).ok()?).ok()?;
+    (s.video == path).then_some(s)
+}
+
+/// Bir indirmeyi siler. `key` yalnızca `list`'in verdiği klasör adı olabilir.
+pub fn remove(cache: &Path, key: &str) -> Result<(), String> {
+    let ok = |c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_';
+    if key.is_empty() || !key.chars().all(ok) {
+        return Err(trs("geçersiz indirme", "invalid download").into());
+    }
+    std::fs::remove_dir_all(cache.join(key))
+        .map_err(|e| tr!("silinemedi: {e}", "couldn't delete: {e}"))
 }
 
 /// Süren indirme. Düşürülünce (oda başka medyaya geçti, oturum kapandı) yt-dlp durdurulur;
@@ -349,6 +407,21 @@ fn run(
         ))?),
         None => None,
     };
+    let at = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64);
+    let info = Saved {
+        key: plan.key.clone(),
+        title: plan.title.clone(),
+        url: url.to_owned(),
+        video: video.clone(),
+        audio: audio.clone(),
+        at,
+        size: 0,
+    };
+    if let Ok(json) = serde_json::to_vec(&info) {
+        let _ = std::fs::write(dir.join(INFO), json);
+    }
     Ok(Files {
         video,
         audio,
@@ -471,6 +544,35 @@ mod tests {
         assert_eq!(one.key, "Generic-___x");
         assert_eq!(one.formats, vec![("18".into(), 1000)]);
         assert!(parse_plan("KONIPLAN|Twitch|x|True|best|NA|NA|NA|t").is_err());
+    }
+
+    #[test]
+    fn saved_list_and_remove() {
+        let cache = std::env::temp_dir().join(format!("koni-dl-test-{}", std::process::id()));
+        let dir = cache.join("Youtube-abc");
+        std::fs::create_dir_all(&dir).unwrap();
+        let video = dir.join("media.f1.mp4");
+        std::fs::write(&video, b"1234").unwrap();
+        let info = Saved {
+            key: String::new(),
+            title: "t".into(),
+            url: "https://x".into(),
+            video: video.clone(),
+            audio: None,
+            at: 5,
+            size: 0,
+        };
+        std::fs::write(dir.join(INFO), serde_json::to_vec(&info).unwrap()).unwrap();
+        let l = list(&cache);
+        assert_eq!(l.len(), 1);
+        assert_eq!(l[0].key, "Youtube-abc");
+        assert!(l[0].size >= 4);
+        assert!(saved_for(&video).is_some());
+        assert!(saved_for(&dir.join("other.mp4")).is_none());
+        assert!(remove(&cache, "../x").is_err());
+        remove(&cache, "Youtube-abc").unwrap();
+        assert!(list(&cache).is_empty());
+        let _ = std::fs::remove_dir_all(&cache);
     }
 
     #[test]

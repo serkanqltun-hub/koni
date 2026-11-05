@@ -33,6 +33,7 @@
   import Icon from "./lib/Icon.svelte";
   import NightView from "./lib/NightView.svelte";
   import CinemaLobby from "./lib/CinemaLobby.svelte";
+  import { startOffline } from "./lib/offline.svelte";
   import TitlesPane from "./lib/TitlesPane.svelte";
   import DebridSettings from "./lib/DebridSettings.svelte";
   import SubsFinder from "./lib/SubsFinder.svelte";
@@ -1466,7 +1467,7 @@
           error={roomMedia?.status === "error" ? (roomMedia.error ? tx(roomMedia.error) : roomMedia.title ?? roomMedia.src) : null}
           onOpen={(t) => open(t)} onTitles={openTitles}
           onNight={room && !fullscreen ? openNight : null}
-          onDownload={room ? (u) => run("Herkes İndirsin", syncDownload(u), true) : null}
+          onDownload={room ? (u) => run("Herkes İndirsin", syncDownload(u), true) : (u) => run("İndirme başladı; lobideki Çevrimdışı rafında görünür", startOffline(u))}
           onResume={resumeHere} />
       </div>
     {:else if st?.duration == null}
