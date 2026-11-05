@@ -163,6 +163,7 @@ pub fn run() {
             commands::account_logout,
             commands::stats_get,
             commands::feed_get,
+            commands::watch_report,
             commands::lists_call,
             commands::friends,
             commands::profile,

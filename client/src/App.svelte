@@ -15,7 +15,7 @@
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, bugReport,
     type SyncStatus, type ServerMsg, type Member, type MediaEvent, type LinkEvent, type DlStatus, type Policy,
     type SnifferEvent, type UpdateInfo, type FunMsg, type Movie, syncSetView, type RoomView,
-    debridOpen, type Source, playerMusicView, playerPlay, playerCover, relayOn, setRelay, setLangPrefs, langMode, subSize, lobbyRemoteState,
+    debridOpen, watchReport, type Source, playerMusicView, playerPlay, playerCover, relayOn, setRelay, setLangPrefs, langMode, subSize, lobbyRemoteState,
   } from "./lib/player";
   import BrowseView from "./lib/BrowseView.svelte";
   import TitleBar from "./lib/TitleBar.svelte";
@@ -790,6 +790,23 @@
   });
   $effect(() => { if (!canSleep && sleepSel !== 0) untrack(() => setSleep(0)); });
 
+  // Solo izleme süresi (p0.25): oynarken saniye say, dakikada bir sunucuya bildir. Odadayken oda sayar.
+  let soloAcc = 0;
+  function soloFlush() {
+    const sec = Math.min(Math.floor(soloAcc), 120);
+    soloAcc = 0;
+    if (sec < 1 || !social.server) return;
+    watchReport(social.server, sec, soloMedia?.title || undefined).catch(() => {});
+  }
+  $effect(() => {
+    if (view !== "solo" || roomView !== "watch") return;
+    const id = setInterval(() => {
+      const s = st;
+      if (s && s.duration != null && !s.paused && !s.pausedForCache && !s.eofReached && !s.seeking) soloAcc += 1;
+      if (soloAcc >= 60) soloFlush();
+    }, 1000);
+    return () => { clearInterval(id); soloFlush(); };
+  });
   // "Tam ekran başlat": yeni bir video açılınca (süre bilinince) tam ekrana geç.
   let hadDuration = false;
   $effect(() => {

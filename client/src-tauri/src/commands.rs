@@ -592,6 +592,18 @@ pub async fn feed_get(url: String) -> CmdResult<Option<serde_json::Value>> {
     Ok(Some(account::feed(&url, acc.token).await?))
 }
 
+/// Solo izleme süresi raporu (p0.25). Hesap yoksa `null`.
+#[tauri::command]
+pub async fn watch_report(url: String, sec: u32, title: Option<String>) -> CmdResult<Option<u32>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    Ok(Some(
+        account::watch(&url, acc.token, sec.min(120), title.unwrap_or_default()).await?,
+    ))
+}
+
 /// Arkadaş listesi; `op` `list` | `add` | `remove`. Hesap yoksa `null`.
 #[tauri::command]
 pub async fn friends(

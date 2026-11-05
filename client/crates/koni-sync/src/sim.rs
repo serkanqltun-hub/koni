@@ -499,6 +499,7 @@ impl SimRoom {
             | ClientMsg::Logout { .. }
             | ClientMsg::Stats { .. }
             | ClientMsg::Feed { .. }
+            | ClientMsg::Watch { .. }
             | ClientMsg::Lists { .. }
             | ClientMsg::Friends { .. }
             | ClientMsg::Profile { .. }
