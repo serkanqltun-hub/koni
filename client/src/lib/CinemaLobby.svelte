@@ -2,16 +2,17 @@
   // Boş Sinema (lobi): tek kutu (link/dosya yolu açar, düz yazı Film & Dizi'de arar),
   // Ne izlesek? (tek başınaysa Ne izlesem?) / Film & Dizi / Herkes indirsin (tek başınaysa İndir) kartları,
   // "Kaldığınız yerden" ve tek başınayken "Çevrimdışı" rafı (indirilenler), "Ücretsiz & klasik" rafı
-  // (film sağlayıcısı kurulu değilse kutunun hemen altında, öne çıkmış).
+  // (film sağlayıcısı kurulu değilse kutunun hemen altında, öne çıkmış), öneri rafları.
   // mpv bu sırada gizli; sahneyi arayüz çizer (kokpit modeli bozulmaz).
   import { loadResume, pullResume, removeResume, type ResumeEntry } from "./resume";
   import Icon from "./Icon.svelte";
   import { t, tx, locale } from "./i18n.svelte";
   import { offline, initOffline, cancelOffline, deleteOffline } from "./offline.svelte";
-  import { debridStatus, addonsList } from "./player";
+  import { debridStatus, addonsList, type DetailRef } from "./player";
   import FreeShelf from "./FreeShelf.svelte";
+  import RecShelves from "./RecShelves.svelte";
 
-  let { value = $bindable(""), people, room, busy, error, hue, onOpen, onTitles, onNight, onDownload, onResume }: {
+  let { value = $bindable(""), people, room, busy, error, hue, onOpen, onTitles, onNight, onDownload, onResume, onDetail, onCall = null }: {
     value: string;
     /** Odadakiler (tek başınaysa boş). */
     people: { id: string; name: string }[];
@@ -26,6 +27,9 @@
     onNight: (() => void) | null;
     onDownload: ((url: string) => void) | null;
     onResume: (r: ResumeEntry) => void;
+    /** Öneri rafından bir afiş: künyeyi aç. */
+    onDetail: (d: DetailRef) => void;
+    onCall?: ((name: string) => void) | null;
   } = $props();
 
   let input = $state<HTMLInputElement>();
@@ -187,6 +191,8 @@
       </div>
     </div>
   </div>
+
+  <RecShelves onOpen={onDetail} {onCall} />
 
   {#if noProvider === false}<FreeShelf inRoom={!!room} {busy} onPlay={onOpen} />{/if}
 </div>

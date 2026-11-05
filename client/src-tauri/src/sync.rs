@@ -25,6 +25,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
 
+use crate::cast::{self, Control};
 use crate::{debrid, download, media, page, AppState};
 
 /// UI → oturum komutları.
@@ -197,7 +198,8 @@ struct Status {
 
 /// libmpv'yi motorun `Player` trait'ine bağlar. mpv hataları loglanır, motor
 /// bir sonraki tick'te gerçek durumu yeniden okur. Oda medyası `page` iken
-/// (tarayıcıda senkron) okuma ve komutlar Keşfet'teki sayfanın videosuna gider.
+/// (tarayıcıda senkron) okuma ve komutlar Keşfet'teki sayfanın videosuna gider;
+/// TV modundaysa (`cast::link`) TV'ye.
 struct MpvAdapter {
     mpv: Arc<Mpv>,
     app: AppHandle,
@@ -234,6 +236,14 @@ impl MpvAdapter {
     }
 }
 
+/// Odada TV modu: oynatıcı TV'dir (bilgisayardaki mpv duraklatılmış bekler).
+fn tv() -> Option<cast::Position> {
+    if page::active() {
+        return None;
+    }
+    cast::linked_position(None)
+}
+
 fn log_err<T>(what: &str, r: koni_player::Result<T>) {
     if let Err(e) = r {
         eprintln!("[koni] sync: {what}: {e}");
@@ -245,11 +255,17 @@ impl Player for MpvAdapter {
         if page::active() {
             return page::position();
         }
+        if let Some(tv) = tv() {
+            return tv.position;
+        }
         self.mpv.time_pos().unwrap_or(0.0)
     }
     fn is_paused(&self) -> bool {
         if page::active() {
             return page::paused();
+        }
+        if let Some(tv) = tv() {
+            return !tv.playing;
         }
         self.mpv.is_paused()
     }
@@ -268,6 +284,9 @@ impl Player for MpvAdapter {
             } else {
                 0.0
             };
+        }
+        if tv().is_some() {
+            return cast::TV_BUFFER_SEC;
         }
         let raw = self.mpv.demuxer_cache_duration();
         if self.in_grace() {
@@ -303,6 +322,9 @@ impl Player for MpvAdapter {
         if page::active() {
             return page::buffering() && !self.in_grace();
         }
+        if tv().is_some() {
+            return false;
+        }
         if self.in_grace() {
             return false;
         }
@@ -312,11 +334,17 @@ impl Player for MpvAdapter {
         if page::active() {
             return page::duration();
         }
+        if let Some(tv) = tv().filter(|tv| tv.duration > 0.0) {
+            return Some(tv.duration);
+        }
         self.mpv.duration()
     }
     fn eof_reached(&self) -> bool {
         if page::active() {
             return page::ended();
+        }
+        if let Some(tv) = tv() {
+            return tv.duration > 0.0 && tv.position >= tv.duration - 0.5;
         }
         self.mpv.eof_reached()
     }
@@ -328,11 +356,21 @@ impl Player for MpvAdapter {
         if page::active() {
             return page::command(&self.app, if paused { "pause" } else { "play" }, 0.0);
         }
+        if tv().is_some() {
+            return cast::send(if paused {
+                Control::Pause
+            } else {
+                Control::Play
+            });
+        }
         log_err("pause", self.mpv.set_pause(paused));
     }
     fn set_speed(&mut self, speed: f64) {
         if page::active() {
             return page::command(&self.app, "rate", speed);
+        }
+        if tv().is_some() {
+            return; // TV'nin hızı ayarlanamaz; motor TV modunda hızı 1.0'da tutar
         }
         log_err("speed", self.mpv.set_speed(speed));
     }
@@ -341,6 +379,9 @@ impl Player for MpvAdapter {
         self.paused_plateau.set(None);
         if page::active() {
             return page::command(&self.app, "seek", pos);
+        }
+        if tv().is_some() {
+            return cast::send(Control::Seek(pos));
         }
         log_err("seek", self.mpv.seek_absolute(pos));
     }
@@ -1231,6 +1272,7 @@ async fn run(
                         l.last_rx = last_tick;
                     }
                 }
+                engine.set_tv(tv().is_some());
                 let ev = engine.tick(&mut player, now);
                 let status = status(&engine, &player, now, csv.as_ref());
                 if let Some(c) = csv.as_mut() {
@@ -1242,7 +1284,10 @@ async fn run(
                 }
                 ev
             }
-            Step::Deadline => engine.tick(&mut player, clock.now()),
+            Step::Deadline => {
+                engine.set_tv(tv().is_some());
+                engine.tick(&mut player, clock.now())
+            }
             Step::Countdown => {
                 // OSD'de büyük 3-2-1; UI başlık pilinde gösterir (`sync://countdown`, 0 = bitti).
                 if let Some(c) = countdown.as_mut() {

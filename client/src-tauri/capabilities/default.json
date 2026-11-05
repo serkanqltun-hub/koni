@@ -68,6 +68,7 @@
     "allow-lists-call",
     "allow-watch-report",
     "allow-detail-get",
+    "allow-recs-get",
     "allow-browse-get",
     "allow-skip-get",
     "allow-skip-set",

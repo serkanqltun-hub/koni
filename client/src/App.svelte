@@ -9,7 +9,7 @@
     COCKPIT_LAYOUT, playerLoad, playerPause, playerTogglePause, playerSeek, playerSetSpeed, playerScreenshot,
     playerSetVolume, playerAddSubtitle, playerSubDelay, playerTracks, playerSetTrack,
     type Tracks, type TrackKind,
-    playerState, setLayout, setFullscreen, openCastPanel, isMac, castDevices, castPrepare, castPlay, castControl, castPosition, castBack, type CastDevice, type CastPosition, type PlayerState,
+    playerState, setLayout, setFullscreen, openCastPanel, isMac, castDevices, castPrepare, castPlay, castControl, castPosition, castBack, TV_BUFFER_SEC, type CastDevice, type CastPosition, type PlayerState,
     syncConnect, syncSeek, syncToggle, syncPause, syncSeekBy, syncLeave, syncContinueWithout, syncResync, syncDownload,
     syncSetCohost, syncSetPolicy, accountGet, accountLogin, accountRegister, accountLogout, snifferClose,
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, mediaList, bugReport,
@@ -91,7 +91,8 @@
   let inviteIn = $state("");
   let connecting = $state(false);
   let room = $state<{ name: string; invite: string; host: string; policy: Policy } | null>(null);
-  let members = $state<Record<string, Member & { driftMs?: number; state?: string; bufferPct?: number; rttMs?: number }>>({});
+  /** `tv`: üye odada TV'den izliyor (raporu TV tampon değeriyle gelir, bkz. `cast::TV_BUFFER_SEC`). */
+  let members = $state<Record<string, Member & { driftMs?: number; state?: string; bufferPct?: number; rttMs?: number; tv?: boolean }>>({});
   let sync = $state<SyncStatus | null>(null);
   let roomMedia = $state<MediaEvent | null>(null);
   let opening = $state(false);
@@ -191,7 +192,7 @@
   let fdOpen = $state(false);
   let fdQuery = $state("");
   /** Profildeki listeden "İzle" ile açılan başlık (TitlesPane kendiliğinden açar ve kaynak arar). */
-  let watchReq = $state<{ ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; prefer?: Prefer } | null>(null);
+  let watchReq = $state<{ ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; prefer?: Prefer; detailOnly?: boolean } | null>(null);
   /** Solo lobide "Ne izlesem?" sihirbazı (açıkken mpv gizli). */
   let soloNightOpen = $state(false);
   function openTitles(q: string) {
@@ -266,7 +267,12 @@
         if (!tv || tv.device !== d) return;
         // Süre yok ve oynamıyor: video bitti ya da TV'de kapatıldı.
         if (s.playing || s.duration > 0) tv.s = s;
-        else if (tvSettled()) { tv = null; note("TV'de oynatma bitti"); }
+        else if (tvSettled()) {
+          tv = null;
+          note("TV'de oynatma bitti");
+          // Odadaysa bilgisayar odaya döner; değilse yalnızca TV modu kapanır.
+          (inRoom ? castBack(d) : castControl(d, { action: "stop" })).catch(() => {});
+        }
       } catch { /* TV geçici yanıt vermeyebilir */ }
     }, 1000);
     return () => clearInterval(id);
@@ -459,6 +465,8 @@
     return pic(f?.avatar);
   }
   const callFriend = (user: string) => run("Çağır", syncFun({ t: "call", user }), true);
+  /** Öneri rafı "Çağır": odadaysa çağırır, tek başınaysa oda kurup çağırır. */
+  const recCall = (user: string) => (room ? callFriend(user) : createRoom("watch", [user]));
   // Video yüzeyi yalnızca oda ve tek başına modda görünür.
   $effect(() => {
     // Müzik sahnesi kendi ekranını çizer: mpv penceresi yalnızca Sinema'da görünür.
@@ -972,7 +980,7 @@
   }
 
   function togglePause() {
-    if (tv) return run("Oynat/Duraklat", castControl(tv.device, { action: tv.s?.playing === false ? "play" : "pause" }), true);
+    if (tv && !inRoom) return run("Oynat/Duraklat", castControl(tv.device, { action: tv.s?.playing === false ? "play" : "pause" }), true);
     if (!inRoom) return run("Oynat/Duraklat", playerTogglePause());
     return run("Oynat/Duraklat", syncToggle(), true);
   }
@@ -984,7 +992,7 @@
     return seekTo(Math.max(0, Math.min(dur - 1, (st?.timePos ?? 0) + by)));
   }
   function seekTo(v: number) {
-    if (tv) return run("Atla", castControl(tv.device, { action: "seek", seconds: v }), true);
+    if (tv && !inRoom) return run("Atla", castControl(tv.device, { action: "seek", seconds: v }), true);
     if (inRoom) return run("Atla", syncSeek(v), true);
     return run("Atla " + fmt(v), playerSeek(v), false, () => t("Atla {pos}", { pos: fmt(v) }));
   }
@@ -1294,7 +1302,7 @@
         if (roomMedia?.status !== "error" && roomMedia?.status !== "no_provider") note("Oda seni beklemeden devam ediyor. Bağlantın düzelince \"Odayla Senkronla\".", undefined, true);
         break;
       case "member_status":
-        if (members[m.id]) Object.assign(members[m.id], { driftMs: m.driftMs, state: m.state, bufferPct: m.bufferPct, rttMs: m.rttMs });
+        if (members[m.id]) Object.assign(members[m.id], { driftMs: m.driftMs, state: m.state, bufferPct: m.bufferPct, rttMs: m.rttMs, tv: (m.bufferSec ?? 0) >= TV_BUFFER_SEC });
         break;
       case "activity":
         add(m.text);
@@ -1500,7 +1508,7 @@
   /** Birlikte izleyenler: bağlı, ayrı izlemiyor, tamponu dolu, sapması yarım saniyeden az. */
   const together = $derived(Object.values(members).filter((m) =>
     !m.away && !m.detached && (m.bufferPct == null || m.bufferPct >= 100) &&
-    (m.id === sync?.me ? !detached : m.driftMs == null || Math.abs(m.driftMs) < 500)));
+    (m.id === sync?.me ? !detached : m.driftMs == null || Math.abs(m.driftMs) < (m.tv ? 3000 : 500))));
   /** Tamponu dolmayanlar (bekleme bandı). */
   const waiting = $derived(Object.values(members).filter((m) => !m.away && m.id !== sync?.me && m.bufferPct != null && m.bufferPct < 100));
   const holdOn = $derived(!!room && roomView === "watch" && !sceneOwned && sync?.roomMode === "hold");
@@ -1734,7 +1742,7 @@
   <div class="video">
     {#if fdOpen}
       <div class="stage" in:fade={{ duration: 200 }}>
-        <TitlesPane withSearch inRoom={room !== null} initial={fdQuery} watch={watchReq} onPlay={openDebrid} onExit={() => { fdOpen = false; watchReq = null; }} onError={(m) => add(m, true)} />
+        <TitlesPane withSearch inRoom={room !== null} initial={fdQuery} watch={watchReq} onPlay={openDebrid} onExit={() => { fdOpen = false; watchReq = null; }} onError={(m) => add(m, true)} onCall={recCall} />
       </div>
     {:else if endOn}
       <div class="stage" in:fade={{ duration: 300 }}>{@render endScreen()}</div>
@@ -1746,7 +1754,8 @@
           onOpen={(t) => open(t)} onTitles={openTitles}
           onNight={fullscreen ? null : room ? openNight : () => (soloNightOpen = true)}
           onDownload={room ? (u) => run("Herkes İndirsin", syncDownload(u), true) : (u) => run("İndirme başladı; lobideki Çevrimdışı rafında görünür", startOffline(u))}
-          onResume={resumeHere} />
+          onResume={resumeHere}
+          onDetail={(d) => { openTitles(""); watchReq = { ...d, detailOnly: true }; }} onCall={recCall} />
       </div>
     {:else if st?.duration == null}
       {@const mediaName = roomMedia ? roomMedia.title || roomMedia.src : soloMedia?.title || soloMedia?.src || ""}
@@ -1862,9 +1871,9 @@
             </div>
           {/if}
           <div class="eyebrow">{t("Aynı ağdaki TV'ler")}</div>
-          {#if inRoom}<div class="hint">{t("Odadayken TV'ye gönderme henüz yok.")}</div>{/if}
+          {#if inRoom}<div class="hint">{t("Odadayken TV odayla birlikte oynar; 3 sn'den fazla kayarsa TV sarılır.")}</div>{/if}
           {#each castList as d (d.id)}
-            <button class="opt" disabled={inRoom || !st?.duration} onclick={() => castTo(d)}>
+            <button class="opt" disabled={!st?.duration} onclick={() => castTo(d)}>
               <span class="opt-ic"><Icon name="cast" /></span><span class="opt-txt"><b>{d.name}</b><small>{d.kind}</small></span>
             </button>
           {:else}
@@ -1938,6 +1947,7 @@
                   <span class="name">{m.name}{#if m.admin}<span class="atag">ADMIN</span>{/if}</span>
                   {#if m.id === room.host}<span class="badge host">Host</span>{/if}
                   {#if m.cohost}<span class="badge">{t("Yardımcı")}</span>{/if}
+                  {#if m.id === sync?.me ? tv !== null : m.tv}<span class="badge">📺 {t("TV'de")}</span>{/if}
                   {#if m.id === sync?.me}<span class="you">{t("sen")}</span>{/if}
                   <span class="num" class:warn-t={waiting}>
                     {#if m.away}{t("bağlantı koptu")}
