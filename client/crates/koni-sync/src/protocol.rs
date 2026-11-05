@@ -125,6 +125,12 @@ pub enum ClientMsg {
     Recs {
         auth: String,
     },
+    /// Tek seferlik (p0.28): film gecesi; `op` `create` | `rsvp` | `cancel`, yoksa liste. Alanlar olduğu gibi eklenir.
+    Event {
+        auth: String,
+        #[serde(flatten, default)]
+        query: Option<serde_json::Map<String, serde_json::Value>>,
+    },
     /// Tek seferlik (p0.27): intro / özet işareti; `op` `get` | `set` | `clear`, `season` 0 = tüm sezonlar.
     Skip {
         auth: String,

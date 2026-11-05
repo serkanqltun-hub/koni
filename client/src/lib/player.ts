@@ -84,7 +84,18 @@ export interface OpenRoom {
   invite: string; room: string; title?: string; view: RoomView; night?: boolean; playing?: boolean;
   pos?: number; dur?: number; members: string[]; mine?: boolean; left?: number;
 }
-export interface Presence { friends: PresenceFriend[]; requests: Friend[]; calls: RoomCall[]; rooms?: OpenRoom[] }
+export interface Presence { friends: PresenceFriend[]; requests: Friend[]; calls: RoomCall[]; rooms?: OpenRoom[]; /** p0.28 */ events?: MovieNight[] }
+/** p0.28 film gecesi (PROTOCOL §3.0p). `rsvp` "" = cevap yok; `state` yoksa bekliyor. */
+export type Rsvp = "" | "yes" | "no" | "maybe";
+export interface MovieNight {
+  id: number; title: string; at: number; host: { name: string; avatar: string };
+  guests: { name: string; avatar: string; rsvp: Rsvp }[]; mine?: boolean; state?: "open" | "missed";
+  room?: { invite: string; name: string };
+}
+export type EventQuery = { op: "create"; title: string; at: number; guests: string[] } | { op: "rsvp"; id: number; rsvp: Exclude<Rsvp, ""> } | { op: "cancel"; id: number };
+/** Hata kodu (`bad_entry`, `not_friends`, `unknown_user`, `too_many_events`) ile düşer. Hesap yoksa `null`. */
+export const eventOp = (url: string, query?: EventQuery) =>
+  invoke<{ t: "event"; id?: number; events: MovieNight[] } | null>("event_op", { url, query: query ?? null });
 export const lobbyStart = (url: string) => invoke<void>("lobby_start", { url });
 export const lobbyDecline = (invite: string) => invoke<void>("lobby_decline", { invite });
 /** Telefon kumandasına durum (p0.24). */

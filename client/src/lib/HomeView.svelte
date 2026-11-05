@@ -8,6 +8,7 @@
   import Avatar from "./Avatar.svelte";
   import SocialModals from "./SocialModals.svelte";
   import ProfileView from "./ProfileView.svelte";
+  import MovieNight from "./MovieNight.svelte";
   import { loadResume, pullResume, removeResume } from "./resume";
   import { feedGet, friendsCall, lobbyDecline, statsGet, upcomingGet, type FeedItem, type TeamItem, type Upcoming, type UpcomingItem, type ListEntry, type OpenRoom, type PresenceFriend, type RoomView, type Stats, type StatsPeriod } from "./player";
   import { refreshProfile, social, splitHandle } from "./social.svelte";
@@ -287,6 +288,8 @@
         </span>
       </div>
     {/each}
+
+    <MovieNight friends={mutual} {busy} {onJoin} />
 
     {#if rooms.length}
       <div class="lab">{t("Açık odalar")} <span class="hint">{t("senin odan kapanmadıkça geri dönebilirsin")}</span></div>

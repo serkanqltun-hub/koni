@@ -207,6 +207,24 @@ pub async fn recs(url: &str, msg: ClientMsg) -> Result<serde_json::Value, String
     Ok(v)
 }
 
+/// `event` el sıkışması (p0.28): film geceleri olduğu gibi arayüze gider.
+pub async fn event(url: &str, msg: ClientMsg) -> Result<serde_json::Value, String> {
+    let t = exchange(url, &msg).await?;
+    let v: serde_json::Value = serde_json::from_str(&t).map_err(|e| e.to_string())?;
+    if v["t"] == "error" {
+        // Kodu döndür: arayüz gece için kendi metnini seçer (`bad_entry`, `not_friends` …).
+        return Err(v["code"]
+            .as_str()
+            .or(v["message"].as_str())
+            .unwrap_or(trs("sunucu hatası", "server error"))
+            .to_string());
+    }
+    if v["t"] != "event" {
+        return Err(tr!("beklenmeyen cevap: {t}", "unexpected response: {t}"));
+    }
+    Ok(v)
+}
+
 /// `skip` el sıkışması (p0.27): intro / özet işaretleri olduğu gibi arayüze gider.
 pub async fn skip(url: &str, msg: ClientMsg) -> Result<serde_json::Value, String> {
     let t = exchange(url, &msg).await?;

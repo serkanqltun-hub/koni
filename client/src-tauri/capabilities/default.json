@@ -71,6 +71,7 @@
     "allow-watch-report",
     "allow-detail-get",
     "allow-recs-get",
+    "allow-event-op",
     "allow-browse-get",
     "allow-skip-get",
     "allow-skip-set",

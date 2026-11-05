@@ -64,6 +64,7 @@ const COMMANDS: &[&str] = &[
     "skip_set",
     "upcoming_get",
     "recs_get",
+    "event_op",
     "solo_night",
     "solo_night_pick",
     "friends",
