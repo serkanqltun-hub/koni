@@ -36,17 +36,30 @@ struct Page {
     video: Option<Video>,
     /// Sayfanın başlığı (`document.title`), odaya giden adı.
     title: String,
+    /// Oda bu sayfaya geçtiğinden beri sayfada video bulundu mu. Bulunana kadar bu üye
+    /// "hazır değil" sayılır: oda herkesin videosu açılınca başlar (Keşfet, "herkes hazır olunca").
+    found: bool,
 }
 
 static PAGE: Mutex<Page> = Mutex::new(Page {
     room: None,
     video: None,
     title: String::new(),
+    found: false,
 });
 
 /// Oda medyası değişti: `page` ise adresi, değilse `None`.
 pub fn set_room(url: Option<String>) {
-    PAGE.lock().unwrap().room = url;
+    let mut p = PAGE.lock().unwrap();
+    if p.room != url {
+        p.found = false;
+    }
+    p.room = url;
+}
+
+/// Oda sayfaya geçtiğinden beri bu sayfada video bulundu mu.
+pub fn found() -> bool {
+    PAGE.lock().unwrap().found
 }
 
 /// Senkron motoru sayfanın videosunu mu sürüyor.
@@ -150,6 +163,9 @@ pub fn report(r: Report) -> Option<(String, f64)> {
         return None;
     }
     let mut p = PAGE.lock().unwrap();
+    if p.room.is_some() {
+        p.found = true;
+    }
     if let Some(t) = r.title.filter(|t| !t.trim().is_empty()) {
         p.title = t.trim().chars().take(200).collect();
     }

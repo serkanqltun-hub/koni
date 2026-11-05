@@ -9,6 +9,7 @@
   import { DEFAULT_SERVER, serverLabel } from "./server";
   import { prefs } from "./prefs.svelte";
   import { autoSkip, setAutoSkip } from "./skip";
+  import { library, initLibrary, addFolder, removeFolder, rescan } from "./library.svelte";
 
   // Uygulama ayarları (UI-PLAN §5.9, E3). Yalnızca gerçekten çalışan ayarlar var.
   let {
@@ -35,10 +36,11 @@
     onBugReport: (note: string) => Promise<unknown>;
   } = $props();
 
-  type Section = "account" | "player" | "debrid" | "keys" | "about";
+  type Section = "account" | "player" | "library" | "debrid" | "keys" | "about";
   const SECTIONS: { id: Section; label: string }[] = [
     { id: "account", label: "Hesap" },
     { id: "player", label: "Oynatıcı" },
+    { id: "library", label: "Kütüphane" },
     { id: "debrid", label: "Sağlayıcı" },
     { id: "keys", label: "Kısayollar" },
     { id: "about", label: "Hakkında" },
@@ -69,6 +71,12 @@
   // Telefon kumandası (p0.24): santralin adresi tarayıcıda açılınca kumanda sayfası gelir.
   const remoteUrl = $derived(server.replace(/^ws/i, "http"));
   let copied = $state(false);
+  initLibrary();
+  const libCount = $derived.by(() => {
+    const items = library.data?.items ?? [];
+    const series = new Set(items.filter((i) => i.season != null).map((i) => i.m?.id ?? i.name.toLowerCase()));
+    return { movies: items.filter((i) => i.season == null).length, series: series.size, eps: items.length - items.filter((i) => i.season == null).length };
+  });
   function copyRemote() {
     navigator.clipboard.writeText(remoteUrl).then(() => { copied = true; setTimeout(() => (copied = false), 1500); }, () => {});
   }
@@ -139,6 +147,27 @@
           <input type="checkbox" role="switch" checked={autoSkip()} onchange={(e) => setAutoSkip(e.currentTarget.checked)} />
         </div>
       </div>
+    {:else if section === "library"}
+      <h1>{t("Kütüphane")}</h1>
+      <div class="group glass-card">
+        <div class="item">
+          <div class="grow"><b>{t("Yerel kütüphane")}</b><small>{t("Bilgisayarındaki film ve dizi klasörlerini ekle; Sinema'da afişleriyle “Kütüphanem” rafında görünür. Dosyalar bilgisayarından çıkmaz.")}</small></div>
+          <button class="white" disabled={library.busy} onclick={addFolder}>{t("Klasör ekle")}</button>
+        </div>
+        {#each library.data?.folders ?? [] as f (f)}
+          <div class="item">
+            <span class="grow mono sel">{f}</span>
+            <button disabled={library.busy} onclick={() => removeFolder(f)}>{t("Kaldır")}</button>
+          </div>
+        {/each}
+        {#if library.data?.folders.length}
+          <div class="item">
+            <small class="grow">{library.busy ? t("Taranıyor…") : t("{m} film, {s} dizi ({e} bölüm)", { m: libCount.movies, s: libCount.series, e: libCount.eps })}</small>
+            <button disabled={library.busy} onclick={rescan}>{t("Yeniden tara")}</button>
+          </div>
+        {/if}
+        {#if library.error}<div class="item"><small class="grow bad">{library.error}</small></div>{/if}
+      </div>
     {:else if section === "debrid"}
       <h1>{t("Sağlayıcı")}</h1>
       <DebridSettings />
@@ -197,5 +226,6 @@
     background: linear-gradient(135deg, #0a84ff, #5e5ce6);
   }
   .sel { display: block; margin-top: 4px; color: var(--text-2); user-select: text; overflow-wrap: anywhere; }
+  .bad { color: #ff8a80; }
   kbd { font: 500 11px var(--font-mono); padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line-2); color: var(--text-2); }
 </style>

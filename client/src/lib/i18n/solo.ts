@@ -43,5 +43,21 @@ const en: Record<string, string> = {
   "Arkadaşların da izleyecek": "Your friends want to watch",
   "{names} de istiyor": "{names} want(s) to watch it too",
   "Birlikte aç · Çağır": "Watch together · Invite",
+
+  // Yerel kütüphane (LibraryPane, Ayarlar > Kütüphane)
+  "Kütüphanem": "My library",
+  "Taranıyor…": "Scanning…",
+  "{n} başlık": "{n} titles",
+  "{n} bölüm": "{n} episodes",
+  "{n} yeni": "{n} new",
+  "Sıradaki: {code}": "Up next: {code}",
+  "Klasörler taranıyor…": "Scanning folders…",
+  "Eklediğin klasörlerde video bulunamadı.": "No videos found in your folders.",
+  "Kütüphane": "Library",
+  "Yerel kütüphane": "Local library",
+  "Bilgisayarındaki film ve dizi klasörlerini ekle; Sinema'da afişleriyle “Kütüphanem” rafında görünür. Dosyalar bilgisayarından çıkmaz.": "Add your movie and series folders; they show up with posters in the “My library” shelf in Cinema. Files never leave your computer.",
+  "Klasör ekle": "Add folder",
+  "Yeniden tara": "Rescan",
+  "{m} film, {s} dizi ({e} bölüm)": "{m} movies, {s} series ({e} episodes)",
 };
 export default en;

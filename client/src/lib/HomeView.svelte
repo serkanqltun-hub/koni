@@ -9,6 +9,7 @@
   import SocialModals from "./SocialModals.svelte";
   import ProfileView from "./ProfileView.svelte";
   import MovieNight from "./MovieNight.svelte";
+  import MonthlyRecap from "./MonthlyRecap.svelte";
   import { loadResume, pullResume, removeResume } from "./resume";
   import { feedGet, friendsCall, lobbyDecline, statsGet, upcomingGet, type FeedItem, type TeamItem, type Upcoming, type UpcomingItem, type ListEntry, type OpenRoom, type PresenceFriend, type RoomView, type Stats, type StatsPeriod } from "./player";
   import { refreshProfile, social, splitHandle } from "./social.svelte";
@@ -398,6 +399,8 @@
         {/each}
       </div>
     </div>
+
+    <MonthlyRecap />
 
     {#if resumes.length}
       <div class="lab">{t("Yarım kalanlar")} <span class="hint">{t("aynı ekiple devam: oda kurulur, onlar çağrılır")}</span></div>

@@ -117,7 +117,8 @@ export const feedGet = (url: string) => invoke<{ you: string; items: FeedItem[] 
 /** Profil listeleri (p0.23, PROTOCOL §3.0g): "want" İzleyeceklerim, "seen" İzlediklerim. */
 export type ListName = "want" | "seen";
 export interface ListEntry {
-  ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; at?: number;
+  /** `video`: Keşfet'ten bir YouTube videosu (p0.28, `ref: "yt:<id>"`). */
+  ref: string; kind: "movie" | "series" | "video"; title: string; year?: number; poster?: string; at?: number;
   /** seen: 1 ❤️, -1 👎 */ rating?: number; /** seen: 1–5 yıldız ve tek kelime (p0.25) */ stars?: number; word?: string; /** seen: birlikte izlenenler */ with?: string[]; source?: string;
 }
 export interface Holder { name: string; avatar?: string; rating?: number; stars?: number; word?: string }
@@ -187,6 +188,17 @@ export interface RecHolder { name: string; avatar?: string; stars?: number; word
 export interface RecEntry extends ListEntry { by?: RecHolder[]; mates?: RecHolder[] }
 export interface Recs { t: "recs"; because: { ref: string; title: string; items: Movie[] }[]; friends: RecEntry[]; together: RecEntry[] }
 export const recsGet = (url: string) => invoke<Recs | null>("recs_get", { url });
+/** p0.28 `recap` (PROTOCOL §3.0q): aylık özet. `month` `YYYY-MM`, yoksa bu ay. */
+export interface Recap {
+  t: "recap"; month: string; watchSec: number; days: number; hours: number[]; peakHour: number;
+  movies: number; series: number; genres: { name: string; count: number }[];
+  mates: { name: string; avatar?: string; sec: number; rooms: number }[];
+  badges: { id: string; title: string; rule: string }[];
+  best?: { ref: string; title: string; poster?: string; stars: number; votes: number };
+}
+export const recapGet = (url: string, month?: string) => invoke<Recap | null>("recap_get", { url, month });
+/** Özet kartını Resimler/KONI'ye PNG olarak yazar; dosya yolunu döner. */
+export const recapSavePng = (month: string, png: string) => invoke<string>("recap_save_png", { month, png });
 export interface Ratings { tmdb?: number; imdb?: string; rt?: string; meta?: string }
 export interface Movie {
   id: number; title: string; original?: string; year?: number; overview?: string; poster?: string;
@@ -528,3 +540,16 @@ export function setLangPrefs(mode: LangMode, size: SubSize) {
   try { localStorage.setItem(LANG_KEY, mode); localStorage.setItem(SUBSIZE_KEY, size); } catch { /* depolama kapalı */ }
   return invoke<void>("player_set_lang_prefs", { mode, size });
 }
+
+/** Yerel kütüphane (library.rs): Ayarlar'da eklenen klasörlerdeki videolar, Cinemeta eşleşmesiyle. */
+export interface LibraryMatch { id: string; kind: "movie" | "series"; name: string; poster?: string | null; year?: string | null }
+export interface LibraryItem { path: string; name: string; year?: number | null; season?: number | null; episode?: number | null; size: number; added: number; m?: LibraryMatch | null }
+export interface LibraryData { folders: string[]; items: LibraryItem[] }
+export const libraryGet = () => invoke<LibraryData>("library_get");
+/** Klasör seçme penceresini açar; vazgeçilirse `null`. */
+export const libraryAdd = () => invoke<LibraryData | null>("library_add");
+export const libraryRemove = (folder: string) => invoke<LibraryData>("library_remove", { folder });
+export const libraryScan = () => invoke<LibraryData>("library_scan");
+/** Bölüm düzeyi izledim (p0.25 `seen_ep`). */
+export const listsSeenEp = (url: string, ref: string, season: number, episode: number) =>
+  listsCall<Lists>(url, "seen_ep", { reference: ref, extra: { season, episode } });

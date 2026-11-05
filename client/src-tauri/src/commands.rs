@@ -292,6 +292,27 @@ pub fn player_screenshot(app: AppHandle, state: State<'_, AppState>) -> CmdResul
     Ok(p)
 }
 
+/// Aylık özet kartını (PNG, base64) Resimler/KONI klasörüne kaydeder; dosya yolunu döner.
+#[tauri::command(async)]
+pub fn recap_save_png(app: AppHandle, month: String, png: String) -> CmdResult<String> {
+    use base64::Engine;
+    if month.len() != 7 || !month.chars().all(|c| c.is_ascii_digit() || c == '-') {
+        return Err(tr!("geçersiz ay: {month}", "invalid month: {month}"));
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(png.trim_start_matches("data:image/png;base64,"))
+        .map_err(|e| e.to_string())?;
+    let dir = app
+        .path()
+        .picture_dir()
+        .map_err(|e| e.to_string())?
+        .join("KONI");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("koni-ozet-{month}.png"));
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 #[tauri::command(async)]
 pub fn player_set_volume(state: State<'_, AppState>, volume: f64) -> CmdResult {
     if !(0.0..=130.0).contains(&volume) {
@@ -784,6 +805,20 @@ pub async fn event_op(
         query,
     };
     Ok(Some(account::event(&url, msg).await?))
+}
+
+/// Aylık özet (p0.28); `month` `YYYY-AA`, yoksa bu ay. Hesap yoksa `null`.
+#[tauri::command]
+pub async fn recap_get(url: String, month: Option<String>) -> CmdResult<Option<serde_json::Value>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    let msg = koni_sync::protocol::ClientMsg::Recap {
+        auth: acc.token,
+        month,
+    };
+    Ok(Some(account::recap(&url, msg).await?))
 }
 
 /// Dizinin intro / özet işaretleri (p0.27). Hesap yoksa `null`.
@@ -1656,6 +1691,38 @@ pub fn addon_remove(app: AppHandle, url: String) -> CmdResult<Vec<crate::addons:
 #[tauri::command]
 pub async fn catalog_search(query: String) -> CmdResult<Vec<crate::addons::Title>> {
     crate::addons::search(&query).await
+}
+
+// ---- Yerel kütüphane (library.rs) ----------------
+
+#[tauri::command]
+pub async fn library_get(app: AppHandle) -> CmdResult<serde_json::Value> {
+    crate::library::get(&app).await
+}
+
+/// Klasör seçme penceresini açar; seçilen klasörü ekleyip tarar. Vazgeçilirse `None`.
+#[tauri::command]
+pub async fn library_add(app: AppHandle) -> CmdResult<Option<serde_json::Value>> {
+    use tauri_plugin_dialog::DialogExt;
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog().file().pick_folder(move |p| {
+        let _ = tx.send(p);
+    });
+    let Some(dir) = rx.await.ok().flatten() else {
+        return Ok(None);
+    };
+    let dir = dir.into_path().map_err(|e| e.to_string())?;
+    crate::library::add(&app, dir).await.map(Some)
+}
+
+#[tauri::command]
+pub async fn library_remove(app: AppHandle, folder: String) -> CmdResult<serde_json::Value> {
+    crate::library::remove(&app, &folder).await
+}
+
+#[tauri::command]
+pub async fn library_scan(app: AppHandle) -> CmdResult<serde_json::Value> {
+    crate::library::scan(&app).await
 }
 
 #[tauri::command]

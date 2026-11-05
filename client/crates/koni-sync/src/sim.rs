@@ -510,6 +510,7 @@ impl SimRoom {
             | ClientMsg::Upcoming { .. }
             | ClientMsg::Recs { .. }
             | ClientMsg::Event { .. }
+            | ClientMsg::Recap { .. }
             | ClientMsg::Friends { .. }
             | ClientMsg::Profile { .. }
             | ClientMsg::Admin { .. }
