@@ -166,6 +166,11 @@ export interface BrowseQuery {
 export interface BrowsePage { t: "browse"; kind: string; page: number; items: Movie[]; total: number; error?: string }
 export const browseGet = (url: string, kind: "movie" | "series", query: BrowseQuery) =>
   invoke<BrowsePage | null>("browse_get", { url, kind, query });
+/** p0.27 `upcoming` (PROTOCOL §3.0m): izlenen dizilerin sıradaki bölümü ve ekip kaydı. */
+export interface UpcomingItem { ref: string; title: string; poster?: string; season?: number; episode?: number; name?: string; /** YYYY-MM-DD */ airs?: string; unseen: number }
+export interface TeamItem { ref: string; title: string; room: string; season: number; episode: number; members: { name: string; avatar?: string }[]; ahead?: string[]; at: number }
+export interface Upcoming { t: "upcoming"; items: UpcomingItem[]; team: TeamItem[] }
+export const upcomingGet = (url: string) => invoke<Upcoming | null>("upcoming_get", { url });
 /** p0.27 `recs` (PROTOCOL §3.0o): öneri rafları. `friends`/`together` liste satırıdır. */
 export interface RecHolder { name: string; avatar?: string; stars?: number; word?: string }
 export interface RecEntry extends ListEntry { by?: RecHolder[]; mates?: RecHolder[] }

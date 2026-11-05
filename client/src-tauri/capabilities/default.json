@@ -72,6 +72,7 @@
     "allow-browse-get",
     "allow-skip-get",
     "allow-skip-set",
+    "allow-upcoming-get",
     "allow-solo-night",
     "allow-solo-night-pick",
     "allow-friends",

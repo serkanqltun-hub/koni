@@ -60,6 +60,7 @@ const COMMANDS: &[&str] = &[
     "browse_get",
     "skip_get",
     "skip_set",
+    "upcoming_get",
     "recs_get",
     "solo_night",
     "solo_night_pick",

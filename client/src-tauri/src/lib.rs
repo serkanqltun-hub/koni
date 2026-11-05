@@ -178,6 +178,7 @@ pub fn run() {
             commands::browse_get,
             commands::skip_get,
             commands::skip_set,
+            commands::upcoming_get,
             commands::recs_get,
             commands::friends,
             commands::profile,
