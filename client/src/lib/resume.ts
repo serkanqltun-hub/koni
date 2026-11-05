@@ -2,6 +2,7 @@
  *  `movie:tt…` / `series:tt…:s:e`) hesaplı sunucuya da yazılır (p0.25 `progress`); yerel dosya ve linkler
  *  yalnızca bu bilgisayarda kalır. */
 import { listsGet, listsProgress, listsRemove, type Progress } from "./player";
+import { markFileSeen } from "./library.svelte";
 
 /** Kaydedilen medya. `debrid`'de `src` infoHash, `file`/`idx` dosya ipucu. */
 export interface ResumeMedia {
@@ -45,7 +46,10 @@ function store(list: ResumeEntry[]): ResumeEntry[] {
 export function saveResume(e: Omit<ResumeEntry, "at">): ResumeEntry[] {
   const rest = loadResume().filter((x) => x.src !== e.src && !sameTitle(x, e));
   if (!(e.duration > 0) || e.pos < 30 || e.duration - e.pos < 90) {
-    if (e.duration > 0 && e.pos >= 30) pushRemove(e); // bitti
+    if (e.duration > 0 && e.pos >= 30) {
+      pushRemove(e); // bitti
+      if (e.kind === "file") markFileSeen(e.src);
+    }
     return store(rest);
   }
   pushProgress(e);

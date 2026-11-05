@@ -12,6 +12,7 @@ mod cast;
 mod commands;
 mod debrid;
 mod download;
+mod library;
 mod lobby;
 mod lounge;
 mod media;
@@ -74,6 +75,7 @@ pub fn run() {
     }));
     builder
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
         .setup(|app| {
@@ -218,6 +220,10 @@ pub fn run() {
             commands::addon_add,
             commands::addon_remove,
             commands::catalog_search,
+            commands::library_get,
+            commands::library_add,
+            commands::library_remove,
+            commands::library_scan,
             commands::catalog_popular,
             commands::catalog_episodes,
             commands::addon_streams,

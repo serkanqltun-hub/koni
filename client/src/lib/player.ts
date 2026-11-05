@@ -529,3 +529,16 @@ export function setLangPrefs(mode: LangMode, size: SubSize) {
   try { localStorage.setItem(LANG_KEY, mode); localStorage.setItem(SUBSIZE_KEY, size); } catch { /* depolama kapalı */ }
   return invoke<void>("player_set_lang_prefs", { mode, size });
 }
+
+/** Yerel kütüphane (library.rs): Ayarlar'da eklenen klasörlerdeki videolar, Cinemeta eşleşmesiyle. */
+export interface LibraryMatch { id: string; kind: "movie" | "series"; name: string; poster?: string | null; year?: string | null }
+export interface LibraryItem { path: string; name: string; year?: number | null; season?: number | null; episode?: number | null; size: number; added: number; m?: LibraryMatch | null }
+export interface LibraryData { folders: string[]; items: LibraryItem[] }
+export const libraryGet = () => invoke<LibraryData>("library_get");
+/** Klasör seçme penceresini açar; vazgeçilirse `null`. */
+export const libraryAdd = () => invoke<LibraryData | null>("library_add");
+export const libraryRemove = (folder: string) => invoke<LibraryData>("library_remove", { folder });
+export const libraryScan = () => invoke<LibraryData>("library_scan");
+/** Bölüm düzeyi izledim (p0.25 `seen_ep`). */
+export const listsSeenEp = (url: string, ref: string, season: number, episode: number) =>
+  listsCall<Lists>(url, "seen_ep", { reference: ref, extra: { season, episode } });
