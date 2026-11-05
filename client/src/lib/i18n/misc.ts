@@ -35,5 +35,16 @@ const en: Record<string, string> = {
   "Şimdi denetle": "Check now",
   "Oynatıcı LGPL libmpv/FFmpeg kullanır; lisanslar ve kaynak kurulum klasöründe (NOTICE.md, LICENSES/, source/).":
     "The player uses LGPL libmpv/FFmpeg; licenses and sources are in the install folder (NOTICE.md, LICENSES/, source/).",
+  "Oynatıcı": "Player",
+  "Tam ekran başlat": "Start in full screen",
+  "Bir video açılınca otomatik tam ekrana geçer.": "Switches to full screen automatically when a video opens.",
+  "Spoiler gizle": "Hide spoilers",
+  "Dizilerde henüz izlemediğin bölümlerin adı ve küçük resmi bulanık görünür; tıklayınca açılır.": "Episodes you haven't watched yet are blurred in the episode list; click to reveal.",
+  "Spoiler olabilir · göstermek için tıkla": "May contain spoilers · click to reveal",
+  "Uyku zamanlayıcı": "Sleep timer",
+  "Uyku zamanlayıcı: duraklatıldı": "Sleep timer: paused",
+  "Uyku: kapalı": "Sleep: off",
+  "{n} dk sonra duraklat": "Pause in {n} min",
+  "Bölüm bitince duraklat": "Pause when it ends",
 };
 export default en;
