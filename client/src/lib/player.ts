@@ -352,12 +352,21 @@ export interface DlStatus {
   error: string;
 }
 
+/** Odanın geçmişindeki bir medya (§4.20). `media` olduğu gibi `cmd media` ile yeniden açılır. */
+export interface HistoryItem {
+  media: { kind: MediaEvent["kind"]; src: string; title?: string; duration?: number; file?: string; idx?: number; referer?: string };
+  by: string;
+  at: number;
+  pos: number;
+}
+
 /** `sync://server`: docs/PROTOCOL.md §4 mesajları (pong hariç). */
 export type ServerMsg =
   | { t: "room_created"; room: string; name: string; invite: string; you: string }
-  | { t: "joined"; you: string; invite: string; resumed?: boolean; snapshot: { room: string; name: string; host: string; policy: Policy; view?: RoomView | ""; members: Member[]; downloads?: DlStatus[]; state: { media?: { task?: string } } } }
+  | { t: "joined"; you: string; invite: string; resumed?: boolean; snapshot: { room: string; name: string; host: string; policy: Policy; view?: RoomView | ""; members: Member[]; downloads?: DlStatus[]; history?: HistoryItem[]; state: { media?: { task?: string } } } }
   | ({ t: "dl_status"; taskId: string } & DlStatus)
   | { t: "state"; mode: RoomMode; by?: { id: string; name: string } }
+  | { t: "history"; items: HistoryItem[] }
   | { t: "activity"; kind: string; text: string }
   | { t: "member_joined"; member: Member }
   | { t: "member_left"; id: string; host?: string }
@@ -376,6 +385,8 @@ export type ServerMsg =
 
 export const syncConnect = (url: string, username: string, roomName: string | null, invite: string | null) =>
   invoke<void>("sync_connect", { url, username, roomName, invite });
+/** Odanın geçmişinden aynı medyayı yeniden aç. */
+export const syncReopen = (media: HistoryItem["media"]) => invoke<void>("sync_reopen", { media });
 export const syncPlay = () => invoke<void>("sync_play");
 export const syncPause = () => invoke<void>("sync_pause");
 export const syncSeek = (seconds: number) => invoke<void>("sync_seek", { seconds });

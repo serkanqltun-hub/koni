@@ -1256,6 +1256,12 @@ pub fn sync_seek(state: State<'_, AppState>, seconds: f64) -> CmdResult {
     sync_send(&state, UiCmd::Seek(seconds))
 }
 
+/// Odanın geçmişindeki bir medyayı yeniden aç (`cmd media`).
+#[tauri::command(async)]
+pub fn sync_reopen(state: State<'_, AppState>, media: koni_sync::protocol::Media) -> CmdResult {
+    sync_send(&state, UiCmd::Reopen(media))
+}
+
 /// Odada çalanı herkes için kapat (oda açık kalır).
 #[tauri::command(async)]
 pub fn sync_close(state: State<'_, AppState>) -> CmdResult {

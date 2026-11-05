@@ -57,6 +57,8 @@ pub enum UiCmd {
     },
     /// "Herkes İndirsin": odaya `download` medyası aç.
     OpenDownload(String),
+    /// Odanın geçmişinden aynı medyayı yeniden aç (`cmd media`).
+    Reopen(Media),
     /// Odaya Real-Debrid torrenti aç (`kind: debrid`); herkes kendi hesabıyla çözer.
     OpenDebrid(Media),
     /// Tarayıcıda senkron (`kind: page`): herkes sayfayı Keşfet'te açar.
@@ -1195,6 +1197,16 @@ async fn run(
                 UiCmd::OpenDownload(src) => {
                     let m = Media::new(MediaKind::Download, src, String::new());
                     vec![EngineEvent::Send(engine.user_media(m))]
+                }
+                UiCmd::Reopen(m) => {
+                    if room_has(&engine, m.kind, &m.src) {
+                        room_media.loaded = None;
+                        let media = engine.room().and_then(|r| r.media.as_deref());
+                        room_media.reconcile(app, media, &player.mpv);
+                        Vec::new()
+                    } else {
+                        vec![EngineEvent::Send(engine.user_media(m))]
+                    }
                 }
                 UiCmd::OpenDebrid(m) => {
                     if room_has(&engine, MediaKind::Debrid, &m.src) {
