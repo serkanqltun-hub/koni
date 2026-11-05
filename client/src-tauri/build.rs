@@ -40,6 +40,8 @@ const COMMANDS: &[&str] = &[
     "sync_set_cohost",
     "sync_set_policy",
     "sync_set_view",
+    "sync_break",
+    "sync_ready",
     "web_search",
     "media_list",
     "sync_resync",
