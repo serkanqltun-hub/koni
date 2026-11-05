@@ -22,6 +22,8 @@ const en: Record<string, string> = {
   "Telefondan kumanda": "Phone remote",
   "Kopyala": "Copy",
   "Kopyalandı": "Copied",
+  "Davet linki QR kodu": "Invite link QR code",
+  "Kumanda adresi QR kodu": "Remote control address QR code",
   "Telefonunun tarayıcısında bu adresi aç ve KONİ hesabınla giriş yap: oynat/duraklat, ileri/geri ve ses. Odadaysan herkeste aynı anda olur.": "Open this address in your phone's browser and sign in with your KONİ account: play/pause, skip and volume. In a room it happens for everyone at once.",
   "Bağlantıyı sunucu üzerinden yönlendir": "Route connections through the server",
   "Bazı servislere doğrudan ulaşılamıyorsa bağlantı KONİ sunucusu üzerinden kurulur. Video sunucudan geçmez.": "If some services can't be reached directly, the connection goes through the KONİ server. Video doesn't pass through the server.",

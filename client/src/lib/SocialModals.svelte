@@ -5,6 +5,7 @@
   import { pic, refreshProfile, social, splitHandle } from "./social.svelte";
   import { t, tx } from "./i18n.svelte";
   import { inviteLink } from "./server";
+  import { qrDataUrl } from "./qr";
 
   let { kind, welcome = false, onClose, onFriends }: {
     kind: "invite" | "add" | "avatar";
@@ -125,6 +126,7 @@
       <p>{t("Linki arkadaşına gönder: tıklayınca KONİ sunucu dahil her şeyi kendisi doldurur. Bu linkle kaydolan doğrudan arkadaşın olur, link tek kişiliktir.")}</p>
       <div class="code"><b class="mono link-text">{code ? inviteLink(code, social.server) : "koni://invite/····-····"}</b>
         <button class="white" disabled={!code} onclick={copy}>{copied ? t("Kopyalandı ✓") : t("Linki kopyala")}</button></div>
+      {#if code}<img class="qr" src={qrDataUrl(inviteLink(code, social.server))} alt={t("Davet linki QR kodu")} />{/if}
       {#if code}<button class="link newc" disabled={busy} onclick={newInvite}>{t("Yeni link oluştur")}</button>{/if}
       <div class="facts"><span><b>{t("7 gün")}</b>{t("geçerli")}</span><span><b>{t("1 kişi")}</b>{t("kullanabilir")}</span><span><b>{t("Otomatik")}</b>{t("arkadaş olursunuz")}</span></div>
       {/if}
@@ -206,6 +208,7 @@
   .code b { font-size: 26px; font-weight: 700; letter-spacing: 0.12em; user-select: text; }
   .code b.link-text { flex: 1; min-width: 0; font-size: 13px; letter-spacing: 0; word-break: break-all; }
   .code button { margin-left: auto; }
+  .qr { display: block; width: 132px; height: 132px; margin: 12px auto 0; border-radius: 10px; }
   .newc { align-self: flex-start; font-size: 12px; margin-top: -6px; }
   .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .facts span { padding: 10px 12px; border-radius: 12px; background: var(--glass); border: 1px solid var(--line); font-size: 12px; color: var(--text-2); }
