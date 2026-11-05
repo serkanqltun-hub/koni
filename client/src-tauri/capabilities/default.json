@@ -29,6 +29,7 @@
     "allow-player-music-view",
     "allow-player-cover",
     "allow-player-set-track",
+    "allow-player-set-lang-prefs",
     "allow-set-layout",
     "allow-set-fullscreen",
     "allow-open-cast-panel",

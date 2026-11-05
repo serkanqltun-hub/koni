@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getVersion } from "@tauri-apps/api/app";
-  import { relayOn, setRelay, type UpdateInfo } from "./player";
+  import { relayOn, setRelay, langMode, subSize, setLangPrefs, type LangMode, type SubSize, type UpdateInfo } from "./player";
   import BugReport from "./BugReport.svelte";
   import DebridSettings from "./DebridSettings.svelte";
   import LangSwitch from "./LangSwitch.svelte";
@@ -62,6 +62,9 @@
     ["G / H", "Altyazı 50 ms erken / geç"],
   ];
   let relay = $state(relayOn());
+  let lang = $state<LangMode>(langMode());
+  let size = $state<SubSize>(subSize());
+  const savePrefs = () => setLangPrefs(lang, size).catch(() => {});
   // Telefon kumandası (p0.24): santralin adresi tarayıcıda açılınca kumanda sayfası gelir.
   const remoteUrl = $derived(server.replace(/^ws/i, "http"));
   let copied = $state(false);
@@ -106,6 +109,22 @@
     {:else if section === "player"}
       <h1>{t("Oynatıcı")}</h1>
       <div class="group glass-card">
+        <div class="item">
+          <div class="grow"><b>{t("Ses ve altyazı dili")}</b><small>{t("Dosya açılınca Türkçe ses ya da altyazı varsa kendiliğinden seçilir.")}</small></div>
+          <select bind:value={lang} onchange={savePrefs}>
+            <option value="dub">{t("Önce Türkçe dublaj, yoksa Türkçe altyazı")}</option>
+            <option value="sub">{t("Türkçe altyazı")}</option>
+            <option value="off">{t("Dokunma")}</option>
+          </select>
+        </div>
+        <div class="item">
+          <div class="grow"><b>{t("Altyazı boyutu")}</b></div>
+          <select bind:value={size} onchange={savePrefs}>
+            <option value="small">{t("Küçük")}</option>
+            <option value="medium">{t("Orta")}</option>
+            <option value="large">{t("Büyük")}</option>
+          </select>
+        </div>
         <div class="item">
           <div class="grow"><b>{t("Tam ekran başlat")}</b><small>{t("Bir video açılınca otomatik tam ekrana geçer.")}</small></div>
           <input type="checkbox" role="switch" bind:checked={prefs.fullscreenStart} />

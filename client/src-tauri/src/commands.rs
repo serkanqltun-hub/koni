@@ -359,6 +359,14 @@ pub async fn player_set_track(app: AppHandle, kind: String, key: String) -> CmdR
         .map_err(|e| e.to_string())?
 }
 
+/// Ses/altyazı dil tercihi (`dub|sub|off`) ve altyazı boyutu (`small|medium|large`).
+#[tauri::command(async)]
+pub fn player_set_lang_prefs(state: State<'_, AppState>, mode: String, size: String) -> CmdResult {
+    let p = player(&state)?;
+    crate::tracks::set_prefs(&p, &mode, &size);
+    Ok(())
+}
+
 #[tauri::command(async)]
 pub fn player_state(state: State<'_, AppState>) -> CmdResult<PlayerSnapshot> {
     Ok(player(&state)?.snapshot())

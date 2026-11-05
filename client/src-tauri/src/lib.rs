@@ -132,6 +132,7 @@ pub fn run() {
             commands::player_music_view,
             commands::player_cover,
             commands::player_set_track,
+            commands::player_set_lang_prefs,
             commands::player_state,
             commands::set_layout,
             commands::set_fullscreen,

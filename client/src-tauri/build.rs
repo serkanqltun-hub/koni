@@ -18,6 +18,7 @@ const COMMANDS: &[&str] = &[
     "player_music_view",
     "player_cover",
     "player_set_track",
+    "player_set_lang_prefs",
     "set_layout",
     "set_fullscreen",
     "open_cast_panel",
