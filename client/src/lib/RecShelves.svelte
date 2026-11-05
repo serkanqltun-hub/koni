@@ -15,14 +15,15 @@
   $effect(() => {
     const server = social.server;
     if (!server) return;
-    recsGet(server).then((r) => (recs = r), () => {});
+    // Keşfet videoları (`kind: "video"`) künye açamaz: raflara girmez.
+    recsGet(server).then((r) => (recs = r && { ...r, friends: r.friends.filter((e) => e.kind !== "video"), together: r.together.filter((e) => e.kind !== "video") }), () => {});
   });
 
   const fromMovie = (m: Movie): DetailRef => ({
     ref: m.imdb || `tmdb:${m.kind === "tv" ? "tv" : "movie"}:${m.id}`,
     kind: m.kind === "tv" ? "series" : "movie", title: m.title, poster: m.poster, year: m.year,
   });
-  const fromEntry = (e: RecEntry): DetailRef => ({ ref: e.ref, kind: e.kind, title: e.title, poster: e.poster, year: e.year });
+  const fromEntry = (e: RecEntry): DetailRef => ({ ref: e.ref, kind: e.kind === "series" ? "series" : "movie", title: e.title, poster: e.poster, year: e.year });
   const bare = (n: string) => splitHandle(n)[0];
   const names = (l: { name: string }[]) => l.slice(0, 2).map((h) => bare(h.name)).join(", ") + (l.length > 2 ? ` +${l.length - 2}` : "");
   const shelves = $derived(recs ? (recs.because.some((b) => b.items.length) || recs.friends.length || recs.together.length) : false);

@@ -106,7 +106,8 @@ export const feedGet = (url: string) => invoke<{ you: string; items: FeedItem[] 
 /** Profil listeleri (p0.23, PROTOCOL §3.0g): "want" İzleyeceklerim, "seen" İzlediklerim. */
 export type ListName = "want" | "seen";
 export interface ListEntry {
-  ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; at?: number;
+  /** `video`: Keşfet'ten bir YouTube videosu (p0.28, `ref: "yt:<id>"`). */
+  ref: string; kind: "movie" | "series" | "video"; title: string; year?: number; poster?: string; at?: number;
   /** seen: 1 ❤️, -1 👎 */ rating?: number; /** seen: 1–5 yıldız ve tek kelime (p0.25) */ stars?: number; word?: string; /** seen: birlikte izlenenler */ with?: string[]; source?: string;
 }
 export interface Holder { name: string; avatar?: string; rating?: number; stars?: number; word?: string }
