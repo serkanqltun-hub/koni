@@ -109,15 +109,22 @@ export interface ListEntry {
 }
 export interface Holder { name: string; avatar?: string; rating?: number }
 export interface WantEntry extends ListEntry { mates?: Holder[] }
-export interface Lists { user: string; avatar?: string; want: WantEntry[]; seen: ListEntry[]; common?: string[]; together?: number }
+/** p0.25 kaldığın yer: başlık başına tek satır (dizide son bölüm). */
+export interface Progress { ref: string; kind: "movie" | "series"; season?: number; episode?: number; pos: number; duration?: number; title?: string; poster?: string; at: number }
+export interface Lists { user: string; avatar?: string; want: WantEntry[]; seen: ListEntry[]; common?: string[]; together?: number; progress?: Progress[]; episodes?: Record<string, string[]> }
 export interface ListWho { ref: string; want: Holder[] | null; seen: Holder[] | null; mine: { want?: boolean; seen?: boolean; rating?: number } }
-const listsCall = <T>(url: string, op: string, o: { user?: string; list?: ListName; reference?: string; rating?: number; entry?: ListEntry } = {}) =>
-  invoke<T | null>("lists_call", { url, op, user: o.user ?? null, list: o.list ?? null, reference: o.reference ?? null, rating: o.rating ?? null, entry: o.entry ?? null });
+const listsCall = <T>(url: string, op: string, o: { user?: string; list?: ListName | "progress"; reference?: string; rating?: number; entry?: ListEntry; extra?: Record<string, unknown> } = {}) =>
+  invoke<T | null>("lists_call", { url, op, user: o.user ?? null, list: o.list ?? null, reference: o.reference ?? null, rating: o.rating ?? null, entry: o.entry ?? null, extra: o.extra ?? null });
 /** Kendi listelerin (`user` boş) ya da karşılıklı arkadaşınınkiler. Hesap yoksa `null`. */
 export const listsGet = (url: string, user?: string) => listsCall<Lists>(url, "", { user });
 export const listsAdd = (url: string, list: ListName, entry: ListEntry) => listsCall<Lists>(url, "add", { list, entry });
-export const listsRemove = (url: string, list: ListName, ref: string) => listsCall<Lists>(url, "remove", { list, reference: ref });
+export const listsRemove = (url: string, list: ListName | "progress", ref: string) => listsCall<Lists>(url, "remove", { list, reference: ref });
 export const listsRate = (url: string, ref: string, rating: number) => listsCall<Lists>(url, "rate", { reference: ref, rating });
+/** Kaldığın yeri sunucuya yazar (p0.25). */
+export const listsProgress = (url: string, p: Omit<Progress, "at">) => {
+  const { ref, ...extra } = p;
+  return listsCall<Lists>(url, "progress", { reference: ref, extra });
+};
 export const listsWho = (url: string, ref: string) => listsCall<ListWho>(url, "who", { reference: ref });
 /** "Sorun bildir": not + etkinlik logu (eskiden yeniye) + son senkron CSV'si sunucuya gider; döner: rapor adı. */
 export const bugReport = (url: string, username: string, note: string, log: string[]) =>

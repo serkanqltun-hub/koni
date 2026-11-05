@@ -30,7 +30,7 @@
   import { DEFAULT_SERVER, normServer } from "./lib/server";
   import { loadRecent, rememberRoom, forgetRoom, type RecentRoom } from "./lib/recent";
   import ResumeBar from "./lib/ResumeBar.svelte";
-  import type { ResumeEntry, ResumeMedia } from "./lib/resume";
+  import { refOf, setResumeServer, type ResumeEntry, type ResumeMedia } from "./lib/resume";
   import Icon from "./lib/Icon.svelte";
   import NightView from "./lib/NightView.svelte";
   import CinemaLobby from "./lib/CinemaLobby.svelte";
@@ -103,6 +103,8 @@
   let downloads = $state<Record<string, DlStatus>>({});
   /** Bu sunucuda kayıtlı hesap adı; hesapsız sunucuda null. */
   let account = $state<string | null>(null);
+  // Kaldığın yer hesaplı sunucuya da yazılır (alt bileşenler açılmadan önce ayarlanır).
+  $effect.pre(() => setResumeServer(account ? serverUrl : null));
   /** Hesap kontrolü bitti mi (bitmeden giriş ekranı gösterilmez). */
   let accountChecked = $state(false);
   /** Hesapsız (açık) sunucuda yalnızca kullanıcı adıyla devam. */
@@ -995,9 +997,17 @@
 
   /** Sinema lobisinden "Devam": medyayı bu odada / tek başına açar (konum ResumeBar'da). */
   function resumeHere(r: ResumeEntry) {
+    if (r.kind === "ref") return watchRef(r);
     if (r.kind === "file") return note("Dosyayı pencereye bırak: {title}", { title: r.title }, true);
     if (r.kind === "debrid") return openDebrid({ addon: "", name: "", title: "", hash: r.src, file: r.file ?? "", idx: r.idx ?? null }, r.title);
     open(r.src);
+  }
+  /** Başka bilgisayarda yarım kalan film/dizi: başlık açılır, kaynak kendiliğinden aranır. */
+  function watchRef(r: ResumeEntry) {
+    const p = refOf(r.file);
+    if (!p) return;
+    openTitles("");
+    watchReq = { ref: p.ref, kind: p.kind, title: p.kind === "series" ? r.title.replace(/\s+S\d+E\d+$/, "") : r.title, poster: r.poster };
   }
   /** Yarım kalan filmi aynı oda adıyla yeniden kurup medyayı açar. */
   function resumeMovie(r: ResumeEntry) {
@@ -1066,7 +1076,8 @@
           if (pr && pr.kind === "file") note("Dosyayı Aç ile yükle: {title}", { title: pr.title });
           else if (pr && pr.kind === "debrid") {
             openDebrid({ addon: "", name: "", title: "", hash: pr.src, file: pr.file ?? "", idx: pr.idx ?? null }, pr.title);
-          } else if (pr) open(pr.src);
+          } else if (pr && pr.kind === "ref") watchRef(pr);
+          else if (pr) open(pr.src);
         }
         // eski Santral (p0.12 ve öncesi) modu bilmez: Sinema
         applyView(m.snapshot.view || "watch");

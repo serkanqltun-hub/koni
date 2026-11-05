@@ -69,6 +69,9 @@ pub enum ClientMsg {
         rating: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]
         entry: Option<serde_json::Value>,
+        /// p0.25 alanları (`kind`, `season`, `episode`, `pos`, `duration`, `title`, `poster` …) olduğu gibi eklenir.
+        #[serde(flatten, default)]
+        extra: Option<serde_json::Map<String, serde_json::Value>>,
     },
     /// Tek seferlik (p0.22): ana ekran "Etkinlik" sekmesi, son 7 gün.
     Feed {
@@ -559,6 +562,29 @@ pub fn buffer_pct(buffer_sec: f64, target_sec: f64) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lists_extra_fields_inline() {
+        let mut extra = serde_json::Map::new();
+        extra.insert("kind".into(), "series".into());
+        extra.insert("pos".into(), 812.5.into());
+        let m = ClientMsg::Lists {
+            auth: "a".into(),
+            op: "progress".into(),
+            user: String::new(),
+            list: String::new(),
+            reference: "tt1".into(),
+            rating: None,
+            entry: None,
+            extra: Some(extra),
+        };
+        let v: serde_json::Value = serde_json::to_value(&m).unwrap();
+        assert_eq!(v["t"], "lists");
+        assert_eq!(v["ref"], "tt1");
+        assert_eq!(v["kind"], "series");
+        assert_eq!(v["pos"], 812.5);
+        assert!(v.get("extra").is_none());
+    }
 
     #[test]
     fn member_status_rtt_optional() {

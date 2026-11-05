@@ -182,6 +182,7 @@ const en: Record<string, string> = {
   "Kaldığınız yerden": "Continue watching",
   "bu oda": "this room",
   "bu bilgisayar": "this computer",
+  "tüm cihazların": "all your devices",
   "Listeden çıkar": "Remove from list",
   "Yarım kalan film yok. İzlediğin her şeyin yeri burada tutulur.": "Nothing in progress. Your place in everything you watch is saved here.",
   "İndir": "Download",
