@@ -1,6 +1,6 @@
 # KONİ — WebSocket Protokolü (Faz 0)
 
-> Sürüm: **p0.24** (taslak) · Kaynak: [design/sync.md §4](design/sync.md), hesaplar [design/accounts.md §5.1](design/accounts.md), keşif [design/discovery.md §7](design/discovery.md)
+> Sürüm: **p0.25** (taslak) · Kaynak: [design/sync.md §4](design/sync.md), hesaplar [design/accounts.md §5.1](design/accounts.md), keşif [design/discovery.md §7](design/discovery.md)
 > Kapsam: hesap (davet kodu + kullanıcı adı + argon2id şifre, oturum belirteci), oda oluştur/katıl, play/pause/seek, oda medyası (`media`), HOLD/countdown, Host Only + yardımcı host, ping/saat senkronu, yeniden bağlanma (`resume`), kronik stall → "olmadan devam et" / DETACHED, "Herkes İndirsin" bariyeri.
 > Henüz yok: admin araçları.
 >
@@ -24,6 +24,7 @@
 > p0.22: "Açık odalar" (§3.0e): `presence.rooms` (girebileceğin açık odalar: senin çıktığın ve karşılıklı arkadaşının içinde olduğu), `presence.friends[].invite`; bir odada bulunmuş hesap oda açık kaldıkça çağrısız geri girer. Oda içinde `close_room` (yalnızca host) → herkese `error` (`room_ended`); host değilse `denied` (`not_host`). Tek seferlik `feed` (§3.0e) → ana ekran "Etkinlik" sekmesi. `watch` olayına `title`. Yalnızca ekleme.
 > p0.23: profil listeleri (§3.0g): tek seferlik `lists` el sıkışması (İzleyeceklerim / İzlediklerim, arkadaşın listeleri, ortak liste, künyede kimler istiyor). Odada `debrid` film (`file` = `movie:tt…|…`) %80'i geçince odadakilerin İzlediklerim'ine kiminle izlendiğiyle girer. `night_pick` artık `itemId` yerine `imdb` (`tt…`) da alır (listeden öneri). `error.code=bad_entry`. Yalnızca ekleme.
 > p0.24: telefon kumandası (§3.0h): `remote` bağlantısı ve `remote` / `remote_state` mesajları; `/ws` adresine tarayıcıyla düz `GET` kumanda sayfasını döner. Yalnızca ekleme; p0.23 sunucusu `remote`'a `error` (`not_joined`) döner.
+> p0.25: solo desteği. `lists` (§3.0g) `op: "progress"` (kaldığın yer, kendi cevabında `progress`), `op: "seen_ep"` / `"unseen_ep"` (bölüm izledim; `seen` satırında ve cevapta `episodes`), `rate` için `stars` (1–5) + `word`, `who` cevabında `stars` ortalaması; `remove` `list: "progress"` alır. Tek seferlik `watch` (§3.0i, solo izleme süresi → istatistik, `feed` satırında `solo`) ve `detail` (§3.0j, odasız künye + `similar`). Kartlara `backdrop`. Yalnızca ekleme; p0.24 sunucusu `watch`/`detail`'e `error` (`not_joined`), yeni `lists` op'larına `bad_message` döner.
 >
 > p0.13: oda modu: `cmd` `set_view` (§3.3), `view` mesajı (§4.17), `snapshot.view` (§4.1). Yalnızca ekleme; p0.12 sunucusu `set_view`'a `denied` (`bad_op`) döner, istemci `view` yoksa Sinema varsayar.
 >
@@ -158,6 +159,33 @@ Tek seferlik (cevap, sonra bağlantı kapanır). Başlık anahtarı `ref`: IMDb 
 { "t": "lists", "auth": "…", "op": "who", "ref": "tt2543164" }
 ```
 Cevap: `{ "t": "lists", "user", "avatar", "want": [entry], "seen": [entry] }`. Kendi `want` satırlarında `mates` (aynı başlığı isteyen karşılıklı arkadaşlar); arkadaşın görünümünde `common` (ikinizin de istediği `ref`'ler) ve `together` (birlikte izlenen sayısı). `seen` satırında `rating`, `with` (birlikte izlenenler). `add/remove/rate` kendi listelerini döner. `who`: `{ "op": "who", "ref", "want": [{name, avatar}], "seen": [{name, avatar, rating}], "mine": { "want"?: true, "seen"?: true, "rating"? } }`. `seen`'e eklenen başlık `want`'tan düşer.
+
+p0.25 eklemeleri (eski istekler aynen çalışır):
+```json
+{ "t": "lists", "auth": "…", "op": "progress", "ref": "tt0903747", "kind": "series", "season": 1, "episode": 4, "pos": 812.4, "duration": 2820, "title": "Breaking Bad", "poster": "https://…" }
+{ "t": "lists", "auth": "…", "op": "remove", "list": "progress", "ref": "tt0903747" }
+{ "t": "lists", "auth": "…", "op": "seen_ep", "ref": "tt0903747", "season": 1, "episode": 3 }   // "unseen_ep" geri alır
+{ "t": "lists", "auth": "…", "op": "rate", "ref": "tt2543164", "stars": 4, "word": "büyüleyici" }
+```
+- `progress` (kaldığın yer): başlık başına tek satır; dizide son izlenen bölüm (`season`, `episode`). `pos`/`duration` saniye. `title`/`poster` boş gelirse eskisi kalır. Kullanıcı başına en yeni 50 satır tutulur. `kind` `movie` (varsayılan) | `series`. Geçersiz alan → `bad_entry`.
+- Kendi listelerin cevabına (okuma ve tüm op'lar) `progress: [{ ref, kind, season?, episode?, pos, duration?, title?, poster?, at }]` (yeniden eskiye) ve `episodes: { "<ref>": ["1:1", "1:2"] }` eklenir. Arkadaşın görünümünde `progress` yok.
+- `seen_ep`: bölüm düzeyi izledim (`season` ≥ 0, `episode` ≥ 1). Başlığı İzlediklerim'e koymaz; dizi zaten `seen`'deyse satırında `episodes: ["s:e"]` görünür.
+- `rate` + `stars`: 1–5 yıldız ve isteğe bağlı tek kelime (`word`, en fazla 24 karakter, fazlası kesilir). ❤️/👎 `rating`'e dokunmaz; `stars: -1` yıldızı ve kelimeyi siler. `stars`/`word` yoksa p0.23 gibi `rating` ayarlanır. Yalnızca `seen`'deki başlıkta işe yarar (önce `add` `seen`).
+- `seen` satırlarında `stars`, `word`. `who`: `seen[]` satırlarında `stars`, `word`; `mine.stars`, `mine.word`, `mine.episodes`; en az bir puan varsa üstte `stars` (sen + karşılıklı arkadaşlar, bir ondalık) ve `starsCount`.
+
+### 3.0i `watch` — solo izleme süresi (p0.25)
+Tek seferlik. Solo oynatıcı oynarken istemci dakikada bir gönderir:
+```json
+{ "t": "watch", "auth": "…", "sec": 60, "title": "Arrival" }
+```
+Cevap `{ "t": "watch", "sec": 60 }` (sayılan süre). Bir rapor en fazla 120 sn sayar ve hesabın bir önceki raporundan bu yana geçen süreyi aşamaz (fazlası 0 döner). Süre odadaki gibi `watch` olayı olarak yazılır (`solo: true`, gece payı dahil): `stats` (`watchSec`, `nightSec`, `days`) ve rozetler solo'yu da sayar; rozet kuralları aynı (Maratoncu yalnızca odada). `feed` (§3.0e) solo satırında `solo: true`, `room` boş.
+
+### 3.0j `detail` — odasız künye (p0.25)
+Tek seferlik; `night_detail`'in odasız hali. `ref` liste anahtarıdır: `tt…` ya da `tmdb:<movie|tv>:<id>`. `kind` (`movie` | `series`/`tv`) IMDb kimliğinde aramayı hızlandırır; yoksa önce film denenir.
+```json
+{ "t": "detail", "auth": "…", "ref": "tt2543164", "kind": "movie" }
+```
+Cevap `{ "t": "detail", "ref", "item": <kart>, "similar": [<kart>] }`: `item` `night_detail` kartının aynısı (puanlar, yönetmen, oyuncular, fragman, `seasons`) + `backdrop` (geniş arka plan görseli); `similar` en fazla 10 benzer başlık (ayrıntısız: başlık, yıl, afiş, özet, TMDB puanı). Bulunamazsa ya da sunucuda künye kapalıysa `{ "t": "detail", "ref", "error": "…" }`. Hesaplı sunucuda `auth` gerekir.
 
 ### 3.0f `admin` — yönetim (p0.19)
 Admin sunucuda verilir: `koni-server admin -db koni.db Ad#1234` (`-off` geri alır, `-list` hesapları listeler).

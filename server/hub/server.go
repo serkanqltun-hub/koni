@@ -78,6 +78,14 @@ func (h *Hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		writeJSON(ctx, c, h.Lists(in))
 		c.Close(websocket.StatusNormalClosure, "")
 		return
+	case "watch": // solo watching (p0.25)
+		writeJSON(ctx, c, h.Watch(in))
+		c.Close(websocket.StatusNormalClosure, "")
+		return
+	case "detail": // künye without a room (p0.25)
+		writeJSON(ctx, c, h.Detail(ctx, in))
+		c.Close(websocket.StatusNormalClosure, "")
+		return
 	case "feed":
 		writeJSON(ctx, c, h.Feed(in))
 		c.Close(websocket.StatusNormalClosure, "")
@@ -162,7 +170,7 @@ func (h *Hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			sess.Handle(Inbound{T: "?"}) // yields bad_message to this member
 			continue
 		}
-		if m.T == "create_room" || m.T == "join" || m.T == "resume" || m.T == "register" || m.T == "login" || m.T == "logout" || m.T == "friends" || m.T == "feed" || m.T == "lists" || m.T == "profile" || m.T == "hello" || m.T == "remote" || m.T == "admin" {
+		if m.T == "create_room" || m.T == "join" || m.T == "resume" || m.T == "register" || m.T == "login" || m.T == "logout" || m.T == "friends" || m.T == "feed" || m.T == "lists" || m.T == "profile" || m.T == "hello" || m.T == "remote" || m.T == "admin" || m.T == "watch" || m.T == "detail" {
 			m.T = "?"
 		}
 		if m.T == "call" { // ask a mutual friend in (p0.18): answered to this member only

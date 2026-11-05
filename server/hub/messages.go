@@ -8,7 +8,7 @@ import (
 )
 
 // Protocol version, see docs/PROTOCOL.md.
-const ProtocolVersion = "p0.24"
+const ProtocolVersion = "p0.25"
 
 // Inbound is the union of all client→server messages; fields are used per type "t".
 type Inbound struct {
@@ -96,6 +96,18 @@ type Inbound struct {
 	Ref    string       `json:"ref,omitempty"`
 	Rating int          `json:"rating,omitempty"`
 	Entry  *store.Entry `json:"entry,omitempty"`
+	// p0.25: "rate" also takes Stars (1–5) + Word; "progress" (Ref, Kind, Season,
+	// Episode, Pos, Duration, Title?, Poster?); "seen_ep" / "unseen_ep" (Ref, Season, Episode).
+	Stars    int     `json:"stars,omitempty"`
+	Word     string  `json:"word,omitempty"`
+	Season   int     `json:"season,omitempty"`
+	Episode  int     `json:"episode,omitempty"`
+	Duration float64 `json:"duration,omitempty"`
+	Title    string  `json:"title,omitempty"`
+	Poster   string  `json:"poster,omitempty"`
+
+	// watch (p0.25): solo watching seconds since the last report (Title optional)
+	Sec int `json:"sec,omitempty"`
 
 	// subs_search / subs_pick (§3.10)
 	Hash   string `json:"hash,omitempty"` // OpenSubtitles moviehash of the local file

@@ -20,6 +20,9 @@ type Hub struct {
 	limit   limiter // login/register attempts per IP
 	reports limiter // bug reports per IP
 	soc     social  // lobby connections, presence, room calls (social.go)
+
+	watchMu sync.Mutex
+	watchAt map[int64]int64 // last solo watch report per account, unix ms (solo.go)
 }
 
 func New(cfg Config) *Hub {
@@ -28,6 +31,7 @@ func New(cfg Config) *Hub {
 		limit:   limiter{n: authAttempts, window: authWindow},
 		reports: limiter{n: reportsPerHour, window: time.Hour},
 		soc:     social{conns: map[int64]map[*lobbyConn]struct{}{}, calls: map[int64][]roomCall{}, poke: make(chan struct{}, 1)},
+		watchAt: map[int64]int64{},
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/serkanqltun-hub/koni/server/discover"
 	"github.com/serkanqltun-hub/koni/server/hub"
 	"github.com/serkanqltun-hub/koni/server/store"
 	_ "modernc.org/sqlite"
@@ -296,5 +297,125 @@ func TestLists(t *testing.T) {
 	w := handshake(t, srv, msg{"t": "lists", "auth": ta, "op": "who", "ref": "tt6751668"})
 	if s := w["seen"].([]any); len(s) != 1 || bare(s[0].(map[string]any)["name"]) != "Serkan" {
 		t.Fatalf("who: %v", w)
+	}
+}
+
+// p0.25: "Kaldığın yer" on the server, watched episodes, 1–5 stars with a word, and
+// solo watching in stats. Old ❤️/👎 rate calls keep working.
+func TestListsP025(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "koni.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	srv := httptest.NewServer(hub.New(hub.Config{Store: st}).Handler())
+	defer srv.Close()
+	root, _ := st.CreateInvite(0, time.Hour)
+	serkan := handshake(t, srv, msg{"t": "register", "code": root, "username": "Serkan", "password": "uzun-sifre"})
+	ts := serkan.s("token")
+	ta := handshake(t, srv, msg{"t": "register", "code": handshake(t, srv, msg{"t": "profile", "auth": ts, "op": "invite"}).s("code"), "username": "Ayşe", "password": "uzun-sifre"}).s("token")
+
+	// progress: one row per title, a series keeps its latest episode
+	handshake(t, srv, msg{"t": "lists", "auth": ts, "op": "progress", "ref": "tt2543164", "kind": "movie", "pos": 1200.5, "duration": 6960, "title": "Arrival"})
+	handshake(t, srv, msg{"t": "lists", "auth": ts, "op": "progress", "ref": "tt0903747", "kind": "series", "season": 1, "episode": 3, "pos": 100, "duration": 2800, "title": "Breaking Bad"})
+	r := handshake(t, srv, msg{"t": "lists", "auth": ts, "op": "progress", "ref": "tt0903747", "kind": "series", "season": 1, "episode": 4, "pos": 50, "duration": 2800})
+	p := r["progress"].([]any)
+	if len(p) != 2 {
+		t.Fatalf("progress: %v", r)
+	}
+	if bb := p[0].(map[string]any); bb["ref"] != "tt0903747" || bb["episode"] != 4.0 || bb["title"] != "Breaking Bad" {
+		t.Fatalf("series progress: %v", bb)
+	}
+	if r := handshake(t, srv, msg{"t": "lists", "auth": ts, "op": "progress", "ref": "", "pos": 1}); r.s("code") != "bad_entry" {
+		t.Fatalf("bad progress: %v", r)
+	}
+	r = handshake(t, srv, msg{"t": "lists", "auth": ts, "op": "remove", "list": "progress", "ref": "tt2543164"})
+	if len(r["progress"].([]any)) != 1 {
+		t.Fatalf("remove progress: %v", r)
+	}
+
+	// episodes
+	handshake(t, srv, msg{"t": "lists", "auth": ts, "op": "seen_ep", "ref": "tt0903747", "season": 1, "episode": 1})
+	handshake(t, srv, msg{"t": "lists", "auth": ts, "op": "seen_ep", "ref": "tt0903747", "season": 1, "episode": 2})
+	r = handshake(t, srv, msg{"t": "lists", "auth": ts, "op": "unseen_ep", "ref": "tt0903747", "season": 1, "episode": 2})
+	if e := r["episodes"].(map[string]any)["tt0903747"].([]any); len(e) != 1 || e[0] != "1:1" {
+		t.Fatalf("episodes: %v", r)
+	}
+
+	// stars: both rate, the average counts you and your mutual friends
+	add := func(tok string) {
+		handshake(t, srv, msg{"t": "lists", "auth": tok, "op": "add", "list": "seen", "entry": msg{"ref": "tt6751668", "title": "Parasite"}})
+	}
+	add(ts)
+	add(ta)
+	handshake(t, srv, msg{"t": "lists", "auth": ts, "op": "rate", "ref": "tt6751668", "rating": 1}) // p0.24 ❤️
+	handshake(t, srv, msg{"t": "lists", "auth": ts, "op": "rate", "ref": "tt6751668", "stars": 5, "word": "  başyapıt  "})
+	handshake(t, srv, msg{"t": "lists", "auth": ta, "op": "rate", "ref": "tt6751668", "stars": 4, "word": "çok uzun bir kelime olurdu bu aslında"})
+	w := handshake(t, srv, msg{"t": "lists", "auth": ts, "op": "who", "ref": "tt6751668"})
+	mine := w["mine"].(map[string]any)
+	if w["stars"] != 4.5 || w["starsCount"] != 2.0 || mine["stars"] != 5.0 || mine["word"] != "başyapıt" || mine["rating"] != 1.0 {
+		t.Fatalf("who stars: %v", w)
+	}
+	if h := w["seen"].([]any)[0].(map[string]any); h["stars"] != 4.0 || len([]rune(h["word"].(string))) != store.MaxWord {
+		t.Fatalf("friend stars: %v", h)
+	}
+
+	// solo watching: counted in stats, capped by time since the last report
+	if r := handshake(t, srv, msg{"t": "watch", "auth": ts, "sec": 60, "title": "Arrival"}); r["sec"] != 60.0 {
+		t.Fatalf("watch: %v", r)
+	}
+	if r := handshake(t, srv, msg{"t": "watch", "auth": ts, "sec": 60}); r["sec"] != 0.0 {
+		t.Fatalf("watch flood: %v", r)
+	}
+	if r := handshake(t, srv, msg{"t": "watch", "sec": 60}); r.s("code") != "auth_required" {
+		t.Fatalf("watch without auth: %v", r)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		s := handshake(t, srv, msg{"t": "stats", "auth": ts, "period": "all"})
+		var sec float64
+		for _, u := range s["users"].([]any) {
+			if u := u.(map[string]any); bare(u["user"]) == "Serkan" {
+				sec, _ = u["watchSec"].(float64)
+			}
+		}
+		if sec == 60 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("solo watch not in stats: %v", s)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// p0.25 `detail` without a discover client answers with an error line, not a crash.
+func TestDetailWithoutDiscover(t *testing.T) {
+	srv := httptest.NewServer(hub.New(hub.Config{}).Handler())
+	defer srv.Close()
+	r := handshake(t, srv, msg{"t": "detail", "ref": "tt2543164"})
+	if r.s("t") != "detail" || r.s("error") == "" {
+		t.Fatalf("detail: %v", r)
+	}
+}
+
+// p0.25 `detail`: a list ref (IMDb or tmdb:) → the full card and similar titles.
+func TestDetail(t *testing.T) {
+	d, err := discover.New("test-key", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.TMDBBase = fakeTMDB(t).URL
+	srv := httptest.NewServer(hub.New(hub.Config{Discover: d}).Handler())
+	defer srv.Close()
+	for _, ref := range []string{"tt100", "tmdb:movie:100"} {
+		r := handshake(t, srv, msg{"t": "detail", "ref": ref})
+		it, _ := r["item"].(map[string]any)
+		if it == nil || it["title"] != "Film 100" || it["trailer"] != "yt100" || len(r["similar"].([]any)) != 2 {
+			t.Fatalf("detail %s: %v", ref, r)
+		}
+	}
+	if r := handshake(t, srv, msg{"t": "detail", "ref": "tmdb:x:1"}); r.s("error") == "" {
+		t.Fatalf("bad ref: %v", r)
 	}
 }
