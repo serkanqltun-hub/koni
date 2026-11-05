@@ -125,6 +125,12 @@ pub enum ClientMsg {
     Recs {
         auth: String,
     },
+    /// Tek seferlik (p0.28): aylık özet; `month` `YYYY-AA`, yoksa bu ay.
+    Recap {
+        auth: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        month: Option<String>,
+    },
     /// Tek seferlik (p0.27): intro / özet işareti; `op` `get` | `set` | `clear`, `season` 0 = tüm sezonlar.
     Skip {
         auth: String,
@@ -474,6 +480,11 @@ pub enum ServerMsg {
         #[serde(rename = "targetSec")]
         target_sec: f64,
     },
+    /// p0.28: odanın ortak geçmişi (en yeni önce, en fazla 20).
+    History {
+        #[serde(default)]
+        items: Vec<HistoryItem>,
+    },
     Pong {
         t0: i64,
         #[serde(rename = "serverTs")]
@@ -517,6 +528,24 @@ pub struct Snapshot {
     pub state: RoomState,
     #[serde(default)]
     pub downloads: Vec<DlStatus>,
+    /// p0.28: odanın ortak geçmişi (eski sunucuda boş).
+    #[serde(default)]
+    pub history: Vec<HistoryItem>,
+}
+
+/// Odanın geçmişindeki bir medya (docs/PROTOCOL.md §4.20).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HistoryItem {
+    pub media: Media,
+    /// Açan üyenin adı.
+    #[serde(default)]
+    pub by: String,
+    /// Açıldığı an (unix ms).
+    #[serde(default)]
+    pub at: i64,
+    /// Oda o medyadan ayrılırken kaldığı yer (sn).
+    #[serde(default)]
+    pub pos: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
