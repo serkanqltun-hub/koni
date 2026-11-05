@@ -143,6 +143,7 @@ pub fn run() {
             commands::cast_play,
             commands::cast_control,
             commands::cast_position,
+            commands::cast_back,
             commands::sync_connect,
             commands::sync_play,
             commands::sync_pause,

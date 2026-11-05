@@ -484,11 +484,33 @@ pub fn cast_prepare(state: State<'_, AppState>) -> CmdResult<crate::cast::Media>
     crate::cast::prepare(&player(&state)?)
 }
 
-/// Açık videoyu `device` TV'sinde oynatır.
+/// Açık videoyu `device` TV'sinde kaldığı yerden oynatır; bilgisayardaki oynatıcı durur.
 #[tauri::command(async)]
 pub fn cast_play(state: State<'_, AppState>, device: crate::cast::Device) -> CmdResult {
-    let media = crate::cast::prepare(&player(&state)?)?;
-    crate::cast::play(&device, &media)
+    let mpv = player(&state)?;
+    let media = crate::cast::prepare(&mpv)?;
+    crate::cast::play(&device, &media)?;
+    let at = mpv.time_pos().unwrap_or(0.0);
+    if at > 1.0 {
+        if let Err(e) = crate::cast::control(&device, crate::cast::Control::Seek(at)) {
+            eprintln!("[koni] TV kaldığı yere sarılamadı: {e}");
+        }
+    }
+    mpv.pause().map_err(|e| e.to_string())
+}
+
+/// "Bilgisayara geri al": TV'yi kapatır, videoyu bilgisayarda TV'nin kaldığı yerden sürdürür.
+#[tauri::command(async)]
+pub fn cast_back(state: State<'_, AppState>, device: crate::cast::Device) -> CmdResult {
+    let mpv = player(&state)?;
+    let at = crate::cast::position(&device).map_or(0.0, |p| p.position);
+    if let Err(e) = crate::cast::control(&device, crate::cast::Control::Stop) {
+        eprintln!("[koni] TV durdurulamadı: {e}");
+    }
+    if at > 1.0 {
+        mpv.seek_absolute(at).map_err(|e| e.to_string())?;
+    }
+    mpv.play().map_err(|e| e.to_string())
 }
 
 /// TV'deki oynatmayı yönetir: oynat / duraklat / dur / sar.

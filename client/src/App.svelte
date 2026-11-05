@@ -9,7 +9,7 @@
     COCKPIT_LAYOUT, playerLoad, playerPause, playerTogglePause, playerSeek, playerSetSpeed, playerScreenshot,
     playerSetVolume, playerAddSubtitle, playerSubDelay, playerTracks, playerSetTrack,
     type Tracks, type TrackKind,
-    playerState, setLayout, setFullscreen, openCastPanel, isMac, castDevices, castPrepare, castPlay, type CastDevice, type PlayerState,
+    playerState, setLayout, setFullscreen, openCastPanel, isMac, castDevices, castPrepare, castPlay, castControl, castPosition, castBack, type CastDevice, type CastPosition, type PlayerState,
     syncConnect, syncSeek, syncToggle, syncPause, syncSeekBy, syncLeave, syncContinueWithout, syncResync, syncDownload,
     syncSetCohost, syncSetPolicy, accountGet, accountLogin, accountRegister, accountLogout, snifferClose,
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, mediaList, bugReport,
@@ -238,6 +238,38 @@
       note("Ağ adresi kopyalandı");
     } catch (e) { add(String(e), true); }
   }
+  /** TV modu: video TV'de oynar, bilgisayardaki oynatıcı durur, kontrol şeridi TV'yi yönetir.
+   *  Bilgisayarda yeni oynatma başlarsa TV kapanır. `at`: ilk saniyelerde TV durumu oturmamış olabilir. */
+  let tv = $state<{ device: CastDevice; s: CastPosition | null; at: number } | null>(null);
+  const tvSettled = () => tv !== null && Date.now() - tv.at > 8000;
+  async function castTo(d: CastDevice) {
+    try {
+      await castPlay(d);
+      tv = { device: d, s: null, at: Date.now() };
+      drawer = null;
+      note("TV: {name}", { name: d.name });
+    } catch (e) { add(`TV: ${String(e)}`, true, () => `TV: ${tx(String(e))}`); }
+  }
+  function castHome() {
+    if (!tv) return;
+    const d = tv.device;
+    tv = null;
+    return run("Bilgisayara geri al", castBack(d));
+  }
+  $effect(() => {
+    const d = tv?.device;
+    if (!d) return;
+    const id = setInterval(async () => {
+      try {
+        const s = await castPosition(d);
+        if (!tv || tv.device !== d) return;
+        // Süre yok ve oynamıyor: video bitti ya da TV'de kapatıldı.
+        if (s.playing || s.duration > 0) tv.s = s;
+        else if (tvSettled()) { tv = null; note("TV'de oynatma bitti"); }
+      } catch { /* TV geçici yanıt vermeyebilir */ }
+    }, 1000);
+    return () => clearInterval(id);
+  });
   /** Odada Müzik çekmecesi: ortak Lounge kuyruğu ya da kendi çalma listelerin. */
   let musicTab = $state<"lounge" | "lists">("lounge");
   /** Çekmece açıkken iz listesi tazelenir (dosya açılınca izler sonradan gelir). */
@@ -939,6 +971,7 @@
   }
 
   function togglePause() {
+    if (tv) return run("Oynat/Duraklat", castControl(tv.device, { action: tv.s?.playing === false ? "play" : "pause" }), true);
     if (!inRoom) return run("Oynat/Duraklat", playerTogglePause());
     return run("Oynat/Duraklat", syncToggle(), true);
   }
@@ -950,6 +983,7 @@
     return seekTo(Math.max(0, Math.min(dur - 1, (st?.timePos ?? 0) + by)));
   }
   function seekTo(v: number) {
+    if (tv) return run("Atla", castControl(tv.device, { action: "seek", seconds: v }), true);
     if (inRoom) return run("Atla", syncSeek(v), true);
     return run("Atla " + fmt(v), playerSeek(v), false, () => t("Atla {pos}", { pos: fmt(v) }));
   }
@@ -1348,7 +1382,14 @@
     const unDeep = onOpenUrl(onDeepLink);
     const updateTimer = setInterval(() => checkUpdate(false), 6 * 3600_000);
     const id = setInterval(async () => {
-      try { st = await playerState(); } catch (e) {
+      try {
+        const p = await playerState();
+        if (tv && !p.paused && tvSettled()) {
+          castControl(tv.device, { action: "stop" }).catch(() => {});
+          tv = null;
+        }
+        st = tv?.s ? { ...p, timePos: tv.s.position, duration: tv.s.duration || p.duration, paused: !tv.s.playing } : p;
+      } catch (e) {
         if (!pollErrLogged) { pollErrLogged = true; add(`player_state: ${String(e)}`, true); }
       }
     }, 250);
@@ -1813,9 +1854,16 @@
             </div>
           {/if}
         {:else if shown === "cast"}
+          {#if tv}
+            <div class="banner blue">
+              <b>{t("TV'de oynuyor: {name}", { name: tv.device.name })}</b>
+              <span><button class="chip" onclick={castHome}><Icon name="cast" size={13} />{t("Bilgisayara geri al")}</button></span>
+            </div>
+          {/if}
           <div class="eyebrow">{t("Aynı ağdaki TV'ler")}</div>
+          {#if inRoom}<div class="hint">{t("Odadayken TV'ye gönderme henüz yok.")}</div>{/if}
           {#each castList as d (d.id)}
-            <button class="opt" onclick={() => run(`TV: ${d.name}`, castPlay(d), false, () => t("TV: {name}", { name: d.name }))}>
+            <button class="opt" disabled={inRoom || !st?.duration} onclick={() => castTo(d)}>
               <span class="opt-ic"><Icon name="cast" /></span><span class="opt-txt"><b>{d.name}</b><small>{d.kind}</small></span>
             </button>
           {:else}
@@ -2187,7 +2235,7 @@
         <input class="vol" type="range" min="0" max="130" step="1" value={volume} style="--p:{(volume / 130) * 100}%"
           oninput={(e) => setVolume(+e.currentTarget.value)} />
       </div>
-      <button class="icon" class:on={drawer === "cast"} title={t("TV'de oynat")} onclick={() => toggle("cast")}><Icon name="cast" size={15} /></button>
+      <button class="icon" class:on={drawer === "cast" || tv !== null} title={t("TV'de oynat")} onclick={() => toggle("cast")}><Icon name="cast" size={15} /></button>
       {#if roomView === "watch"}
         <button class="icon" title={t("Tam ekran (F)")} onclick={() => setFs(true)}><Icon name="max" size={15} /></button>
       {/if}

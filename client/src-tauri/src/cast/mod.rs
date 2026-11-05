@@ -4,6 +4,7 @@
 //! TV'ye olduğu gibi verilir. Cihaz türleri (Chromecast, DLNA) kendi dosyalarında
 //! `devices` ve `play` içine eklenir.
 
+pub mod chromecast;
 pub mod dlna;
 pub mod serve;
 
@@ -50,6 +51,7 @@ pub struct Position {
 /// Aynı ağdaki TV'ler. Her tür kendi bulucusunu buraya ekler.
 pub fn devices() -> Vec<Device> {
     let mut out = Vec::new();
+    out.extend(chromecast::devices());
     out.extend(dlna::devices());
     out
 }
@@ -65,6 +67,7 @@ fn unsupported(device: &Device) -> String {
 /// `media`yı cihazda oynatır.
 pub fn play(device: &Device, media: &Media) -> Result<(), String> {
     match device.kind.as_str() {
+        chromecast::KIND => chromecast::play(device, media),
         "dlna" => dlna::play(device, media),
         _ => Err(unsupported(device)),
     }
@@ -73,6 +76,7 @@ pub fn play(device: &Device, media: &Media) -> Result<(), String> {
 /// Oynat / duraklat / dur / sar.
 pub fn control(device: &Device, c: Control) -> Result<(), String> {
     match device.kind.as_str() {
+        chromecast::KIND => chromecast::control(device, c),
         "dlna" => dlna::control(device, c),
         _ => Err(unsupported(device)),
     }
@@ -81,6 +85,7 @@ pub fn control(device: &Device, c: Control) -> Result<(), String> {
 /// TV'deki konum.
 pub fn position(device: &Device) -> Result<Position, String> {
     match device.kind.as_str() {
+        chromecast::KIND => chromecast::position(device),
         "dlna" => dlna::position(device),
         _ => Err(unsupported(device)),
     }
