@@ -105,19 +105,21 @@ export const feedGet = (url: string) => invoke<{ you: string; items: FeedItem[] 
 export type ListName = "want" | "seen";
 export interface ListEntry {
   ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; at?: number;
-  /** seen: 1 ❤️, -1 👎 */ rating?: number; /** seen: birlikte izlenenler */ with?: string[]; source?: string;
+  /** seen: 1 ❤️, -1 👎 */ rating?: number; /** seen: 1–5 yıldız ve tek kelime (p0.25) */ stars?: number; word?: string; /** seen: birlikte izlenenler */ with?: string[]; source?: string;
 }
-export interface Holder { name: string; avatar?: string; rating?: number }
+export interface Holder { name: string; avatar?: string; rating?: number; stars?: number; word?: string }
 export interface WantEntry extends ListEntry { mates?: Holder[] }
 export interface Lists { user: string; avatar?: string; want: WantEntry[]; seen: ListEntry[]; common?: string[]; together?: number }
-export interface ListWho { ref: string; want: Holder[] | null; seen: Holder[] | null; mine: { want?: boolean; seen?: boolean; rating?: number } }
-const listsCall = <T>(url: string, op: string, o: { user?: string; list?: ListName; reference?: string; rating?: number; entry?: ListEntry } = {}) =>
-  invoke<T | null>("lists_call", { url, op, user: o.user ?? null, list: o.list ?? null, reference: o.reference ?? null, rating: o.rating ?? null, entry: o.entry ?? null });
+export interface ListWho { ref: string; want: Holder[] | null; seen: Holder[] | null; mine: { want?: boolean; seen?: boolean; rating?: number; stars?: number; word?: string }; stars?: number; starsCount?: number }
+const listsCall = <T>(url: string, op: string, o: { user?: string; list?: ListName; reference?: string; rating?: number; stars?: number; word?: string; entry?: ListEntry } = {}) =>
+  invoke<T | null>("lists_call", { url, op, user: o.user ?? null, list: o.list ?? null, reference: o.reference ?? null, rating: o.rating ?? null, stars: o.stars ?? null, word: o.word ?? null, entry: o.entry ?? null });
 /** Kendi listelerin (`user` boş) ya da karşılıklı arkadaşınınkiler. Hesap yoksa `null`. */
 export const listsGet = (url: string, user?: string) => listsCall<Lists>(url, "", { user });
 export const listsAdd = (url: string, list: ListName, entry: ListEntry) => listsCall<Lists>(url, "add", { list, entry });
 export const listsRemove = (url: string, list: ListName, ref: string) => listsCall<Lists>(url, "remove", { list, reference: ref });
 export const listsRate = (url: string, ref: string, rating: number) => listsCall<Lists>(url, "rate", { reference: ref, rating });
+/** Yıldız puanı (1–5, `-1` siler) ve tek kelime (p0.25). Başlık önce İzlediklerim'de olmalı. */
+export const listsStars = (url: string, ref: string, stars: number, word = "") => listsCall<Lists>(url, "rate", { reference: ref, stars, word });
 export const listsWho = (url: string, ref: string) => listsCall<ListWho>(url, "who", { reference: ref });
 /** "Sorun bildir": not + etkinlik logu (eskiden yeniye) + son senkron CSV'si sunucuya gider; döner: rapor adı. */
 export const bugReport = (url: string, username: string, note: string, log: string[]) =>
