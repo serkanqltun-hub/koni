@@ -13,11 +13,12 @@
     syncConnect, syncSeek, syncToggle, syncPause, syncSeekBy, syncLeave, syncContinueWithout, syncResync, syncDownload,
     syncSetCohost, syncSetPolicy, accountGet, accountLogin, accountRegister, accountLogout, snifferClose,
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, mediaList, bugReport,
-    type SyncStatus, type ServerMsg, type Member, type MediaEvent, type LinkEvent, type DlStatus, type Policy,
+    type SyncStatus, type ServerMsg, type Member, type MediaEvent, type ListEntry, type LinkEvent, type DlStatus, type Policy,
     type SnifferEvent, type UpdateInfo, type FunMsg, type Movie, syncSetView, type RoomView,
-    debridOpen, type Source, playerMusicView, playerPlay, playerCover, relayOn, setRelay, setLangPrefs, langMode, subSize, lobbyRemoteState,
+    debridOpen, watchReport, type Source, playerMusicView, playerPlay, playerCover, relayOn, setRelay, setLangPrefs, langMode, subSize, lobbyRemoteState,
   } from "./lib/player";
   import BrowseView from "./lib/BrowseView.svelte";
+  import RateCard from "./lib/RateCard.svelte";
   import TitleBar from "./lib/TitleBar.svelte";
   import Logo from "./lib/Logo.svelte";
   import LoginView from "./lib/LoginView.svelte";
@@ -30,7 +31,7 @@
   import { DEFAULT_SERVER, normServer } from "./lib/server";
   import { loadRecent, rememberRoom, forgetRoom, type RecentRoom } from "./lib/recent";
   import ResumeBar from "./lib/ResumeBar.svelte";
-  import type { ResumeEntry, ResumeMedia } from "./lib/resume";
+  import { refOf, setResumeServer, type ResumeEntry, type ResumeMedia } from "./lib/resume";
   import Icon from "./lib/Icon.svelte";
   import NightView from "./lib/NightView.svelte";
   import CinemaLobby from "./lib/CinemaLobby.svelte";
@@ -104,6 +105,8 @@
   let downloads = $state<Record<string, DlStatus>>({});
   /** Bu sunucuda kayıtlı hesap adı; hesapsız sunucuda null. */
   let account = $state<string | null>(null);
+  // Kaldığın yer hesaplı sunucuya da yazılır (alt bileşenler açılmadan önce ayarlanır).
+  $effect.pre(() => setResumeServer(account ? serverUrl : null));
   /** Hesap kontrolü bitti mi (bitmeden giriş ekranı gösterilmez). */
   let accountChecked = $state(false);
   /** Hesapsız (açık) sunucuda yalnızca kullanıcı adıyla devam. */
@@ -448,6 +451,11 @@
       lastMode = mode;
     });
   });
+  /** Puan kartı için başlık: medya `file` alanı `movie:tt…|…` ya da `series:tt…:s:e|…` ise. */
+  function titleEntry(file: string | undefined, title: string): ListEntry | null {
+    const m = file?.match(/^(movie|series):(tt\d+)/);
+    return m ? { ref: m[2], kind: m[1] as "movie" | "series", title } : null;
+  }
   function closeEnd(then?: () => void) {
     endClosed = nowMedia?.src ?? "";
     then?.();
@@ -873,6 +881,23 @@
   });
   $effect(() => { if (!canSleep && sleepSel !== 0) untrack(() => setSleep(0)); });
 
+  // Solo izleme süresi (p0.25): oynarken saniye say, dakikada bir sunucuya bildir. Odadayken oda sayar.
+  let soloAcc = 0;
+  function soloFlush() {
+    const sec = Math.min(Math.floor(soloAcc), 120);
+    soloAcc = 0;
+    if (sec < 1 || !social.server) return;
+    watchReport(social.server, sec, soloMedia?.title || undefined).catch(() => {});
+  }
+  $effect(() => {
+    if (view !== "solo" || roomView !== "watch") return;
+    const id = setInterval(() => {
+      const s = st;
+      if (s && s.duration != null && !s.paused && !s.pausedForCache && !s.eofReached && !s.seeking) soloAcc += 1;
+      if (soloAcc >= 60) soloFlush();
+    }, 1000);
+    return () => { clearInterval(id); soloFlush(); };
+  });
   // "Tam ekran başlat": yeni bir video açılınca (süre bilinince) tam ekrana geç.
   let hadDuration = false;
   $effect(() => {
@@ -1078,9 +1103,17 @@
 
   /** Sinema lobisinden "Devam": medyayı bu odada / tek başına açar (konum ResumeBar'da). */
   function resumeHere(r: ResumeEntry) {
+    if (r.kind === "ref") return watchRef(r);
     if (r.kind === "file") return note("Dosyayı pencereye bırak: {title}", { title: r.title }, true);
     if (r.kind === "debrid") return openDebrid({ addon: "", name: "", title: "", hash: r.src, file: r.file ?? "", idx: r.idx ?? null }, r.title);
     open(r.src);
+  }
+  /** Başka bilgisayarda yarım kalan film/dizi: başlık açılır, kaynak kendiliğinden aranır. */
+  function watchRef(r: ResumeEntry) {
+    const p = refOf(r.file);
+    if (!p) return;
+    openTitles("");
+    watchReq = { ref: p.ref, kind: p.kind, title: p.kind === "series" ? r.title.replace(/\s+S\d+E\d+$/, "") : r.title, poster: r.poster };
   }
   /** Yarım kalan filmi aynı oda adıyla yeniden kurup medyayı açar. */
   function resumeMovie(r: ResumeEntry) {
@@ -1149,7 +1182,8 @@
           if (pr && pr.kind === "file") note("Dosyayı Aç ile yükle: {title}", { title: pr.title });
           else if (pr && pr.kind === "debrid") {
             openDebrid({ addon: "", name: "", title: "", hash: pr.src, file: pr.file ?? "", idx: pr.idx ?? null }, pr.title);
-          } else if (pr) open(pr.src);
+          } else if (pr && pr.kind === "ref") watchRef(pr);
+          else if (pr) open(pr.src);
         }
         // eski Santral (p0.12 ve öncesi) modu bilmez: Sinema
         applyView(m.snapshot.view || "watch");
@@ -1432,6 +1466,7 @@
 {#snippet endScreen()}
   {@const title = nowMedia?.title || soloTitle || t("Video")}
   {@const ep = title.match(/^(.*?)\s+S(\d{2})E(\d{2})$/)}
+  {@const rateEntry = titleEntry(nowMedia?.file, ep ? ep[1] : title)}
   {@const here = Object.values(members).filter((m) => !m.away).length}
   <div class="end" style="--h:{hue(title)}">
     <div class="end-bd"></div>
@@ -1444,6 +1479,7 @@
         {#if room}<div><b>{here}/{Object.keys(members).length}</b><small>{t("sonuna kadar kaldı")}</small></div>{/if}
         <div><b>{pauses}</b><small>{t("mola")}</small></div>
       </div>
+      {#if rateEntry}{#key rateEntry.ref}<RateCard entry={rateEntry} />{/key}{/if}
       <div class="end-row">
         {#if soloEp && nextEp.busy}
           <button class="big w" disabled><Icon name="next" size={16} /> {t("{code} açılıyor…", { code: nextEp.code })}</button>

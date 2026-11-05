@@ -161,6 +161,7 @@
     {@render poster(e, true)}
     <span class="t"><b>{e.title}</b><small>{sub(e)}</small></span>
     <span class="with">{#each (e.with ?? []).slice(0, 3) as w (w)}<Avatar id={social.presence?.friends.find((f) => splitHandle(f.name)[0] === splitHandle(w)[0])?.avatar ?? (withMe(e) && splitHandle(w)[0] === splitHandle(myName)[0] ? social.profile?.avatar : undefined)} name={w} size={20} />{/each}<em>{withLine(e)}</em></span>
+    {#if e.stars}<span class="stars" title={e.word ?? ""}>{"★".repeat(e.stars)}<small>{e.word ?? ""}</small></span>{/if}
     {#if own}
       <span class="rate">
         <button class:on={e.rating === 1} title={t("Beğendim")} onclick={() => rate(e, 1)}>❤️</button>
@@ -365,6 +366,8 @@
   .with :global(.avw) { margin-left: -5px; border-radius: 50%; box-shadow: 0 0 0 1.5px #17181b; }
   .with :global(.avw:first-child) { margin-left: 0; }
   .with em { font-style: normal; font-size: 11.5px; color: var(--text-2); margin-left: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stars { flex: none; display: inline-flex; align-items: baseline; gap: 6px; color: #ffd60a; font-size: 12px; letter-spacing: 1px; }
+  .stars small { color: var(--text-2); letter-spacing: 0; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rate { display: flex; gap: 2px; flex: none; }
   .rate button { width: 28px; height: 28px; padding: 0; border-radius: 8px; background: none; border: 0; opacity: 0.3; font-size: 14px; }
   .rate button.on { opacity: 1; }
