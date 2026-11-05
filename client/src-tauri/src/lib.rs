@@ -159,6 +159,8 @@ pub fn run() {
             commands::sync_set_cohost,
             commands::sync_set_policy,
             commands::sync_set_view,
+            commands::sync_break,
+            commands::sync_ready,
             commands::web_search,
             commands::media_list,
             commands::sync_resync,
