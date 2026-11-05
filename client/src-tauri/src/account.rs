@@ -187,6 +187,22 @@ pub async fn browse(url: &str, msg: ClientMsg) -> Result<serde_json::Value, Stri
     Ok(v)
 }
 
+/// `skip` el sıkışması (p0.27): intro / özet işaretleri olduğu gibi arayüze gider.
+pub async fn skip(url: &str, msg: ClientMsg) -> Result<serde_json::Value, String> {
+    let t = exchange(url, &msg).await?;
+    let v: serde_json::Value = serde_json::from_str(&t).map_err(|e| e.to_string())?;
+    if v["t"] == "error" {
+        return Err(v["message"]
+            .as_str()
+            .unwrap_or(trs("sunucu hatası", "server error"))
+            .to_string());
+    }
+    if v["t"] != "skip" {
+        return Err(tr!("beklenmeyen cevap: {t}", "unexpected response: {t}"));
+    }
+    Ok(v)
+}
+
 /// `watch` el sıkışması (p0.25): solo izleme süresi; cevaptaki sayılan saniye döner.
 pub async fn watch(url: &str, auth: String, sec: u32, title: String) -> Result<u32, String> {
     let t = exchange(url, &ClientMsg::Watch { auth, sec, title }).await?;

@@ -7,7 +7,8 @@ import views from "./views";
 import panels from "./panels";
 import misc from "./misc";
 import rust from "./rust";
+import skip from "./skip";
 import { PATTERNS } from "./patterns";
 
-export const EN: Record<string, string> = { ...misc, ...panels, ...views, ...home, ...night, ...solo, ...app, ...rust };
+export const EN: Record<string, string> = { ...misc, ...panels, ...views, ...home, ...night, ...solo, ...app, ...rust, ...skip };
 export { PATTERNS };

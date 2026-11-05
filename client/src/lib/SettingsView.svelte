@@ -8,6 +8,7 @@
   import { qrDataUrl } from "./qr";
   import { DEFAULT_SERVER, serverLabel } from "./server";
   import { prefs } from "./prefs.svelte";
+  import { autoSkip, setAutoSkip } from "./skip";
 
   // Uygulama ayarları (UI-PLAN §5.9, E3). Yalnızca gerçekten çalışan ayarlar var.
   let {
@@ -132,6 +133,10 @@
         <div class="item">
           <div class="grow"><b>{t("Spoiler gizle")}</b><small>{t("Dizilerde henüz izlemediğin bölümlerin adı ve küçük resmi bulanık görünür; tıklayınca açılır.")}</small></div>
           <input type="checkbox" role="switch" bind:checked={prefs.hideSpoilers} />
+        </div>
+        <div class="item">
+          <div class="grow"><b>{t("İntro'yu otomatik atla")}</b><small>{t("Dizide işaretli intro ya da özet gelince sormadan atlar. Odada yalnızca host atlatır.")}</small></div>
+          <input type="checkbox" role="switch" checked={autoSkip()} onchange={(e) => setAutoSkip(e.currentTarget.checked)} />
         </div>
       </div>
     {:else if section === "debrid"}

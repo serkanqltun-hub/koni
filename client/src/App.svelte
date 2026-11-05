@@ -31,6 +31,7 @@
   import { DEFAULT_SERVER, normServer } from "./lib/server";
   import { loadRecent, rememberRoom, forgetRoom, type RecentRoom } from "./lib/recent";
   import ResumeBar from "./lib/ResumeBar.svelte";
+  import SkipBar from "./lib/SkipBar.svelte";
   import { refOf, setResumeServer, type ResumeEntry, type ResumeMedia } from "./lib/resume";
   import Icon from "./lib/Icon.svelte";
   import NightView from "./lib/NightView.svelte";
@@ -2196,6 +2197,12 @@
       <span class="time">{fmt(st?.duration)}</span>
     </div>
     <div class="right">
+      {#if roomView === "watch" && account && st?.duration && nowMedia && nowMedia.kind !== "page"}
+        <!-- İntro / özet atla (T28): odada atlama oda konumuna ileri seek. -->
+        <SkipBar url={serverUrl} ep={epRef(nowMedia.src, nowMedia.file)} pos={st.timePos ?? null}
+          canSeek={inRoom ? amControl || room?.policy !== "host_only" : true} autoOk={!inRoom || amHost}
+          onSeek={seekTo} onNote={(k) => note(k)} />
+      {/if}
       {#if roomView === "watch"}
       <ResumeBar media={nowMedia?.kind === "page" ? null : (nowMedia as ResumeMedia | null)} pos={st?.timePos ?? null} duration={st?.duration ?? null}
         roomPos={inRoom ? (sync?.roomPos ?? null) : null} room={room?.name}
