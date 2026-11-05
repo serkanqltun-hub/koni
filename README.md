@@ -18,6 +18,10 @@ Make a room, call your friends in, and everyone sees the same frame at the same 
 
 <img src="docs/img/readme/home.webp" alt="KONİ home screen: open rooms, friends online, weekly stats and badges" width="860">
 
+<br>
+
+<img src="docs/img/readme/demo.webp" alt="A short tour of KONİ: home screen, activity feed, Discover, Cinema and Music" width="860">
+
 </div>
 
 ---
@@ -231,6 +235,26 @@ What changed in each version: [docs/releases/](docs/releases/).
 
 ---
 
+## FAQ
+
+<details>
+<summary><b>Do I need to set up a server?</b></summary>
+<br>
+
+Not if a friend already runs one. KONİ has no built-in server: click a friend's invite link and the address fills in by itself, or type the address by hand on the first screen. If you are starting a new group, you can [host your own server](docs/SELF-HOSTING.md) from the [`server/`](server/) folder; it is one small binary.
+
+</details>
+
+<details>
+<summary><b>Why is the download on the Savas07 account?</b></summary>
+<br>
+
+Releases and auto-updates are published from a separate repository, [Savas07/koni-releases](https://github.com/Savas07/koni-releases/releases/latest), so that the source repository stays code only. The installers there are built from this repository's code.
+
+</details>
+
+---
+
 ## Türkçe
 
 **KONİ, arkadaş grupları için ortak izleme ve dinleme uygulaması.** Oda kur, arkadaşlarını çağır; herkes aynı anı aynı saniyede görür.
@@ -244,6 +268,8 @@ What changed in each version: [docs/releases/](docs/releases/).
 KONİ hazır bir sunucuyla gelmez: her arkadaş grubu kendi sunucusunu kurar. Arkadaşının davet linkine tıklarsan sunucu adresi kendiliğinden gelir; yeni bir grup kuruyorsan ilk ekranda kendi sunucunun adresini yazarsın.
 
 Windows 10/11 ve macOS 11+ (Apple Silicon, M1 ve sonrası) için. Uygulama imzasız olduğundan ilk açılışta bir kez onay ister: Windows'ta *Ek bilgi → Yine de çalıştır*; Mac'te macOS 14 ve öncesinde uygulamaya sağ tık → *Aç*, macOS 15 ve sonrasında bir kez açmayı dene, sonra *Sistem Ayarları → Gizlilik ve Güvenlik* → *Yine de Aç*.
+
+**SSS:** *Sunucu kurmam gerekiyor mu?* Arkadaşının davet linkine tıklaman yeterli; sunucu adresi kendiliğinden gelir ya da ilk ekranda elle yazılır. Yeni bir grup kuruyorsan [`server/`](server/) ile kendi sunucunu kurabilirsin. *İndirme neden Savas07'den?* Sürümler ve otomatik güncellemeler, kaynak depo yalnız kod kalsın diye [Savas07/koni-releases](https://github.com/Savas07/koni-releases/releases/latest) üzerinden dağıtılır.
 
 Uygulama varsayılan olarak İngilizce açılır; **Ayarlar**'dan ya da giriş ekranından Türkçe seçilebilir. İndirmek için [sürümler sayfası](https://github.com/Savas07/koni-releases/releases/latest), kendi sunucunu kurmak için [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
