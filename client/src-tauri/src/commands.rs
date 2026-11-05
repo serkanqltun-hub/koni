@@ -748,6 +748,17 @@ pub async fn browse_get(
     Ok(Some(account::browse(&url, msg).await?))
 }
 
+/// Öneri rafları (p0.27). Hesap yoksa `null`.
+#[tauri::command]
+pub async fn recs_get(url: String) -> CmdResult<Option<serde_json::Value>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    let msg = koni_sync::protocol::ClientMsg::Recs { auth: acc.token };
+    Ok(Some(account::recs(&url, msg).await?))
+}
+
 /// Ana ekran "Etkinlik" sekmesi (p0.22). Hesap yoksa `null`.
 #[tauri::command]
 pub async fn feed_get(url: String) -> CmdResult<Option<serde_json::Value>> {

@@ -157,6 +157,11 @@ export interface BrowseQuery {
 export interface BrowsePage { t: "browse"; kind: string; page: number; items: Movie[]; total: number; error?: string }
 export const browseGet = (url: string, kind: "movie" | "series", query: BrowseQuery) =>
   invoke<BrowsePage | null>("browse_get", { url, kind, query });
+/** p0.27 `recs` (PROTOCOL §3.0o): öneri rafları. `friends`/`together` liste satırıdır. */
+export interface RecHolder { name: string; avatar?: string; stars?: number; word?: string }
+export interface RecEntry extends ListEntry { by?: RecHolder[]; mates?: RecHolder[] }
+export interface Recs { t: "recs"; because: { ref: string; title: string; items: Movie[] }[]; friends: RecEntry[]; together: RecEntry[] }
+export const recsGet = (url: string) => invoke<Recs | null>("recs_get", { url });
 export interface Ratings { tmdb?: number; imdb?: string; rt?: string; meta?: string }
 export interface Movie {
   id: number; title: string; original?: string; year?: number; overview?: string; poster?: string;
