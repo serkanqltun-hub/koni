@@ -117,6 +117,10 @@ pub enum ClientMsg {
         #[serde(flatten, default)]
         query: Option<serde_json::Map<String, serde_json::Value>>,
     },
+    /// Tek seferlik (p0.27): öneri rafları (`because` / `friends` / `together`).
+    Recs {
+        auth: String,
+    },
     /// Tek seferlik (p0.22): ana ekran "Etkinlik" sekmesi, son 7 gün.
     Feed {
         auth: String,

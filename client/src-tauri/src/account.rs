@@ -187,6 +187,16 @@ pub async fn browse(url: &str, msg: ClientMsg) -> Result<serde_json::Value, Stri
     Ok(v)
 }
 
+/// `recs` el sıkışması (p0.27): öneri rafları olduğu gibi arayüze gider.
+pub async fn recs(url: &str, msg: ClientMsg) -> Result<serde_json::Value, String> {
+    let t = exchange(url, &msg).await?;
+    let v: serde_json::Value = serde_json::from_str(&t).map_err(|e| e.to_string())?;
+    if v["t"] != "recs" {
+        return Err(tr!("beklenmeyen cevap: {t}", "unexpected response: {t}"));
+    }
+    Ok(v)
+}
+
 /// `watch` el sıkışması (p0.25): solo izleme süresi; cevaptaki sayılan saniye döner.
 pub async fn watch(url: &str, auth: String, sec: u32, title: String) -> Result<u32, String> {
     let t = exchange(url, &ClientMsg::Watch { auth, sec, title }).await?;

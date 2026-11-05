@@ -505,6 +505,7 @@ impl SimRoom {
             | ClientMsg::SoloNight { .. }
             | ClientMsg::SoloNightPick { .. }
             | ClientMsg::Browse { .. }
+            | ClientMsg::Recs { .. }
             | ClientMsg::Friends { .. }
             | ClientMsg::Profile { .. }
             | ClientMsg::Admin { .. }

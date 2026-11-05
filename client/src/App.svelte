@@ -190,7 +190,7 @@
   let fdOpen = $state(false);
   let fdQuery = $state("");
   /** Profildeki listeden "İzle" ile açılan başlık (TitlesPane kendiliğinden açar ve kaynak arar). */
-  let watchReq = $state<{ ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; prefer?: Prefer } | null>(null);
+  let watchReq = $state<{ ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; prefer?: Prefer; detailOnly?: boolean } | null>(null);
   /** Solo lobide "Ne izlesem?" sihirbazı (açıkken mpv gizli). */
   let soloNightOpen = $state(false);
   function openTitles(q: string) {
@@ -458,6 +458,8 @@
     return pic(f?.avatar);
   }
   const callFriend = (user: string) => run("Çağır", syncFun({ t: "call", user }), true);
+  /** Öneri rafı "Çağır": odadaysa çağırır, tek başınaysa oda kurup çağırır. */
+  const recCall = (user: string) => (room ? callFriend(user) : createRoom("watch", [user]));
   // Video yüzeyi yalnızca oda ve tek başına modda görünür.
   $effect(() => {
     // Müzik sahnesi kendi ekranını çizer: mpv penceresi yalnızca Sinema'da görünür.
@@ -1733,7 +1735,7 @@
   <div class="video">
     {#if fdOpen}
       <div class="stage" in:fade={{ duration: 200 }}>
-        <TitlesPane withSearch inRoom={room !== null} initial={fdQuery} watch={watchReq} onPlay={openDebrid} onExit={() => { fdOpen = false; watchReq = null; }} onError={(m) => add(m, true)} />
+        <TitlesPane withSearch inRoom={room !== null} initial={fdQuery} watch={watchReq} onPlay={openDebrid} onExit={() => { fdOpen = false; watchReq = null; }} onError={(m) => add(m, true)} onCall={recCall} />
       </div>
     {:else if endOn}
       <div class="stage" in:fade={{ duration: 300 }}>{@render endScreen()}</div>
@@ -1745,7 +1747,8 @@
           onOpen={(t) => open(t)} onTitles={openTitles}
           onNight={fullscreen ? null : room ? openNight : () => (soloNightOpen = true)}
           onDownload={room ? (u) => run("Herkes İndirsin", syncDownload(u), true) : (u) => run("İndirme başladı; lobideki Çevrimdışı rafında görünür", startOffline(u))}
-          onResume={resumeHere} />
+          onResume={resumeHere}
+          onDetail={(d) => { openTitles(""); watchReq = { ...d, detailOnly: true }; }} onCall={recCall} />
       </div>
     {:else if st?.duration == null}
       {@const mediaName = roomMedia ? roomMedia.title || roomMedia.src : soloMedia?.title || soloMedia?.src || ""}
