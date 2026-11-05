@@ -607,6 +607,46 @@ pub async fn detail_get(
     Ok(Some(account::detail(&url, msg).await?))
 }
 
+/// "Ne izlesem?" destesi (p0.26). Hesap yoksa `null`.
+#[tauri::command]
+pub async fn solo_night(
+    url: String,
+    kind: String,
+    filter: Option<serde_json::Value>,
+    budget_min: Option<u32>,
+    dub: Option<String>,
+) -> CmdResult<Option<serde_json::Value>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    let msg = koni_sync::protocol::ClientMsg::SoloNight {
+        auth: acc.token,
+        kind,
+        filter,
+        budget_min,
+        dub: dub.unwrap_or_default(),
+    };
+    Ok(Some(account::solo_night(&url, msg).await?))
+}
+
+/// "Ne izlesem?": `ref` kartı bitti, sıradaki kart (p0.26). Hesap yoksa `null`.
+#[tauri::command]
+pub async fn solo_night_pick(
+    url: String,
+    reference: String,
+) -> CmdResult<Option<serde_json::Value>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    let msg = koni_sync::protocol::ClientMsg::SoloNightPick {
+        auth: acc.token,
+        reference,
+    };
+    Ok(Some(account::solo_night(&url, msg).await?))
+}
+
 /// "Göz at" (p0.26): filtreli 30'luk sayfa. Hesap yoksa `null`.
 #[tauri::command]
 pub async fn browse_get(

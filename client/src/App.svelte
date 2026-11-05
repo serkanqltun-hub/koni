@@ -35,6 +35,8 @@
   import Icon from "./lib/Icon.svelte";
   import NightView from "./lib/NightView.svelte";
   import CinemaLobby from "./lib/CinemaLobby.svelte";
+  import SoloNight from "./lib/SoloNight.svelte";
+  import type { Prefer } from "./lib/sources";
   import { startOffline } from "./lib/offline.svelte";
   import TitlesPane from "./lib/TitlesPane.svelte";
   import DebridSettings from "./lib/DebridSettings.svelte";
@@ -188,7 +190,9 @@
   let fdOpen = $state(false);
   let fdQuery = $state("");
   /** Profildeki listeden "İzle" ile açılan başlık (TitlesPane kendiliğinden açar ve kaynak arar). */
-  let watchReq = $state<{ ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string } | null>(null);
+  let watchReq = $state<{ ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; prefer?: Prefer } | null>(null);
+  /** Solo lobide "Ne izlesem?" sihirbazı (açıkken mpv gizli). */
+  let soloNightOpen = $state(false);
   function openTitles(q: string) {
     watchReq = null;
     if (roomView !== "watch") applyView("watch");
@@ -406,7 +410,7 @@
   // Video yüzeyi yalnızca oda ve tek başına modda görünür.
   $effect(() => {
     // Müzik sahnesi kendi ekranını çizer: mpv penceresi yalnızca Sinema'da görünür.
-    const mode = (view === "room" || view === "solo") && roomView === "watch" && !nightOpen && !leaveAsk && !sceneOwned ? "cockpit" : "hidden";
+    const mode = (view === "room" || view === "solo") && roomView === "watch" && !nightOpen && !soloNightOpen && !leaveAsk && !sceneOwned ? "cockpit" : "hidden";
     setLayout({ ...L, mode, rightColDip: L.rightColDip + (drawer || drawerLive ? DRAWER_DIP : 0) }).catch((e) => add(`Düzen: ${String(e)}`, true, () => t("Düzen: {e}", { e: tx(String(e)) })));
   });
 
@@ -425,6 +429,7 @@
     roomView === "watch" && !!st?.eofReached && st.duration != null && !lobbyOpen && endClosed !== (nowMedia?.src ?? ""),
   );
   const lobbyOn = $derived(cinemaEmpty || (roomView === "watch" && lobbyOpen));
+  $effect(() => { if (room || view !== "solo" || !lobbyOn) soloNightOpen = false; });
   /** Sinema sahnesini arayüz çiziyor (lobi, Film & Dizi, film bitti): mpv ve alt şerit gizli. */
   const sceneOwned = $derived(roomView === "watch" && (fdOpen || lobbyOn || endOn));
   // Yeni medya gelince lobi/bitti kapanır.
@@ -1280,7 +1285,7 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    if (nightOpen) return; // NightView kendi tuşlarını işler
+    if (nightOpen || soloNightOpen) return; // NightView / SoloNight kendi tuşlarını işler
     const tag = (e.target as HTMLElement | null)?.tagName;
     if (e.code === "Space" && !typing(e) && tag !== "BUTTON") {
       e.preventDefault();
@@ -1304,7 +1309,7 @@
 
   /** Odada/oynatıcıda bir kutuya yazmıyorken yapıştırılan link "Video ekle"ye düşer. */
   function onPaste(e: ClipboardEvent) {
-    if ((view !== "room" && view !== "solo") || nightOpen) return;
+    if ((view !== "room" && view !== "solo") || nightOpen || soloNightOpen) return;
     const tag = (e.target as HTMLElement | null)?.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA") return;
     const text = e.clipboardData?.getData("text")?.trim();
@@ -1678,7 +1683,7 @@
           people={room ? Object.values(members).map((m) => ({ id: m.id, name: m.name })) : []} room={room?.name ?? null}
           error={roomMedia?.status === "error" ? (roomMedia.error ? tx(roomMedia.error) : roomMedia.title ?? roomMedia.src) : null}
           onOpen={(t) => open(t)} onTitles={openTitles}
-          onNight={room && !fullscreen ? openNight : null}
+          onNight={fullscreen ? null : room ? openNight : () => (soloNightOpen = true)}
           onDownload={room ? (u) => run("Herkes İndirsin", syncDownload(u), true) : (u) => run("İndirme başladı; lobideki Çevrimdışı rafında görünür", startOffline(u))}
           onResume={resumeHere} />
       </div>
@@ -1968,6 +1973,10 @@
     </div>
   {/if}
 
+  {#if soloNightOpen}
+    <SoloNight {hue} onClose={() => (soloNightOpen = false)} onError={(m) => add(m, true)}
+      onWatch={(d, prefer) => { soloNightOpen = false; openTitles(""); watchReq = { ...d, prefer }; }} />
+  {/if}
   {#if nightOpen && room}
     <NightView me={sync?.me ?? null} canControl={funControl} {hue} onClose={() => { nightOpen = false; nightLists = false; }}
       people={Object.keys(members).length} poolDefault={nightLists} away={reconnecting !== null || Object.values(members).some((m) => m.away)}

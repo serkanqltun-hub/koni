@@ -137,6 +137,13 @@ export interface DetailRef { ref: string; kind: "movie" | "series"; title: strin
 export interface TitleDetail { t: "detail"; ref: string; item?: Movie; similar?: Movie[]; error?: string }
 export const detailGet = (url: string, ref: string, kind?: "movie" | "series") =>
   invoke<TitleDetail | null>("detail_get", { url, reference: ref, kind: kind ?? null });
+/** "Ne izlesem?" (p0.26 §3.0k): odasız deste; `item` yoksa havuz bitti. Hesap yoksa `null`. */
+export interface SoloDeal { t: "solo_night"; kind: string; items: Movie[]; more: number; dub?: string; error?: string }
+export interface SoloNext { t: "solo_night_pick"; ref: string; item?: Movie; more: number }
+export const soloNight = (url: string, kind: NightKind, filter: NightFilter | null, budgetMin?: number, dub?: string) =>
+  invoke<SoloDeal | null>("solo_night", { url, kind, filter, budgetMin: budgetMin ?? null, dub: dub ?? null });
+export const soloNightPick = (url: string, ref: string) =>
+  invoke<SoloNext | null>("solo_night_pick", { url, reference: ref });
 /** "Sorun bildir": not + etkinlik logu (eskiden yeniye) + son senkron CSV'si sunucuya gider; döner: rapor adı. */
 export const bugReport = (url: string, username: string, note: string, log: string[]) =>
   invoke<string>("bug_report", { url, username, note, log });

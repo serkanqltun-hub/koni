@@ -93,6 +93,23 @@ pub enum ClientMsg {
         #[serde(skip_serializing_if = "String::is_empty")]
         kind: String,
     },
+    /// Tek seferlik (p0.26): "Ne izlesem?" destesi; `filter` §3.9a filtresi, `budgetMin` dakika.
+    SoloNight {
+        auth: String,
+        kind: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        filter: Option<serde_json::Value>,
+        #[serde(rename = "budgetMin", skip_serializing_if = "Option::is_none")]
+        budget_min: Option<u32>,
+        #[serde(skip_serializing_if = "String::is_empty", default)]
+        dub: String,
+    },
+    /// Tek seferlik (p0.26): `ref` kartı bitti; son destenin sıradaki kartı.
+    SoloNightPick {
+        auth: String,
+        #[serde(rename = "ref")]
+        reference: String,
+    },
     /// Tek seferlik (p0.26): "Göz at" filtreli 30'luk sayfa; `genre`, `yearFrom`, `sort`, `page` … olduğu gibi eklenir.
     Browse {
         auth: String,

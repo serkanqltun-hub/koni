@@ -5,10 +5,10 @@
   import { untrack } from "svelte";
   import type { Source } from "./player";
   import { t, tx } from "./i18n.svelte";
-  import { LADDER, huntOrder, type Rung, type SourceInfo } from "./sources";
+  import { LADDER, huntOrder, type Prefer, type Rung, type SourceInfo } from "./sources";
   import { SLOW_WAIT, TOP_KEY, huntFrom, loadTop } from "./hunt";
 
-  let { sources, kicker, heading, inRoom, onPlay, onAddon, autostart = false }: {
+  let { sources, kicker, heading, inRoom, onPlay, onAddon, autostart = false, prefer = "" }: {
     sources: SourceInfo[];
     kicker: string;
     heading: string;
@@ -17,6 +17,8 @@
     onAddon: () => void;
     /** Kaynaklar gelince aramayı kendiliğinden başlat (listeden "İzle"). */
     autostart?: boolean;
+    /** Ne izlesem: TR dublajlı/altyazılı kaynaklar önce. */
+    prefer?: Prefer;
   } = $props();
 
   let top = $state<Rung>(loadTop());
@@ -44,7 +46,7 @@
   function reset() {
     token++;
     clearInterval(timer);
-    order = huntOrder(sources, top);
+    order = huntOrder(sources, top, prefer);
     results = [];
     cur = -1;
     next = 0;

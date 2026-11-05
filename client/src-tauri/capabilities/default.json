@@ -63,6 +63,8 @@
     "allow-watch-report",
     "allow-detail-get",
     "allow-browse-get",
+    "allow-solo-night",
+    "allow-solo-night-pick",
     "allow-friends",
     "allow-profile",
     "allow-admin",
