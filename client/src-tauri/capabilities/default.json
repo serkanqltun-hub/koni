@@ -20,6 +20,7 @@
     "allow-player-toggle-pause",
     "allow-player-seek",
     "allow-player-set-speed",
+    "allow-player-screenshot",
     "allow-player-set-volume",
     "allow-player-add-subtitle",
     "allow-player-sub-delay",

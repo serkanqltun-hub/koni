@@ -256,6 +256,27 @@ pub fn player_set_speed(state: State<'_, AppState>, speed: f64) -> CmdResult {
     player(&state)?.set_speed(speed).map_err(|e| e.to_string())
 }
 
+/// Geçerli kareyi Resimler klasörüne PNG olarak kaydeder; dosya yolunu döner.
+#[tauri::command(async)]
+pub fn player_screenshot(app: AppHandle, state: State<'_, AppState>) -> CmdResult<String> {
+    let dir = app
+        .path()
+        .picture_dir()
+        .map_err(|e| e.to_string())?
+        .join("KONI");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let path = dir.join(format!("koni-{stamp}.png"));
+    let p = path.to_string_lossy().to_string();
+    player(&state)?
+        .command(&["screenshot-to-file", &p, "window"])
+        .map_err(|e| e.to_string())?;
+    Ok(p)
+}
+
 #[tauri::command(async)]
 pub fn player_set_volume(state: State<'_, AppState>, volume: f64) -> CmdResult {
     if !(0.0..=130.0).contains(&volume) {
