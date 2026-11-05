@@ -9,16 +9,20 @@
   import { t, tx, locale } from "./i18n.svelte";
 
   type Person = { id: string; name: string; me: boolean; ready: boolean };
-  let { inRoom, page, people, pending, onProbe, onPendingTaken, onClose, onDiscover, onError }: {
+  let { inRoom, page, people, pending, busy, onProbe, onQueue, onPendingTaken, onClose, onDiscover, onError }: {
     inRoom: boolean;
     /** Oda medyası `page` ise: herkesin açacağı sayfa. */
     page: { src: string; title: string } | null;
     people: Person[];
     /** Başka yerden (Video ekle) açılan, yt-dlp'nin tanımadığı adres. */
     pending: string | null;
+    /** Oynatıcıda bir video açık (bitmemiş): YouTube videosuna tıklamak onu değiştirmez, sıraya eklenebilir. */
+    busy: boolean;
     /** yt-dlp ile aç: başlık ya da `null` (site desteklenmiyor). Hata fırlatabilir. */
     onProbe: (url: string) => Promise<string | null>;
     onPendingTaken: () => void;
+    /** Video sırasına ekle (odada ortak sıra, solo'da yerel). Hata fırlatabilir. */
+    onQueue: (url: string, title: string) => Promise<void>;
     /** Tarayıcıda senkronu herkes için bitir (oda medyası kapanır). */
     onClose: () => void;
     onDiscover: () => void;
@@ -152,7 +156,8 @@
     const prev = lastUrl;
     lastUrl = u;
     if (!editing) q = u ?? "";
-    if (u && (isYtWatch(u) || (prev && phase === "wait"))) {
+    // Oynatıcıda bir video sürerken YouTube videosuna geçmek onu değiştirmez: "Sıraya ekle" ya da "KONİ'de izle".
+    if (u && ((isYtWatch(u) && !busy) || (prev && phase === "wait"))) {
       // YouTube videosu açıldı veya beklerken listeden videoya geçildi: otomatik eşitle.
       waitNote = "";
       phase = "idle";
@@ -168,6 +173,21 @@
   function fail(m: string) {
     err = m.replace(/^Error:\s*/, "");
     onError(err);
+  }
+
+  let queuing = $state(false);
+  async function enqueue() {
+    const url = st.url;
+    if (!url || queuing) return;
+    queuing = true;
+    err = "";
+    try {
+      await onQueue(url, isYtWatch(url) ? st.title.replace(/\s+-\s+YouTube$/, "") : "");
+    } catch (e) {
+      fail(String(e));
+    } finally {
+      queuing = false;
+    }
   }
 
   function cancelWait() { phase = "idle"; }
@@ -235,6 +255,11 @@
     {:else if phase === "probe" || phase === "wait"}
       <button type="button" class="koni busy" onclick={phase === "wait" ? cancelWait : undefined}><span class="sp"></span>{t("Video aranıyor…")}</button>
     {:else}
+      {#if st.url && (st.video || isYtWatch(st.url))}
+        <button type="button" class="koni q" disabled={queuing} title={t("Video sırasına ekle; oynayan bitince sırayla açılır")} onclick={enqueue}>
+          {#if queuing}<span class="sp"></span>{:else}<Icon name="plus" size={13} />{/if}{t("Sıraya ekle")}
+        </button>
+      {/if}
       <button type="button" class="koni" class:dim={!st.url} class:pulse={!!st.video && phase === "idle"} disabled={!st.url} onclick={watch}><i></i>{t("KONİ'de izle")}</button>
     {/if}
   </form>
@@ -388,6 +413,8 @@
   .koni.live i { background: var(--green); border-radius: 50%; transform: none; width: 8px; height: 8px; }
   .koni.dim, .koni:disabled { background: var(--glass-2, var(--raise)); color: var(--text-2); }
   .koni.dim i { background: var(--text-3); }
+  .koni.q { gap: 6px; padding: 0 14px 0 11px; background: rgba(255, 255, 255, 0.1); color: #fff; font-weight: 700; }
+  .koni.q:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
   .sp { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.2); border-top-color: #fff; animation: r 0.9s linear infinite; flex: none; }
   @keyframes r { to { transform: rotate(360deg); } }
 

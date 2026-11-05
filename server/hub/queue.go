@@ -135,10 +135,12 @@ func (r *Room) handleQueueRemove(m *Member, in Inbound) {
 }
 
 // queueIdle: an added song may start at once. Nothing is loaded, the room media
-// already ended, or the room media is not a queue song and is not playing (e.g. a
-// paused film left over from Sinema).
+// already ended, or (in Müzik) the room media is not a queue song and is not playing
+// (e.g. a paused film left over from Sinema). In Keşfet/Sinema the queue is a video
+// queue: a paused video is still being watched, the added one waits for its end.
 func (r *Room) queueIdle() bool {
-	return r.media == nil || r.queue.atEnd == r.media || (r.media != r.queue.playing && r.mode == ModePaused)
+	return r.media == nil || r.queue.atEnd == r.media ||
+		(r.view == ViewListen && r.media != r.queue.playing && r.mode == ModePaused)
 }
 
 // handleQueueNext skips to the head of the queue now. in.Src is the song the member

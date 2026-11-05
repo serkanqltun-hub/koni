@@ -9,8 +9,9 @@
   import { createList, addTracks, playList } from "./playlists.svelte";
   import { artFor, splitTitle } from "./music";
   import Icon from "./Icon.svelte";
+  import { vq, vqAdd, vqRemove } from "./videoQueue.svelte";
 
-  let { canControl, me, title, src, cover, onError, onLog }: {
+  let { canControl, me, title, src, cover, video = false, solo = false, onNext, onError, onLog }: {
     canControl: boolean;
     me: string | null;
     /** Odada çalan medyanın başlığı (yoksa boş). */
@@ -18,6 +19,12 @@
     /** Odada çalan medyanın adresi: "sıradaki" ile gider, çift basış tek atlama sayılır. */
     src: string;
     cover: string | null;
+    /** Keşfet/Sinema: aynı sıra video sırası olarak gösterilir (bitince 10 sn geri sayım, App). */
+    video?: boolean;
+    /** Tek başına: oda kuyruğu yerine bu bilgisayardaki video sırası (oy yok). */
+    solo?: boolean;
+    /** Solo'da "Sıradakine geç". */
+    onNext?: () => void;
     onError: (msg: string) => void;
     onLog: (msg: string) => void;
   } = $props();
@@ -30,11 +37,34 @@
   const spotify = (s: string) => /open\.spotify\.com\/|^spotify:/i.test(s);
   const ytList = (s: string) => /youtube\.com\/.*[?&]list=|youtube\.com\/playlist/i.test(s);
 
+  type Item = { id: string; media: { src: string; title: string }; by: string; byName: string; voters: string[] };
+  const items = $derived<Item[]>(
+    solo ? vq.items.map((x) => ({ id: x.src, media: x, by: "", byName: "", voters: [] })) : fun.queue,
+  );
+  const split = (s: string) => (video ? { song: s, artist: "" } : splitTitle(s));
+
   async function add() {
     const s = link.trim();
     if (!s || adding) return;
     adding = true;
     try {
+      if (video) {
+        // Video sırası: tek video ya da liste; liste videoları sıraya tek tek eklenir.
+        busyText = t("Video aranıyor…");
+        const hits = ytList(s) || solo ? (await mediaList(s)).filter((h) => !h.live) : [];
+        if ((ytList(s) || solo) && !hits.length) throw new Error(t("Bu linkte video bulunamadı"));
+        link = "";
+        if (solo) {
+          const n = hits.filter((h) => vqAdd(h.url, h.title)).length;
+          onLog(n === 1 ? t("Sıraya eklendi: ") + hits[0].title : t("{n} video sıraya eklendi", { n }));
+        } else if (hits.length) {
+          for (const h of hits.slice(0, 10)) await queueAdd(h.url, h.title);
+          onLog(t("{n} video sıraya eklendi", { n: Math.min(hits.length, 10) }));
+        } else {
+          onLog(t("Sıraya eklendi: ") + (await queueAdd(s)));
+        }
+        return;
+      }
       if (spotify(s) || ytList(s)) {
         busyText = spotify(s) ? t("Spotify şarkıları YouTube'da eşleniyor…") : t("Liste okunuyor…");
         const hits = (await mediaList(s)).filter((h) => !h.live);
@@ -64,51 +94,63 @@
   function send(msg: Record<string, unknown>) {
     syncFun(msg).catch((e) => onError(String(e)));
   }
+  function skip() {
+    if (solo) onNext?.();
+    else send({ t: "queue_next", src });
+  }
+  function remove(q: Item) {
+    if (solo) vqRemove(q.media.src);
+    else send({ t: "queue_remove", queueId: q.id });
+  }
 
 </script>
 
 <div class="add">
   <Icon name="plus" size={15} />
-  <input class="q" placeholder={t("Şarkı, Spotify ya da YouTube listesi linki")} bind:value={link} onkeydown={(e) => e.key === "Enter" && add()} />
+  <input class="q" placeholder={video ? t("Video ya da YouTube listesi linki") : t("Şarkı, Spotify ya da YouTube listesi linki")} bind:value={link} onkeydown={(e) => e.key === "Enter" && add()} />
   {#if link.trim()}<button class="go" disabled={adding} onclick={add}>{adding ? "…" : t("Ekle")}</button>{/if}
 </div>
-<div class="hint">{busyText || t("YouTube, SoundCloud ya da Spotify (şarkı, albüm, liste) linki.")}</div>
+<div class="hint">{busyText || (video ? t("Keşfet'te videoyu bulup \"Sıraya ekle\"ye de basabilirsin.") : t("YouTube, SoundCloud ya da Spotify (şarkı, albüm, liste) linki."))}</div>
 
-<div class="eyebrow gap">{t("Şimdi çalıyor")}</div>
+<div class="eyebrow gap">{video ? t("Şimdi oynuyor") : t("Şimdi çalıyor")}</div>
 {#if title}
-  {@const m = splitTitle(title)}
+  {@const m = split(title)}
   <div class="item now">
-    <span class="thumb">{#if cover}<img src={cover} alt="" />{:else}<Icon name="music" size={16} />{/if}</span>
-    <span class="t"><b>{m.song}</b><small>{m.artist || "Lounge"}</small></span>
-    {#if canControl && fun.queue.length}
-      <button class="ghost" title={t("Sıradakine geç")} onclick={() => send({ t: "queue_next", src })}><Icon name="next" size={15} /></button>
+    <span class="thumb">{#if cover}<img src={cover} alt="" />{:else}<Icon name={video ? "film" : "music"} size={16} />{/if}</span>
+    <span class="t"><b>{m.song}</b><small>{m.artist || (video ? t("Video") : "Lounge")}</small></span>
+    {#if canControl && items.length}
+      <button class="ghost" title={t("Sıradakine geç")} onclick={skip}><Icon name="next" size={15} /></button>
     {/if}
   </div>
 {:else}
-  <div class="hint">{t("Bir şey çalmıyor.")}</div>
+  <div class="hint">{video ? t("Bir şey oynamıyor.") : t("Bir şey çalmıyor.")}</div>
 {/if}
 
-<div class="eyebrow gap">{t("Sıradakiler")}{fun.queue.length ? ` · ${fun.queue.length}` : ""}</div>
-{#if fun.queue.length}
+<div class="eyebrow gap">{t("Sıradakiler")}{items.length ? ` · ${items.length}` : ""}</div>
+{#if items.length}
   <ol class="queue">
-    {#each fun.queue as q, i (q.id)}
+    {#each items as q, i (q.id)}
       {@const voted = me != null && q.voters.includes(me)}
-      {@const m = splitTitle(q.media.title)}
+      {@const m = split(q.media.title)}
       {@const art = artFor(q.media.src)}
       <li class="item" animate:flip={{ duration: 300 }} in:fly={{ x: 16, duration: 280 }} out:fade={{ duration: 160 }}>
         <span class="n">{i + 1}</span>
-        <span class="thumb">{#if art}<img src={art} alt="" loading="lazy" />{:else}<Icon name="music" size={14} />{/if}</span>
+        <span class="thumb">{#if art}<img src={art} alt="" loading="lazy" />{:else}<Icon name={video ? "film" : "music"} size={14} />{/if}</span>
         <span class="t" title={q.media.src}><b>{m.song}</b><small>{m.artist ? m.artist + " · " : ""}{q.byName}</small></span>
-        <button class="vote" class:on={voted} title={voted ? t("Oyunu geri al") : t("Bunu sıradaki yap")}
-          onclick={() => send({ t: "queue_vote", queueId: q.id })}>▲ {q.voters.length}</button>
-        {#if q.by === me || canControl}
-          <button class="ghost x" title={t("Çıkar")} onclick={() => send({ t: "queue_remove", queueId: q.id })}><Icon name="x" size={13} /></button>
+        {#if !solo}
+          <button class="vote" class:on={voted} title={voted ? t("Oyunu geri al") : t("Bunu sıradaki yap")}
+            onclick={() => send({ t: "queue_vote", queueId: q.id })}>▲ {q.voters.length}</button>
+        {/if}
+        {#if solo || q.by === me || canControl}
+          <button class="ghost x" title={t("Çıkar")} onclick={() => remove(q)}><Icon name="x" size={13} /></button>
         {/if}
       </li>
     {/each}
   </ol>
 {:else}
-  <div class="hint">{t("Kuyruk boş. Şarkı ekle; çalan bitince sıradaki herkeste başlar, en çok oy alan öne geçer.")}</div>
+  <div class="hint">{video
+    ? solo ? t("Sıra boş. Video ekle; oynayan bitince 10 sn sonra sıradaki başlar.") : t("Sıra boş. Video ekle; oynayan bitince 10 sn sonra sıradaki herkeste başlar, en çok oy alan öne geçer.")
+    : t("Kuyruk boş. Şarkı ekle; çalan bitince sıradaki herkeste başlar, en çok oy alan öne geçer.")}</div>
 {/if}
 
 <style>

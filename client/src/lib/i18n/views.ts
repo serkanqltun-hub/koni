@@ -223,6 +223,9 @@ const en: Record<string, string> = {
   "Stremio addon manifest adresi (…/manifest.json). Addon'u kendi sağlayıcı anahtarınla yapılandır ve oluşan bağlantıyı (anahtar dahil) olduğu gibi buraya ekle. Bağlantı yalnızca bu bilgisayarda durur, odada paylaşılmaz; herkesin KONİ'si aynı bölümü kendi addon'undan bulup senkron açar. Birden çok adresi boşlukla ayırarak tek seferde ekleyebilirsin.": "Stremio addon manifest address (…/manifest.json). Configure the addon with your own provider key and paste the resulting link here as is (key included). The link stays on this computer and isn't shared in a room; everyone's KONİ finds the same episode through its own addon and opens it in sync. You can add several addresses at once, separated by spaces.",
   "https://…/manifest.json (birden çok olabilir)": "https://…/manifest.json (you can add several)",
   "Ekle": "Add",
+  // Video sırası
+  "Sıraya ekle": "Add to queue",
+  "Video sırasına ekle; oynayan bitince sırayla açılır": "Add to the video queue; it plays in order when the current video ends",
   // RateCard
   "Puanın": "Your rating",
   "Tek kelime (isteğe bağlı)": "One word (optional)",
