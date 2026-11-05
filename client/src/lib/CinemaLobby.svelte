@@ -12,6 +12,7 @@
   import FreeShelf from "./FreeShelf.svelte";
   import RecShelves from "./RecShelves.svelte";
   import LibraryPane from "./LibraryPane.svelte";
+  import RoomHistory from "./RoomHistory.svelte";
 
   let { value = $bindable(""), people, room, busy, error, hue, onOpen, onTitles, onNight, onDownload, onResume, onDetail, onCall = null }: {
     value: string;
@@ -194,6 +195,7 @@
   </div>
 
   <LibraryPane {busy} {onOpen} />
+  {#if room}<div class="rh-wrap"><RoomHistory /></div>{/if}
 
   <RecShelves onOpen={onDetail} {onCall} />
 
@@ -201,6 +203,7 @@
 </div>
 
 <style>
+  .rh-wrap { margin: 18px 0 4px; }
   .lobby {
     position: absolute; inset: 0; display: flex; flex-direction: column; gap: 22px; padding: 34px 44px; overflow-y: auto;
     background: radial-gradient(70% 60% at 20% 0%, rgba(10, 132, 255, 0.16), transparent 70%), radial-gradient(50% 50% at 90% 100%, rgba(94, 92, 230, 0.12), transparent 70%), #08090b;

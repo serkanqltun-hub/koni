@@ -14,7 +14,7 @@
     syncSetCohost, syncSetPolicy, accountGet, accountLogin, accountRegister, accountLogout, snifferClose,
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, mediaList, bugReport,
     type SyncStatus, type ServerMsg, type Member, type MediaEvent, type ListEntry, type LinkEvent, type DlStatus, type Policy,
-    type SnifferEvent, type UpdateInfo, type FunMsg, type Movie, syncSetView, type RoomView,
+    type SnifferEvent, type UpdateInfo, type FunMsg, type Movie, syncSetView, type RoomView, syncBreak, syncReady, syncPlay,
     debridOpen, watchReport, type Source, playerMusicView, playerPlay, playerCover, relayOn, setRelay, setLangPrefs, langMode, subSize, lobbyRemoteState,
   } from "./lib/player";
   import BrowseView from "./lib/BrowseView.svelte";
@@ -32,6 +32,9 @@
   import { loadRecent, rememberRoom, forgetRoom, type RecentRoom } from "./lib/recent";
   import ResumeBar from "./lib/ResumeBar.svelte";
   import SkipBar from "./lib/SkipBar.svelte";
+  import BreakButton from "./lib/BreakButton.svelte";
+  import BreakStage from "./lib/BreakStage.svelte";
+  import { brk, breakVisible, onBreak, resetBreak } from "./lib/break.svelte";
   import { refOf, setResumeServer, type ResumeEntry, type ResumeMedia } from "./lib/resume";
   import Icon from "./lib/Icon.svelte";
   import NightView from "./lib/NightView.svelte";
@@ -491,8 +494,13 @@
   );
   const lobbyOn = $derived(cinemaEmpty || (roomView === "watch" && lobbyOpen));
   $effect(() => { if (room || view !== "solo" || !lobbyOn) soloNightOpen = false; });
+  /** Mola sahnesi (T33): mola sürerken ya da "hazırız" sonrası 3-2-1 bitene kadar. */
+  const breakOn = $derived(!!room && breakVisible(brk.cur, countdown));
+  $effect(() => { if (brk.cur && !breakVisible(brk.cur, countdown)) resetBreak(); });
+  // Tam ekranda mola sahnesi çizilemez: moladan önce tam ekrandan çık.
+  $effect(() => { if (breakOn && fullscreen) untrack(() => setFs(false)); });
   /** Sinema sahnesini arayüz çiziyor (lobi, Film & Dizi, film bitti): mpv ve alt şerit gizli. */
-  const sceneOwned = $derived(roomView === "watch" && (fdOpen || lobbyOn || endOn));
+  const sceneOwned = $derived(roomView === "watch" && (breakOn || fdOpen || lobbyOn || endOn));
   // Yeni medya gelince lobi/bitti kapanır.
   let sceneSrc = "";
   $effect(() => {
@@ -884,6 +892,10 @@
   }
 
   function onFunMsg(m: FunMsg) {
+    if (m.t === "break") {
+      onBreak(m);
+      return;
+    }
     if (m.t === "called") {
       called = { ...called, [m.user]: true };
       note("{name} çağrıldı", { name: m.user.replace(/#\d+$/, "") });
@@ -1439,6 +1451,7 @@
         downloads = {};
         countdown = 0;
         roomView = "browse";
+        resetBreak();
         resetFun();
         if (reopen) {
           roomName = reopen;
@@ -1643,7 +1656,7 @@
     </TitleBar>
     <HomeView name={account ?? username} bind:roomName busy={connecting} error={noticeText} {welcome}
       onCreate={createRoom} onJoin={(code) => connect(true, code)} onSolo={() => { notice = null; solo = true; }} onResume={resumeMovie}
-      onWatch={(e) => { notice = null; solo = true; openTitles(""); watchReq = { ref: e.ref, kind: e.kind, title: e.title, year: e.year, poster: e.poster, season: e.season, episode: e.episode }; }} />
+      onWatch={(e) => { notice = null; solo = true; if (e.kind === "video") { pageWait = "https://www.youtube.com/watch?v=" + e.ref.slice(3); return applyView("browse"); } openTitles(""); watchReq = { ref: e.ref, kind: e.kind, title: e.title, year: e.year, poster: e.poster, season: e.season, episode: e.episode }; }} />
   </div>
 {:else if !fullscreen}
 {@const barOn = roomView === "watch" ? !sceneOwned : roomView !== "browse" || st?.duration != null}
@@ -1741,7 +1754,12 @@
   {:else}
   <!-- mpv bu kutunun üstünde native pencerede çizer; buraya overlay yok (kokpit modeli). -->
   <div class="video">
-    {#if fdOpen}
+    {#if breakOn && brk.cur}
+      <div class="stage" in:fade={{ duration: 200 }}>
+        <BreakStage state={brk.cur} names={Object.fromEntries(Object.values(members).map((m) => [m.id, m.name]))} me={sync?.me ?? null}
+          {countdown} canStart={canPlayback} onReady={() => run("Hazırım", syncReady(), true)} onStart={() => run("Oynat", syncPlay(), true)} />
+      </div>
+    {:else if fdOpen}
       <div class="stage" in:fade={{ duration: 200 }}>
         <TitlesPane withSearch inRoom={room !== null} initial={fdQuery} watch={watchReq} onPlay={openDebrid} onExit={() => { fdOpen = false; watchReq = null; }} onError={(m) => add(m, true)} onCall={recCall} />
       </div>
@@ -2235,6 +2253,7 @@
           {#if subLabel}<Icon name="cc" size={14} /><b class="sl">{subLabel}</b>{:else}<Icon name="cc" size={14} />{t("Altyazı")}{/if}
         </button>
       {/if}
+      {#if room && roomView === "watch" && st?.duration && canPlayback}<BreakButton onBreak={(min) => run("Mola", syncBreak(min), true)} />{/if}
       {#if room}<Reactions compact={roomView === "watch"} />{/if}
       {#if canSleep && roomView === "watch"}
         <select class="sleep" value={sleepSel} title={t("Uyku zamanlayıcı")} onchange={(e) => setSleep(+e.currentTarget.value)}>

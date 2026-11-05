@@ -292,6 +292,27 @@ pub fn player_screenshot(app: AppHandle, state: State<'_, AppState>) -> CmdResul
     Ok(p)
 }
 
+/// Aylık özet kartını (PNG, base64) Resimler/KONI klasörüne kaydeder; dosya yolunu döner.
+#[tauri::command(async)]
+pub fn recap_save_png(app: AppHandle, month: String, png: String) -> CmdResult<String> {
+    use base64::Engine;
+    if month.len() != 7 || !month.chars().all(|c| c.is_ascii_digit() || c == '-') {
+        return Err(tr!("geçersiz ay: {month}", "invalid month: {month}"));
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(png.trim_start_matches("data:image/png;base64,"))
+        .map_err(|e| e.to_string())?;
+    let dir = app
+        .path()
+        .picture_dir()
+        .map_err(|e| e.to_string())?
+        .join("KONI");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("koni-ozet-{month}.png"));
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 #[tauri::command(async)]
 pub fn player_set_volume(state: State<'_, AppState>, volume: f64) -> CmdResult {
     if !(0.0..=130.0).contains(&volume) {
@@ -767,6 +788,20 @@ pub async fn recs_get(url: String) -> CmdResult<Option<serde_json::Value>> {
     };
     let msg = koni_sync::protocol::ClientMsg::Recs { auth: acc.token };
     Ok(Some(account::recs(&url, msg).await?))
+}
+
+/// Aylık özet (p0.28); `month` `YYYY-AA`, yoksa bu ay. Hesap yoksa `null`.
+#[tauri::command]
+pub async fn recap_get(url: String, month: Option<String>) -> CmdResult<Option<serde_json::Value>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    let msg = koni_sync::protocol::ClientMsg::Recap {
+        auth: acc.token,
+        month,
+    };
+    Ok(Some(account::recap(&url, msg).await?))
 }
 
 /// Dizinin intro / özet işaretleri (p0.27). Hesap yoksa `null`.
@@ -1256,6 +1291,12 @@ pub fn sync_seek(state: State<'_, AppState>, seconds: f64) -> CmdResult {
     sync_send(&state, UiCmd::Seek(seconds))
 }
 
+/// Odanın geçmişindeki bir medyayı yeniden aç (`cmd media`).
+#[tauri::command(async)]
+pub fn sync_reopen(state: State<'_, AppState>, media: koni_sync::protocol::Media) -> CmdResult {
+    sync_send(&state, UiCmd::Reopen(media))
+}
+
 /// Odada çalanı herkes için kapat (oda açık kalır).
 #[tauri::command(async)]
 pub fn sync_close(state: State<'_, AppState>) -> CmdResult {
@@ -1307,6 +1348,36 @@ pub fn sync_set_view(state: State<'_, AppState>, view: String) -> CmdResult {
     );
     let msg = serde_json::json!({ "t": "cmd", "cid": cid, "op": "set_view", "view": view });
     sync_send(&state, UiCmd::Fun(msg.to_string()))
+}
+
+/// Mola ver (p0.28 `cmd break`): oda durur, herkese "Hazırım" düğmesi çıkar.
+#[tauri::command]
+pub fn sync_break(state: State<'_, AppState>, min: u32) -> CmdResult {
+    sync_cmd_raw(
+        &state,
+        "break",
+        serde_json::json!({ "min": min.clamp(1, 30) }),
+    )
+}
+
+/// Molada "Hazırım" (p0.28 `cmd ready`).
+#[tauri::command]
+pub fn sync_ready(state: State<'_, AppState>) -> CmdResult {
+    sync_cmd_raw(&state, "ready", serde_json::json!({}))
+}
+
+fn sync_cmd_raw(state: &State<'_, AppState>, op: &str, extra: serde_json::Value) -> CmdResult {
+    let cid = format!(
+        "{op}-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_millis())
+    );
+    let mut msg = serde_json::json!({ "t": "cmd", "cid": cid, "op": op });
+    if let (Some(m), Some(e)) = (msg.as_object_mut(), extra.as_object()) {
+        m.extend(e.clone());
+    }
+    sync_send(state, UiCmd::Fun(msg.to_string()))
 }
 
 /// Keşfet: YouTube araması (yt-dlp `ytsearch`, anahtar gerekmez).

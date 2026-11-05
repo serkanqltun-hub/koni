@@ -62,6 +62,8 @@ export function nextCard(d: Deck | null): Movie | null {
 /** Mesajı duruma uygular. Kullanıcıya gösterilecek bir satır varsa döndürür. */
 export function onFun(m: FunMsg): { text: string; err?: boolean } | null {
   switch (m.t) {
+    case "break": // mola: break.svelte.ts
+      return null;
     case "moods":
       fun.moods = m.moods;
       return null;

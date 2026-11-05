@@ -346,6 +346,7 @@ impl SimRoom {
                 ..self.state.clone()
             },
             downloads: Vec::new(),
+            history: Vec::new(),
         }
     }
 
@@ -508,6 +509,7 @@ impl SimRoom {
             | ClientMsg::Skip { .. }
             | ClientMsg::Upcoming { .. }
             | ClientMsg::Recs { .. }
+            | ClientMsg::Recap { .. }
             | ClientMsg::Friends { .. }
             | ClientMsg::Profile { .. }
             | ClientMsg::Admin { .. }

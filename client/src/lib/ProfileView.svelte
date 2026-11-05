@@ -129,7 +129,7 @@
     if (d < 30) return t("{n} hf", { n: Math.floor(d / 7) });
     return d < 365 ? t("{n} ay", { n: Math.floor(d / 30) }) : t("{n} yıl", { n: Math.floor(d / 365) });
   }
-  const SOURCES: Record<string, string> = { night: "Ne izlesek?'ten", titles: "Film & Dizi'den", friend: "arkadaş listesinden" };
+  const SOURCES: Record<string, string> = { night: "Ne izlesek?'ten", titles: "Film & Dizi'den", friend: "arkadaş listesinden", browse: "Keşfet'ten" };
   /** Dizide yarım kalan son bölüm ("S2 B4'te kaldın"), yerel kayıttan. */
   function stoppedAt(e: ListEntry): string {
     if (e.kind !== "series" || !own) return "";
@@ -153,7 +153,7 @@
     }
     return t("{names} ile", { names: `${w.slice(0, 2).join(", ")}${w.length > 2 ? ` +${w.length - 2}` : ""}` });
   }
-  const sub = (e: ListEntry) => [e.year, e.kind === "series" ? t("dizi") : t("film")].filter(Boolean).join(" · ");
+  const sub = (e: ListEntry) => [e.year, e.kind === "series" ? t("dizi") : e.kind === "video" ? t("video") : t("film")].filter(Boolean).join(" · ");
   const dead = new Set<string>();
   const focus = (el: HTMLElement) => el.focus();
 </script>
@@ -251,7 +251,7 @@
                 <span class="ortak unseen" title={t("{n} izlenmemiş bölüm", { n: unseen[e.ref] })}>{unseen[e.ref]}</span>
               {/if}
               <span class="hov">
-                {#if own && onWatch}<button title={t("Şimdi izle")} onclick={() => onWatch(e)}>▶ {t("İzle")}</button>{/if}
+                {#if own && onWatch}<button title={e.kind === "video" ? t("Keşfet'te aç") : t("Şimdi izle")} onclick={() => onWatch(e)}>▶ {t("İzle")}</button>{/if}
                 <button title={t("İzledim olarak işaretle")} onclick={() => markSeen(e)}>{t("✓ İzledim")}</button>
                 <button class="x2" title={t("Listemden çıkar")} aria-label={t("Listemden çıkar")} onclick={() => remove("want", e.ref)}><Icon name="x" size={11} /></button>
               </span>

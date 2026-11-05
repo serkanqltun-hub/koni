@@ -1045,6 +1045,7 @@ mod tests {
                     members: vec![],
                     state,
                     downloads: vec![],
+                    history: vec![],
                 }),
                 server_ts: srv(0.0),
                 resume: None,
