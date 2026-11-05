@@ -38,6 +38,7 @@
     "allow-cast-play",
     "allow-cast-control",
     "allow-cast-position",
+    "allow-cast-back",
     "allow-sync-connect",
     "allow-sync-play",
     "allow-sync-pause",

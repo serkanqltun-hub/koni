@@ -27,6 +27,7 @@ const COMMANDS: &[&str] = &[
     "cast_play",
     "cast_control",
     "cast_position",
+    "cast_back",
     "sync_connect",
     "sync_play",
     "sync_pause",
