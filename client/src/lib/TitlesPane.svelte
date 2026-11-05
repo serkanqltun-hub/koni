@@ -11,7 +11,7 @@
   import Icon from "./Icon.svelte";
   import SourceHunt from "./SourceHunt.svelte";
   import MovieDetail from "./MovieDetail.svelte";
-  import { rankSources, type SourceInfo } from "./sources";
+  import { rankSources, type Prefer, type SourceInfo } from "./sources";
   import { untrack } from "svelte";
   import { loadResume } from "./resume";
   import { prefs } from "./prefs.svelte";
@@ -28,7 +28,7 @@
     /** Açılışta aranacak metin (lobi kutusundan). */
     initial?: string;
     /** Profildeki listeden "İzle": başlığı aç, bölümü seç, kaynak aramasını başlat. */
-    watch?: { ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string } | null;
+    watch?: { ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; prefer?: Prefer } | null;
   } = $props();
 
   let setup = $state(false);
@@ -337,7 +337,7 @@
         {#if sources.length === 0}
           <div class="intro"><span>{t("Addon'ların bu başlık için kaynak vermedi.")}</span></div>
         {:else}
-          <SourceHunt {sources} {inRoom} autostart={autoPlay} onAddon={() => (setup = true)}
+          <SourceHunt {sources} {inRoom} autostart={autoPlay} prefer={watch?.prefer} onAddon={() => (setup = true)}
             kicker={episode ? t("{code} · {s}. sezon, {e}. bölüm", { code: code(episode), s: episode.season, e: episode.episode }) : [t("Film"), picked.releaseInfo].filter(Boolean).join(" · ")}
             heading={episode ? episode.name || t("{n}. bölüm", { n: episode.episode }) : picked.name}
             onPlay={(src) => onPlay(src, label)} />

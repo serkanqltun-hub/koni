@@ -49,18 +49,23 @@ export function rankSources(list: Source[]): SourceInfo[] {
     || (b.seeds ?? 0) - (a.seeds ?? 0));
 }
 
+/** Ne izlesem: önce TR dublajlı ya da TR altyazılı kaynak (yoksa fark etmez). */
+export type Prefer = "" | "dub" | "sub";
+
 /** Otomatik kaynak seçiminin basamakları: en yüksek kaliteden aşağı. */
 export const LADDER = ["4K", "2K", "1080p", "720p"] as const;
 export type Rung = (typeof LADDER)[number];
 
 /** Denenecek sıra: oynatılabilir kaynaklar, `top` kalitesinden aşağı inerek, her
- *  basamakta hazır debrid URL'li ve en çok eşli olanlar önce. */
-export function huntOrder(list: SourceInfo[], top: Rung): SourceInfo[] {
+ *  basamakta hazır debrid URL'li ve en çok eşli olanlar önce. `prefer` verilirse o dildekiler en önde. */
+export function huntOrder(list: SourceInfo[], top: Rung, prefer: Prefer = ""): SourceInfo[] {
   const rungs = [...LADDER.slice(LADDER.indexOf(top)), "SD"] as readonly Quality[];
+  const want = (s: SourceInfo) => Number(prefer === "dub" ? s.trDub : prefer === "sub" ? s.trSub : false);
   return list
     .filter((s) => s.ok && rungs.includes(s.quality))
     .sort((a, b) =>
-      rungs.indexOf(a.quality) - rungs.indexOf(b.quality)
+      want(b) - want(a)
+      || rungs.indexOf(a.quality) - rungs.indexOf(b.quality)
       || Number(isCachedUrl(b.src)) - Number(isCachedUrl(a.src))
       || (b.seeds ?? 0) - (a.seeds ?? 0));
 }

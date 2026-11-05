@@ -1,6 +1,6 @@
 <script lang="ts">
   // Boş Sinema (lobi): tek kutu (link/dosya yolu açar, düz yazı Film & Dizi'de arar),
-  // Ne izlesek? / Film & Dizi / Herkes indirsin (tek başınaysa İndir) kartları,
+  // Ne izlesek? (tek başınaysa Ne izlesem?) / Film & Dizi / Herkes indirsin (tek başınaysa İndir) kartları,
   // "Kaldığınız yerden" ve tek başınayken "Çevrimdışı" rafı (indirilenler).
   // mpv bu sırada gizli; sahneyi arayüz çizer (kokpit modeli bozulmaz).
   import { loadResume, pullResume, removeResume, type ResumeEntry } from "./resume";
@@ -116,9 +116,15 @@
       {#if onNight}
         <button class="src night" onclick={onNight}>
           <span class="fan" aria-hidden="true"><i></i><i></i><i></i></span>
-          <h3>{t("Karar veremediniz mi?")}</h3>
-          <p>{t("Ne izlesek? herkesin önerisini toplar, oylatır, eşleştirir.")}</p>
-          <span class="cta"><Icon name="spark" size={14} /> {t("Ne izlesek? başlat")}</span>
+          {#if room}
+            <h3>{t("Karar veremediniz mi?")}</h3>
+            <p>{t("Ne izlesek? herkesin önerisini toplar, oylatır, eşleştirir.")}</p>
+            <span class="cta"><Icon name="spark" size={14} /> {t("Ne izlesek? başlat")}</span>
+          {:else}
+            <h3>{t("Karar veremiyor musun?")}</h3>
+            <p>{t("Havanı ve ne kadar vaktin olduğunu seç, kartları kaydır, çark seçsin.")}</p>
+            <span class="cta"><Icon name="spark" size={14} /> {t("Ne izlesem?")}</span>
+          {/if}
         </button>
       {/if}
       <button class="src" class:wide={!onDownload} onclick={() => onTitles(direct(text) ? "" : text)}>
