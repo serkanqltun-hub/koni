@@ -11,6 +11,7 @@
   import Icon from "./Icon.svelte";
   import SourceHunt from "./SourceHunt.svelte";
   import MovieDetail from "./MovieDetail.svelte";
+  import BrowseTitles from "./BrowseTitles.svelte";
   import { rankSources, type Prefer, type SourceInfo } from "./sources";
   import { untrack } from "svelte";
   import { loadResume } from "./resume";
@@ -45,6 +46,8 @@
   });
 
   let failedPosters = $state(new Set<string>());
+  /** Arama yokken: rastgele galeri ya da filtreli "Göz at". */
+  let pane = $state<"gallery" | "browse">("gallery");
   let popular = $state<CatalogTitle[]>([]);
   let popKind = $state<"all" | "movie" | "series">("all");
   let popLoading = $state(false);
@@ -272,6 +275,13 @@
     {/if}
   </span>
 {/snippet}
+{#snippet card(ti: CatalogTitle)}
+  <button class="pg" title={ti.name} onclick={() => { autoPlay = false; pick(ti); }}>
+    {@render posterImg(ti)}
+    <b>{ti.name}</b>
+    <small>{[ti.releaseInfo, ti.imdbRating ? `IMDb ${ti.imdbRating}` : null].filter(Boolean).join(" · ")}</small>
+  </button>
+{/snippet}
 {#if withSearch}
   <div class="fd-top">
     {#if onExit || picked || setup}
@@ -350,6 +360,13 @@
 {:else if loading}
   <div class="intro"><span>{t("Aranıyor…")}</span></div>
 {:else if titles === null}
+  <div class="modes">
+    <button class:on={pane === "gallery"} onclick={() => (pane = "gallery")}>{t("Galeri")}</button>
+    <button class:on={pane === "browse"} onclick={() => (pane = "browse")}>{t("Göz at")}</button>
+  </div>
+  {#if pane === "browse"}
+  <BrowseTitles {card} {onError} />
+  {:else}
   <div class="pop-header">
     <div class="pop-left">
       <b>{t("Film & Dizi Galerisi")}</b>
@@ -369,11 +386,7 @@
   {:else if shownPopular.length}
     <div class="pgrid">
       {#each shownPopular as ti (ti.id)}
-        <button class="pg" title={ti.name} onclick={() => { autoPlay = false; pick(ti); }}>
-          {@render posterImg(ti)}
-          <b>{ti.name}</b>
-          <small>{[ti.releaseInfo, ti.imdbRating ? `IMDb ${ti.imdbRating}` : null].filter(Boolean).join(" · ")}</small>
-        </button>
+        {@render card(ti)}
       {/each}
     </div>
   {:else}
@@ -382,17 +395,14 @@
       <span>{t("Yukarıdan film ya da dizi ara. Kaynaklar senin eklediğin addon'lardan gelir ve kendi hesabınla açılır; odada herkes kendi hesabıyla izler.")}</span>
     </div>
   {/if}
+  {/if}
 {:else if titles.length === 0}
   <div class="intro"><span>{t("Sonuç yok.")}</span></div>
 {:else}
   <div class="lab">{t("Sonuçlar")} <span>{t("Afişe tıkla: kaynaklar senin addon'larından gelir")}</span></div>
   <div class="pgrid">
     {#each titles as ti (ti.id)}
-      <button class="pg" title={ti.name} onclick={() => { autoPlay = false; pick(ti); }}>
-        {@render posterImg(ti)}
-        <b>{ti.name}</b>
-        <small>{[ti.releaseInfo, ti.imdbRating ? `IMDb ${ti.imdbRating}` : null].filter(Boolean).join(" · ")}</small>
-      </button>
+      {@render card(ti)}
     {/each}
   </div>
 {/if}
@@ -473,6 +483,10 @@
   .et small { color: var(--text-3); font-size: 11.5px; }
   .et small.pink { color: #ff6f8e; }
 
+  .modes { display: flex; gap: 18px; margin-top: 2px; border-bottom: 1px solid var(--line); }
+  .modes button { height: 34px; padding: 0 2px; border: 0; border-radius: 0; background: none; font-size: 14px; font-weight: 700; color: var(--text-3); box-shadow: inset 0 -2px 0 transparent; }
+  .modes button:hover { color: var(--text); }
+  .modes button.on { color: var(--text); box-shadow: inset 0 -2px 0 #fff; }
   .pop-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; }
   .pop-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .pop-left b { font-size: 15px; font-weight: 750; letter-spacing: -0.01em; }

@@ -149,6 +149,14 @@ export const bugReport = (url: string, username: string, note: string, log: stri
   invoke<string>("bug_report", { url, username, note, log });
 
 // ---- Keşif, çark, altyazı, kuyruk (PROTOCOL §3.9–3.11, §4.12–4.16) -------------
+/** p0.26 `browse` (PROTOCOL §3.0l): "Göz at" filtreli 30'luk sayfa; kartlar ayrıntısız. */
+export interface BrowseQuery {
+  genre?: number; yearFrom?: number; yearTo?: number; minRating?: number; maxMin?: number; lang?: string;
+  sort?: "popular" | "rating" | "new"; page?: number;
+}
+export interface BrowsePage { t: "browse"; kind: string; page: number; items: Movie[]; total: number; error?: string }
+export const browseGet = (url: string, kind: "movie" | "series", query: BrowseQuery) =>
+  invoke<BrowsePage | null>("browse_get", { url, kind, query });
 export interface Ratings { tmdb?: number; imdb?: string; rt?: string; meta?: string }
 export interface Movie {
   id: number; title: string; original?: string; year?: number; overview?: string; poster?: string;
@@ -169,7 +177,7 @@ export type NightPhase = "setup" | "pick" | "vote" | "done";
 export interface NightMember { id: string; name: string; ready: boolean; mood?: string; picks: number; done: boolean }
 export interface Night {
   id: string; kind: NightKind; perUser: number; by: string; phase: NightPhase; deckId?: string;
-  members: NightMember[]; pool: number; mine: Movie[]; pending: number;
+  source?: "lists"; members: NightMember[]; pool: number; mine: Movie[]; pending: number;
 }
 export interface NightPreview { tag: string; total: number; posters: string[] }
 export interface Mood { id: string; label: string; emoji: string }

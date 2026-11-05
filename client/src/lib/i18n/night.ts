@@ -67,6 +67,8 @@ const en: Record<string, string> = {
   "Kartı sağa çek beğen, sola çek geç": "Drag the card right to like, left to pass",
   "Kazanan": "Winner",
   "Kişi başı en fazla öneri": "Max suggestions per person",
+  "Önerileri ekibin listesinden al": "Take suggestions from the team's lists",
+  "Öneri adımı atlanır; ekibin İzleyeceklerim listelerinden doğrudan oylamaya geçilir.": "The suggestion step is skipped; voting starts straight from everyone's Watchlists.",
   "Künye geliyor…": "Loading details…",
   "Künye yükleniyor…": "Loading details…",
   "Künye": "Details",

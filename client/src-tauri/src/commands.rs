@@ -647,6 +647,25 @@ pub async fn solo_night_pick(
     Ok(Some(account::solo_night(&url, msg).await?))
 }
 
+/// "Göz at" (p0.26): filtreli 30'luk sayfa. Hesap yoksa `null`.
+#[tauri::command]
+pub async fn browse_get(
+    url: String,
+    kind: String,
+    query: Option<serde_json::Map<String, serde_json::Value>>,
+) -> CmdResult<Option<serde_json::Value>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    let msg = koni_sync::protocol::ClientMsg::Browse {
+        auth: acc.token,
+        kind,
+        query,
+    };
+    Ok(Some(account::browse(&url, msg).await?))
+}
+
 /// Ana ekran "Etkinlik" sekmesi (p0.22). Hesap yoksa `null`.
 #[tauri::command]
 pub async fn feed_get(url: String) -> CmdResult<Option<serde_json::Value>> {

@@ -110,6 +110,13 @@ pub enum ClientMsg {
         #[serde(rename = "ref")]
         reference: String,
     },
+    /// Tek seferlik (p0.26): "Göz at" filtreli 30'luk sayfa; `genre`, `yearFrom`, `sort`, `page` … olduğu gibi eklenir.
+    Browse {
+        auth: String,
+        kind: String,
+        #[serde(flatten, default)]
+        query: Option<serde_json::Map<String, serde_json::Value>>,
+    },
     /// Tek seferlik (p0.22): ana ekran "Etkinlik" sekmesi, son 7 gün.
     Feed {
         auth: String,

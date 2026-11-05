@@ -18,12 +18,14 @@
   import DualRange from "./DualRange.svelte";
   import { t, locale, i18n } from "./i18n.svelte";
 
-  let { me, canControl, hue, people, away = false, onClose, onError, onFind }: {
+  let { me, canControl, hue, people, away = false, poolDefault = false, onClose, onError, onFind }: {
     me: string | null;
     /** Odadaki kişi sayısı (host başlatma ekranı). */
     people: number;
     /** Odada bağlantısı geçici kopmuş üye var mı. */
     away?: boolean;
+    /** Profildeki "İkinizin de listesinde" yolu: anahtar açık gelir. */
+    poolDefault?: boolean;
     canControl: boolean;
     hue: (name: string) => number;
     onClose: () => void;
@@ -45,12 +47,13 @@
   // ---- Host başlatır --------------------------------------------------------
   let hostKind = $state<NightKind>("movie");
   let hostPer = $state(3);
+  let hostLists = $state(poolDefault);
   /** Biten oturumdan sonra "Yeni tur". */
   let again = $state(false);
   const showHost = $derived(!n || again);
   function start() {
     again = false;
-    send({ t: "night_start", kind: hostKind, perUser: hostPer });
+    send({ t: "night_start", kind: hostKind, perUser: hostPer, ...(hostLists ? { pool: "lists" } : {}) });
   }
 
   // ---- Açılış: yeni oturumda herkeste 3-2-1 ----------------------------------
@@ -359,9 +362,14 @@
           <button class="k" class:on={hostKind === "movie"} onclick={() => (hostKind = "movie")}><span>🎬</span><b>{t("Film")}</b><small>{t("tek oturuşluk")}</small></button>
           <button class="k" class:on={hostKind === "tv"} onclick={() => (hostKind = "tv")}><span>📺</span><b>{t("Dizi")}</b><small>{t("yeni bir seriye başla")}</small></button>
         </div>
-        <div class="hm-l">{t("Kişi başı en fazla öneri")}</div>
-        <div class="nums">{#each [1, 2, 3, 4, 5] as k}<button class:on={hostPer === k} onclick={() => (hostPer = k)}>{k}</button>{/each}</div>
-        <div class="hm-note">{t("{people} kişi × {per} öneri = en fazla", { people, per: hostPer })} <b>{t("{n} kartlık", { n: people * hostPer })}</b> {t("deste")}</div>
+        <label class="lists-sw"><input type="checkbox" bind:checked={hostLists} /> {t("Önerileri ekibin listesinden al")}</label>
+        {#if hostLists}
+          <div class="hm-note">{t("Öneri adımı atlanır; ekibin İzleyeceklerim listelerinden doğrudan oylamaya geçilir.")}</div>
+        {:else}
+          <div class="hm-l">{t("Kişi başı en fazla öneri")}</div>
+          <div class="nums">{#each [1, 2, 3, 4, 5] as k}<button class:on={hostPer === k} onclick={() => (hostPer = k)}>{k}</button>{/each}</div>
+          <div class="hm-note">{t("{people} kişi × {per} öneri = en fazla", { people, per: hostPer })} <b>{t("{n} kartlık", { n: people * hostPer })}</b> {t("deste")}</div>
+        {/if}
         <button class="cta" onclick={start}>{t("Herkesi çağır")} <span>→</span></button>
       {:else}
         <p class="hm-note">{t("Host başlatınca bu ekran herkeste geri sayımla açılır.")}</p>
@@ -862,6 +870,7 @@
   .xs { margin-left: auto; border: 0; background: none; color: var(--text-3); padding: 4px 6px; }
   .xs:hover { color: #fff; }
   .slot.empty { justify-content: center; height: 54px; border-style: dashed; color: var(--text-3); font-size: 12px; background: transparent; }
+  .lists-sw { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13px; cursor: pointer; }
   .pool { padding: 12px 14px; border-radius: 14px; background: var(--glass); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; color: var(--text-2); }
   .pool b { color: #fff; font-size: 22px; margin-right: 4px; }
   .who2 { display: flex; align-items: center; gap: 4px; font-size: 12px; }
