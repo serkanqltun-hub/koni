@@ -146,6 +146,11 @@ jobs:
           cargo run -p koni-player --example smoke -- --lib "$LIBMPV_DYLIB"
           cargo run -p koni-player --example smoke -- --lib "$LIBMPV_DYLIB" --render-sw
 
+      # Üretilmiş küçük test videosu render API'yle 10 sn gerçek zamanlı oynatılır (ses yok).
+      # 2 sn'den uzun takılma ya da çizilmeyen kare başarısız sayılır.
+      - name: Playback smoke test (10 s)
+        run: cargo run -p koni-player --example playback -- --lib "$LIBMPV_DYLIB" --secs 10
+
       - name: Build KONI.app + dmg
         if: env.BUNDLE == 'true'
         run: ./scripts/build-macos.sh "$LIBMPV_ZIP"

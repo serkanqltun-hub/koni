@@ -55,3 +55,9 @@ FFmpeg, libplacebo, libass, HarfBuzz, FriBidi, FreeType, dav1d) is a shared dyli
 * **CI checks**: FFmpeg config without GPL/nonfree, no GPL codec strings, `mpv_*` and
   `mpv_render_context_*` exports, every dylib links only `@rpath` or the OS, then the
   koni-player smoke test (and in `client.yml` also `--render-sw`, a frame through the render API).
+  `client.yml` then runs the `playback` example: it encodes a small test video with libmpv and
+  plays it for 10 s through the render API with audio muted; a stall over 2 s fails the job.
+* **Freeze watchdog**: the app pings the main thread from its own thread every 0.5 s. If it
+  does not answer within 2 s, the stall is written to `freeze.log` in the app log folder
+  (macOS: `~/Library/Logs/app.koni.desktop/`), the user sees a short notice, and
+  "Report a problem" includes the log tail (`client/src-tauri/src/watchdog.rs`).

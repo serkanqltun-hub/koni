@@ -21,6 +21,7 @@ mod spotify;
 mod sync;
 mod tracks;
 mod update;
+mod watchdog;
 mod waveform;
 
 use std::sync::{Arc, Mutex};
@@ -116,6 +117,7 @@ pub fn run() {
             if let Ok(dir) = app.path().app_data_dir() {
                 media::spawn_ytdlp_update(dir);
             }
+            watchdog::spawn(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

@@ -1,5 +1,7 @@
 // Ortak ve küçük bileşenler (SettingsView, LangSwitch, TitleBar …).
 const en: Record<string, string> = {
+  "Uygulama {n} sn yanıt vermedi. Kaydı tutuldu, Sorun bildir ile gönderebilirsin.": "The app was unresponsive for {n} s. It was logged; you can send it with Report a problem.",
+  "Uygulama {n} sn takıldı": "The app froze for {n} s",
   "Ana ekran": "Home",
   "Ses ve altyazı dili": "Audio and subtitle language",
   "Dosya açılınca Türkçe ses ya da altyazı varsa kendiliğinden seçilir.": "When a file opens, Turkish audio or subtitles are picked automatically if available.",
