@@ -194,6 +194,7 @@ export const playerPlay = () => invoke<void>("player_play");
 export const playerPause = () => invoke<void>("player_pause");
 export const playerTogglePause = () => invoke<void>("player_toggle_pause");
 export const playerSeek = (seconds: number) => invoke<void>("player_seek", { seconds });
+export const playerScreenshot = () => invoke<string>("player_screenshot");
 export const playerSetSpeed = (speed: number) => invoke<void>("player_set_speed", { speed });
 export const playerSetVolume = (volume: number) => invoke<void>("player_set_volume", { volume });
 /** Döner: altyazı dosyasının adı. */

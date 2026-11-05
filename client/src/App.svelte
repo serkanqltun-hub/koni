@@ -6,11 +6,11 @@
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import {
-    COCKPIT_LAYOUT, playerLoad, playerPause, playerTogglePause, playerSeek, playerSetSpeed,
+    COCKPIT_LAYOUT, playerLoad, playerPause, playerTogglePause, playerSeek, playerSetSpeed, playerScreenshot,
     playerSetVolume, playerAddSubtitle, playerSubDelay, playerTracks, playerSetTrack,
     type Tracks, type TrackKind,
     playerState, setLayout, setFullscreen, openCastPanel, isMac, type PlayerState,
-    syncConnect, syncSeek, syncToggle, syncSeekBy, syncLeave, syncContinueWithout, syncResync, syncDownload,
+    syncConnect, syncSeek, syncToggle, syncPause, syncSeekBy, syncLeave, syncContinueWithout, syncResync, syncDownload,
     syncSetCohost, syncSetPolicy, accountGet, accountLogin, accountRegister, accountLogout, snifferClose,
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, bugReport,
     type SyncStatus, type ServerMsg, type Member, type MediaEvent, type LinkEvent, type DlStatus, type Policy,
@@ -26,6 +26,7 @@
   import Avatar from "./lib/Avatar.svelte";
   import { onRemote, pic, social, startSocial, stopSocial, type RemoteOp } from "./lib/social.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
+  import { prefs } from "./lib/prefs.svelte";
   import { DEFAULT_SERVER, normServer } from "./lib/server";
   import { loadRecent, rememberRoom, forgetRoom, type RecentRoom } from "./lib/recent";
   import ResumeBar from "./lib/ResumeBar.svelte";
@@ -51,7 +52,7 @@
   import { t, tx, locale } from "./lib/i18n.svelte";
 
   const L = COCKPIT_LAYOUT;
-  const speeds = [0.96, 1.0, 1.04];
+  const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
   const DENIED: Record<string, string> = {
     host_only: "Bu odada yalnızca host ve yardımcı hostlar kontrol edebilir",
     rate_limited: "Çok hızlı komut gönderdin",
@@ -176,7 +177,10 @@
   /** Sinema içinde Film & Dizi (mpv gizli; açılan kaynak ya da yeni oda medyası kapatır). */
   let fdOpen = $state(false);
   let fdQuery = $state("");
+  /** Profildeki listeden "İzle" ile açılan başlık (TitlesPane kendiliğinden açar ve kaynak arar). */
+  let watchReq = $state<{ ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string } | null>(null);
   function openTitles(q: string) {
+    watchReq = null;
     if (roomView !== "watch") applyView("watch");
     nightOpen = false;
     drawer = null;
@@ -733,6 +737,37 @@
   }
   const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
 
+  // Uyku zamanlayıcı: dakika sonra ya da bölüm/parça bitince duraklat (solo + oda host/yardımcı host).
+  let sleepSel = $state(0); // 0 kapalı, -1 bölüm bitince, >0 dakika
+  let sleepTimer: ReturnType<typeof setTimeout> | undefined;
+  const canSleep = $derived(!room || amControl);
+  function sleepPause() {
+    sleepSel = 0;
+    if (inRoom) { if (amControl) run("Uyku zamanlayıcı: duraklatıldı", syncPause()); } else run("Uyku zamanlayıcı: duraklatıldı", playerPause());
+  }
+  function setSleep(v: number) {
+    sleepSel = v;
+    clearTimeout(sleepTimer);
+    if (v > 0) sleepTimer = setTimeout(sleepPause, v * 60_000);
+  }
+  let sleepEofArmed = false;
+  $effect(() => {
+    const eof = st?.eofReached ?? false;
+    if (sleepSel !== -1) { sleepEofArmed = false; return; }
+    if (!eof) { sleepEofArmed = true; return; }
+    if (sleepEofArmed) { sleepEofArmed = false; untrack(sleepPause); }
+  });
+  $effect(() => { if (!canSleep && sleepSel !== 0) untrack(() => setSleep(0)); });
+
+  // "Tam ekran başlat": yeni bir video açılınca (süre bilinince) tam ekrana geç.
+  let hadDuration = false;
+  $effect(() => {
+    const has = st?.duration != null;
+    const fresh = has && !hadDuration;
+    hadDuration = has;
+    if (fresh && roomView === "watch" && (view === "room" || view === "solo") && prefs.fullscreenStart && !fullscreen) untrack(() => setFs(true));
+  });
+
   async function setFs(on: boolean) {
     fullscreen = on;
     await run(on ? "Tam ekran" : "Tam ekrandan çık", setFullscreen(on));
@@ -1089,6 +1124,11 @@
     return tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
   }
 
+  async function screenshot() {
+    try { const p = await playerScreenshot(); add(`Ekran görüntüsü: ${p}`, false, () => t("Ekran görüntüsü kaydedildi: {p}", { p })); }
+    catch (e) { add(`Ekran görüntüsü: ${String(e)}`, true, () => `${t("Ekran görüntüsü alınamadı")}: ${tx(String(e))}`); }
+  }
+
   function onKey(e: KeyboardEvent) {
     if (nightOpen) return; // NightView kendi tuşlarını işler
     const tag = (e.target as HTMLElement | null)?.tagName;
@@ -1101,6 +1141,11 @@
       else setFs(false);
     } else if ((e.key === "f" || e.key === "F") && !typing(e) && !e.ctrlKey && !e.altKey && (view === "room" || view === "solo") && roomView === "watch") {
       setFs(!fullscreen);
+    } else if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && !typing(e) && !e.ctrlKey && !e.altKey && (view === "room" || view === "solo") && roomView === "watch") {
+      e.preventDefault();
+      seekBy(e.key === "ArrowLeft" ? -10 : 10);
+    } else if ((e.key === "s" || e.key === "S") && !typing(e) && !e.ctrlKey && !e.altKey && (view === "room" || view === "solo") && roomView === "watch" && st?.duration) {
+      screenshot();
     } else if ((e.key === "g" || e.key === "h") && !typing(e) && !e.ctrlKey && !e.altKey) {
       // altyazı gecikmesi: g = 50 ms erken, h = 50 ms geç
       nudgeSub(e.key === "g" ? -0.05 : 0.05);
@@ -1357,7 +1402,8 @@
       {/snippet}
     </TitleBar>
     <HomeView name={account ?? username} bind:roomName busy={connecting} error={noticeText} {welcome}
-      onCreate={createRoom} onJoin={(code) => connect(true, code)} onSolo={() => { notice = null; solo = true; }} onResume={resumeMovie} />
+      onCreate={createRoom} onJoin={(code) => connect(true, code)} onSolo={() => { notice = null; solo = true; }} onResume={resumeMovie}
+      onWatch={(e) => { notice = null; solo = true; openTitles(""); watchReq = { ref: e.ref, kind: e.kind, title: e.title, year: e.year, poster: e.poster }; }} />
   </div>
 {:else if !fullscreen}
 {@const barOn = roomView === "watch" ? !sceneOwned : roomView !== "browse" || st?.duration != null}
@@ -1456,7 +1502,7 @@
   <div class="video">
     {#if fdOpen}
       <div class="stage" in:fade={{ duration: 200 }}>
-        <TitlesPane withSearch inRoom={room !== null} initial={fdQuery} onPlay={openDebrid} onExit={() => (fdOpen = false)} onError={(m) => add(m, true)} />
+        <TitlesPane withSearch inRoom={room !== null} initial={fdQuery} watch={watchReq} onPlay={openDebrid} onExit={() => { fdOpen = false; watchReq = null; }} onError={(m) => add(m, true)} />
       </div>
     {:else if endOn}
       <div class="stage" in:fade={{ duration: 300 }}>{@render endScreen()}</div>
@@ -1876,9 +1922,16 @@
         </button>
       {/if}
       {#if room}<Reactions compact={roomView === "watch"} />{/if}
+      {#if canSleep && roomView === "watch"}
+        <select class="sleep" value={sleepSel} title={t("Uyku zamanlayıcı")} onchange={(e) => setSleep(+e.currentTarget.value)}>
+          <option value={0}>{t("Uyku: kapalı")}</option>
+          {#each [15, 30, 45, 60] as m}<option value={m}>{t("{n} dk sonra duraklat", { n: m })}</option>{/each}
+          <option value={-1}>{t("Bölüm bitince duraklat")}</option>
+        </select>
+      {/if}
       {#if !inRoom}
         <select value={st?.speed ?? 1} title={t("Hız")} onchange={(e) => { const v = e.currentTarget.value; run("Hız " + v, playerSetSpeed(+v), false, () => t("Hız {v}", { v })); }}>
-          {#each speeds as s}<option value={s}>{s.toFixed(2)}x</option>{/each}
+          {#each speeds as s}<option value={s}>{s}x</option>{/each}
         </select>
       {/if}
       <div class="volume" title={t("Ses %{v}", { v: volume })}>

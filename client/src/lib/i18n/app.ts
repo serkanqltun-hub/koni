@@ -135,6 +135,8 @@ const en: Record<string, string> = {
   "Yardımcı host yapıldı": "Made co-host",
   "Hız": "Speed",
   "Hız {v}": "Speed {v}",
+  "Ekran görüntüsü kaydedildi: {p}": "Screenshot saved: {p}",
+  "Ekran görüntüsü alınamadı": "Could not take screenshot",
 
   // İndirme durumu
   "⬇ bekleniyor": "⬇ waiting",

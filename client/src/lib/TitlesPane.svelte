@@ -12,10 +12,12 @@
   import SourceHunt from "./SourceHunt.svelte";
   import ListButtons from "./ListButtons.svelte";
   import { rankSources, type SourceInfo } from "./sources";
+  import { untrack } from "svelte";
   import { loadResume } from "./resume";
+  import { prefs } from "./prefs.svelte";
   import { t, tx } from "./i18n.svelte";
 
-  let { inRoom, onPlay, onError, withSearch = false, onExit, initial = "" }: {
+  let { inRoom, onPlay, onError, withSearch = false, onExit, initial = "", watch = null }: {
     inRoom: boolean;
     onPlay: (s: Source, title: string, alts?: Source[]) => void;
     onError: (msg: string) => void;
@@ -25,6 +27,8 @@
     onExit?: () => void;
     /** Açılışta aranacak metin (lobi kutusundan). */
     initial?: string;
+    /** Profildeki listeden "İzle": başlığı aç, bölümü seç, kaynak aramasını başlat. */
+    watch?: { ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string } | null;
   } = $props();
 
   let setup = $state(false);
@@ -91,9 +95,22 @@
     return new Map(loadResume().map((r) => [r.title, r]));
   });
 
+  /** Spoiler gizleme: yarım kalan en ileri bölümden sonrakiler (hiç kayıt yoksa 1. bölümden sonrakiler) bulanık; tıklayınca açılır. */
+  let revealed = $state(new Set<string>());
+  const seenUpTo = $derived.by(() => {
+    if (!picked || !episodes) return 0;
+    const ord = (e: Episode) => e.season * 10000 + e.episode;
+    const done = episodes.filter((e) => resume.has(`${picked!.name} ${code(e)}`)).map(ord);
+    const first = Math.min(...episodes.filter((e) => e.season > 0).map(ord), Infinity);
+    return Math.max(first, ...done);
+  });
+  const hidden = (e: Episode) =>
+    prefs.hideSpoilers && e.season > 0 && e.season * 10000 + e.episode > seenUpTo && !revealed.has(e.id);
+
   /** BrowseView arama çubuğundan da çağrılır. */
   export async function search(text: string) {
     q = text;
+    autoPlay = false;
     if (!text.trim()) {
       titles = null;
       return;
@@ -106,6 +123,23 @@
     const s = initial;
     if (s.trim()) search(s);
   });
+  /** Listeden gelen istek: arama bitince kaynak avı kendiliğinden başlar. */
+  let autoPlay = $state(false);
+  $effect(() => {
+    const w = watch;
+    if (!w) return;
+    untrack(() => {
+      autoPlay = true;
+      pick({ id: w.ref, type: w.kind, name: w.title, poster: w.poster, releaseInfo: w.year ? String(w.year) : undefined });
+    });
+  });
+  /** Dizide açılacak bölüm: yarım kalan en son bölüm, yoksa ilk bölüm. */
+  function startEpisode(name: string, eps: Episode[]): Episode | undefined {
+    const rs = loadResume();
+    const last = eps.map((e) => ({ e, r: rs.find((r) => r.title === `${name} ${code(e)}`) }))
+      .filter((x) => x.r).sort((a, b) => b.r!.at - a.r!.at)[0];
+    return last?.e ?? eps.find((e) => e.season > 0) ?? eps[0];
+  }
 
   async function pick(ti: CatalogTitle) {
     picked = ti;
@@ -119,6 +153,10 @@
       // Yarım kalan son bölüm varsa o sezon açılır.
       const last = episodes.find((e) => resume.has(`${ti.name} ${code(e)}`));
       season = last?.season ?? episodes.find((e) => e.season > 0)?.season ?? episodes[0]?.season ?? 1;
+      if (autoPlay) {
+        const ep = startEpisode(ti.name, episodes);
+        if (ep) { season = ep.season; pickEpisode(ep); }
+      }
     } catch (e) {
       onError(t("Bölümler: {err}", { err: tx(String(e)) }));
     } finally {
@@ -160,7 +198,7 @@
   }
   function back() {
     if (setup) return closeSetup();
-    if (picked) { picked = null; return; }
+    if (picked) { picked = null; autoPlay = false; return; }
     onExit?.();
   }
   const left = (r: { pos: number; duration: number }) => {
@@ -265,7 +303,8 @@
         <div class="eps">
           {#each shownEps as e (e.id)}
             {@const r = resume.get(`${picked.name} ${code(e)}`)}
-            <button class="ep" class:on={episode?.id === e.id} onclick={() => pickEpisode(e)}>
+            <button class="ep" class:on={episode?.id === e.id} class:spoiler={hidden(e)} title={hidden(e) ? t("Spoiler olabilir · göstermek için tıkla") : undefined}
+              onclick={() => { if (hidden(e)) revealed = new Set(revealed).add(e.id); else pickEpisode(e); }}>
               <span class="n">{e.episode}</span>
               {#if e.thumbnail}<span class="th" style="--w:{r ? (r.pos / r.duration) * 100 : 0}%"><img src={e.thumbnail} alt="" loading="lazy" referrerpolicy="no-referrer" onerror={(e) => { (e.currentTarget as HTMLElement).style.display = "none"; }} /></span>{/if}
               <span class="et"><b>{e.name || t("{n}. bölüm", { n: e.episode })}</b>{#if r}<small class="pink">{left(r)} · {t("kaldığınız yer")}</small>{/if}</span>
@@ -285,7 +324,7 @@
         {#if sources.length === 0}
           <div class="intro"><span>{t("Addon'ların bu başlık için kaynak vermedi.")}</span></div>
         {:else}
-          <SourceHunt {sources} {inRoom} onAddon={() => (setup = true)}
+          <SourceHunt {sources} {inRoom} autostart={autoPlay} onAddon={() => (setup = true)}
             kicker={episode ? t("{code} · {s}. sezon, {e}. bölüm", { code: code(episode), s: episode.season, e: episode.episode }) : [t("Film"), picked.releaseInfo].filter(Boolean).join(" · ")}
             heading={episode ? episode.name || t("{n}. bölüm", { n: episode.episode }) : picked.name}
             onPlay={(src) => onPlay(src, label)} />
@@ -433,6 +472,7 @@
   .ep.on { border-color: rgba(10, 132, 255, 0.6); background: rgba(10, 132, 255, 0.12); }
   .ep .n { font: 700 12px var(--font-mono); color: var(--text-3); width: 20px; text-align: center; flex: none; }
   .ep .th { position: relative; width: 104px; height: 58px; border-radius: 8px; overflow: hidden; flex: none; background: #0d1218; }
+  .ep.spoiler .th img, .ep.spoiler .et { filter: blur(7px); }
   .ep .th img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .ep .th::after { content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--w, 0); background: #ff375f; }
   .et { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
