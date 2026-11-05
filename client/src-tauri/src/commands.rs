@@ -971,12 +971,14 @@ pub async fn bug_report(
         body.push_str(l);
         body.push('\n');
     }
-    if let Some((name, tail)) = app
-        .path()
-        .app_log_dir()
-        .ok()
-        .and_then(|d| last_sync_csv(&d, 400))
+    let log_dir = app.path().app_log_dir().ok();
+    if let Some(tail) = log_dir
+        .as_deref()
+        .and_then(|d| crate::watchdog::tail(d, 40))
     {
+        body.push_str(&format!("\n## Donma logu (son satırlar)\n{tail}"));
+    }
+    if let Some((name, tail)) = log_dir.as_deref().and_then(|d| last_sync_csv(d, 400)) {
         body.push_str(&format!("\n## Senkron logu: {name} (son satırlar)\n{tail}"));
     }
     // Sınırı aşarsa en eski satırlar düşer; başlık ve not korunur.

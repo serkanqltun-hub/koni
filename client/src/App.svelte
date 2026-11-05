@@ -55,6 +55,7 @@
   import Reactions from "./lib/Reactions.svelte";
   import NetBadge from "./lib/NetBadge.svelte";
   import BugReport from "./lib/BugReport.svelte";
+  import FreezeNotice from "./lib/FreezeNotice.svelte";
   import { t, tx, locale } from "./lib/i18n.svelte";
   import { cancelNext, epRef, nextEp, playNext, prefetchNext, setStop } from "./lib/nextep.svelte";
 
@@ -2262,6 +2263,7 @@
   {/if}
 </div>
 {/if}
+<FreezeNotice onFreeze={(n) => note("Uygulama {n} sn takıldı", { n })} />
 
 <style>
   .shell { display: grid; height: 100vh; width: 100vw; grid-template-rows: var(--top-bar) 1fr; grid-template-areas: "title" "main"; }
