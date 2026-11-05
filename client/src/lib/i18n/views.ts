@@ -226,6 +226,9 @@ const en: Record<string, string> = {
   // MovieDetail
   "Benzerleri": "More like this",
   "Bu başlık için kaynak aranamıyor": "Can't look for sources for this title",
+  // Video sırası
+  "Sıraya ekle": "Add to queue",
+  "Video sırasına ekle; oynayan bitince sırayla açılır": "Add to the video queue; it plays in order when the current video ends",
   // RateCard
   "Puanın": "Your rating",
   "Tek kelime (isteğe bağlı)": "One word (optional)",

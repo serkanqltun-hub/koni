@@ -12,7 +12,7 @@
     playerState, setLayout, setFullscreen, openCastPanel, isMac, type PlayerState,
     syncConnect, syncSeek, syncToggle, syncPause, syncSeekBy, syncLeave, syncContinueWithout, syncResync, syncDownload,
     syncSetCohost, syncSetPolicy, accountGet, accountLogin, accountRegister, accountLogout, snifferClose,
-    updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, bugReport,
+    updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, mediaList, bugReport,
     type SyncStatus, type ServerMsg, type Member, type MediaEvent, type ListEntry, type LinkEvent, type DlStatus, type Policy,
     type SnifferEvent, type UpdateInfo, type FunMsg, type Movie, syncSetView, type RoomView,
     debridOpen, watchReport, type Source, playerMusicView, playerPlay, playerCover, relayOn, setRelay, setLangPrefs, langMode, subSize, lobbyRemoteState,
@@ -40,6 +40,7 @@
   import DebridSettings from "./lib/DebridSettings.svelte";
   import SubsFinder from "./lib/SubsFinder.svelte";
   import QueuePanel from "./lib/QueuePanel.svelte";
+  import { vq, vqAdd, vqShift } from "./lib/videoQueue.svelte";
   import MusicView from "./lib/MusicView.svelte";
   import { artFor, splitTitle } from "./lib/music";
   import { isLiked, toggleLike } from "./lib/playlists.svelte";
@@ -148,8 +149,8 @@
   ];
   /** Her sahne yalnızca kendi araçlarını gösterir (sağ ray, çekmece, kontrol şeridi). */
   const SCENE_TOOLS: Record<RoomView, Drawer[]> = {
-    browse: ["people", "feed", "settings"],
-    watch: ["add", "tracks", "discover", "people", "feed", "settings"],
+    browse: ["queue", "people", "feed", "settings"],
+    watch: ["add", "tracks", "discover", "queue", "people", "feed", "settings"],
     listen: ["queue", "people", "feed", "settings"],
   };
   const allowed = (d: Drawer, v: RoomView = roomView) => SCENE_TOOLS[v].includes(d);
@@ -173,10 +174,12 @@
   /** Sahneye geçer: başka sahnenin çekmecesi kapanır, sahnenin varsayılanı açılır
    *  (Müzik → kuyruk; boş Sinema kendi lobisini çizer). */
   function applyView(v: RoomView) {
+    const was = roomView;
     roomView = v;
     if (v !== "watch") { nightOpen = false; fdOpen = false; }
     else if (nightAfterView) { nightAfterView = false; queueMicrotask(openNight); }
-    if (drawer && allowed(drawer, v)) return;
+    // Kuyruk çekmecesi Müzik'te Lounge, Keşfet/Sinema'da video sırası: sahne türü değişince kapanır.
+    if (drawer && allowed(drawer, v) && (drawer !== "queue" || (was === "listen") === (v === "listen"))) return;
     drawer = v === "listen" ? "queue" : null;
   }
   /** Sinema içinde Film & Dizi (mpv gizli; açılan kaynak ya da yeni oda medyası kapatır). */
@@ -246,12 +249,14 @@
     return () => clearTimeout(id);
   });
   /** Sağ raydaki sahne araçları. */
-  type Tool = { id: Drawer; icon: "plus" | "spark" | "music" | "activity" | "gear"; title: string; badge?: string };
+  type Tool = { id: Drawer; icon: "plus" | "spark" | "music" | "list" | "activity" | "gear"; title: string; badge?: string };
   const tools = $derived.by((): Tool[] => {
     const all: (Tool | false)[] = [
       { id: "add", icon: "plus", title: "Video ekle" },
       !!room && { id: "discover", icon: "spark", title: "Ne izlesek?" },
-      { id: "queue", icon: "music", title: room ? "Lounge · kuyruk" : "Müzik · çalma listeleri", badge: room && fun.queue.length ? String(fun.queue.length) : undefined },
+      roomView === "listen"
+        ? { id: "queue", icon: "music", title: room ? "Lounge · kuyruk" : "Müzik · çalma listeleri", badge: room && fun.queue.length ? String(fun.queue.length) : undefined }
+        : { id: "queue", icon: "list", title: "Video sırası", badge: (room ? fun.queue.length : vq.items.length) ? String(room ? fun.queue.length : vq.items.length) : undefined },
       { id: "feed", icon: "activity", title: "Etkinlik" },
       !!room && { id: "settings", icon: "gear", title: "Oda ayarları" },
     ];
@@ -481,8 +486,86 @@
     // Odadan ayrı (detached) çalanın sonu odanın sonu değil.
     if (!room || !src || eofArmedSrc !== src || eofSent === src || untrack(() => detached)) return;
     eofSent = src;
+    // Keşfet/Sinema'da sırada video varsa önce 10 sn geri sayım (herkeste aynı anda başlar).
+    if (untrack(() => roomView !== "listen" && fun.queue.length > 0 && sync?.roomMode !== "paused")) {
+      untrack(() => startVidNext(src));
+      return;
+    }
     syncFun({ t: "track_end", src }).catch(() => {});
   });
+
+  // Video sırası: video bitince 10 sn geri sayım, sonra sıradaki. Odada ortak sıra (Santral
+  // kuyruğu; ilk biten track_end gönderir), solo'da bu bilgisayardaki sıra. "İptal" odada
+  // odayı duraklatır, böylece herkeste geri sayım durur.
+  const UP_NEXT_SEC = 10;
+  let vidNext = $state<{ src: string; at: number } | null>(null);
+  let clock = $state(Date.now());
+  const queueHead = $derived(room ? (fun.queue[0]?.media ?? null) : (vq.items[0] ?? null));
+  const vidNextLeft = $derived(vidNext ? Math.max(0, Math.ceil((vidNext.at - clock) / 1000)) : 0);
+  const canPlayback = $derived(!room || room.policy !== "host_only" || amControl);
+  function startVidNext(src: string) {
+    clock = Date.now();
+    vidNext = { src, at: clock + UP_NEXT_SEC * 1000 };
+  }
+  /** Sıradakini şimdi aç (geri sayım bitti ya da "Şimdi oynat"). */
+  function vidNextGo() {
+    const src = vidNext?.src ?? nowMedia?.src ?? "";
+    vidNext = null;
+    if (room) {
+      if (src) syncFun({ t: "track_end", src }).catch((e) => add(String(e), true));
+      return;
+    }
+    const it = vqShift();
+    if (!it) return;
+    probe(it.src).then(
+      (title) => { if (title === null) note("Sıradaki video açılamadı: {title}", { title: it.title }, true); },
+      (e) => add(`${it.title}: ${String(e)}`, true, () => `${it.title}: ${tx(String(e))}`),
+    );
+  }
+  function vidNextCancel() {
+    vidNext = null;
+    if (room) syncPause().catch(() => {});
+  }
+  $effect(() => {
+    if (!vidNext) return;
+    const id = setInterval(() => {
+      clock = Date.now();
+      if (vidNext && clock >= vidNext.at) untrack(vidNextGo);
+    }, 250);
+    return () => clearInterval(id);
+  });
+  // Başka video açıldı, sıra boşaldı, geri sarıldı ya da oda duraklatıldı (biri iptal etti): geri sayım biter.
+  $effect(() => {
+    if (vidNext && (nowMedia?.src !== vidNext.src || !queueHead || !st?.eofReached || (room && sync?.roomMode === "paused"))) vidNext = null;
+  });
+  // Solo: video (bölüm değil, çalma listesi değil) bitince sırada video varsa geri sayım.
+  let soloEndArmed = "";
+  $effect(() => {
+    const m = soloMedia;
+    if (room || !m || soloEp || nowTrack()) return;
+    if (!st?.eofReached) {
+      if (st?.duration != null) soloEndArmed = m.src;
+      return;
+    }
+    if (soloEndArmed !== m.src || roomView === "listen" || !vq.items.length) return;
+    soloEndArmed = "";
+    untrack(() => startVidNext(m.src));
+  });
+  /** Keşfet → "Sıraya ekle". Odada Santral kuyruğu (boşsa hemen başlar), solo'da yerel sıra. */
+  async function enqueueVideo(url: string, title: string) {
+    if (room) {
+      note("Sıraya eklendi: {title}", { title: await queueAdd(url, title || undefined) });
+      return;
+    }
+    let name = title;
+    if (!name) {
+      const hit = (await mediaList(url)).find((h) => !h.live);
+      if (!hit) throw new Error(t("Bu sayfada video bulunamadı"));
+      name = hit.title;
+    }
+    if (!vqAdd(url, name)) throw new Error(t("Bu zaten sırada"));
+    note("Sıraya eklendi: {title}", { title: name });
+  }
   // Oda medyası bende açılamadı (link ölü, yt-dlp hatası): Santral'a bildirilir. Ekleyen
   // ya da odanın yarısından fazlası açamıyorsa herkes için geçilir; yoksa oda bensiz
   // devam eder, sıradaki şarkıda yeniden katılırım (PROTOCOL §3.11).
@@ -1403,6 +1486,11 @@
           <button class="big g" onclick={cancelNext}>{t("İptal")}</button>
         {:else if nextReady && nextEp.id}
           <button class="big w" onclick={nextNow}><Icon name="next" size={16} /> {t("Sıradaki: {code}", { code: nextEp.code })}</button>
+        {:else if vidNext && queueHead}
+          <button class="big w" onclick={vidNextGo}><Icon name="next" size={16} /> {t("Sıradaki: {title} · {n} sn", { title: queueHead.title, n: vidNextLeft })}</button>
+          {#if canPlayback}<button class="big g" onclick={vidNextCancel}>{t("İptal")}</button>{/if}
+        {:else if queueHead && !soloEp && (room ? funControl : true)}
+          <button class="big w" onclick={vidNextGo}><Icon name="next" size={16} /> {t("Sıradaki: {title}", { title: queueHead.title })}</button>
         {:else if ep}
           <button class="big w" onclick={() => closeEnd(() => openTitles(ep[1]))}><Icon name="next" size={16} /> {t("Sonraki bölümü bul")}</button>
         {:else if room}
@@ -1512,6 +1600,7 @@
     <BrowseView inRoom={room !== null} page={roomMedia?.kind === "page" ? { src: roomMedia.src, title: roomMedia.title } : null}
       people={Object.values(members).filter((m) => !m.away).map((m) => ({ id: m.id, name: m.name, me: m.id === sync?.me, ready: m.bufferPct == null || m.bufferPct >= 100 }))}
       pending={pageWait} onPendingTaken={() => (pageWait = null)} onProbe={probe} onClose={closeVideo}
+      busy={st?.duration != null && !st.eofReached && !!nowMedia && nowMedia.kind !== "page"} onQueue={enqueueVideo}
       onDiscover={() => { nightAfterView = true; pickView("watch"); }} onError={(m) => add(m, true)} />
     </div>
   {:else if roomView === "listen"}
@@ -1646,7 +1735,8 @@
   {/if}
 
   {#if drawer || drawerLive}
-    {@const head = shown === "queue" && !room ? { eyebrow: "Müzik", title: "Çalma listeleri" } : DRAWERS[shown]}
+    {@const head = shown === "queue" && roomView !== "listen" ? { eyebrow: room ? "Oda" : "Sıra", title: "Video sırası" }
+      : shown === "queue" && !room ? { eyebrow: "Müzik", title: "Çalma listeleri" } : DRAWERS[shown]}
     <aside class="drawer" class:open={drawer !== null} inert={!drawer}>
      <div class="d-inner">
       {#key shown}
@@ -1728,6 +1818,9 @@
             <div class="hint">{t("Kısayol:")} <kbd>G</kbd> {t("erken")} · <kbd>H</kbd> {t("geç (50 ms).")}</div>
           {/if}
           <div class="hint">{t("Seçimin yalnızca sende geçerli; odadaki herkes kendi kalitesini, sesini ve altyazısını seçer.")}</div>
+        {:else if shown === "queue" && roomView !== "listen"}
+          <QueuePanel video solo={!room} canControl={room ? funControl : true} me={sync?.me ?? null} title={nowMedia?.title || soloTitle || ""}
+            src={nowMedia?.src ?? ""} cover={null} onNext={vidNextGo} onError={(m) => add(m, true)} onLog={(m) => add(m)} />
         {:else if shown === "queue" && room}
           <div class="seg tabs" role="tablist" style="margin-bottom: 12px">
             <button role="tab" class:on={musicTab === "lounge"} aria-selected={musicTab === "lounge"} onclick={() => (musicTab = "lounge")}>Lounge</button>
@@ -1927,6 +2020,19 @@
       {#each waiting.filter((m) => amControl && offers[m.id] && !m.detached) as m (m.id)}
         <button onclick={() => continueWithout(m.id)}>{t("{name} olmadan devam et", { name: m.name })}</button>
       {/each}
+    </div>
+  </footer>
+  {:else if vidNext && queueHead && barOn}
+  <!-- Video sırası: bitti, sıradaki geri sayımda (şerit banda döner; video üstünde bir şey yok). -->
+  <footer class="bar nextb" in:fade={{ duration: 200 }}>
+    <span class="nx-n">{vidNextLeft}</span>
+    <span class="h-t">
+      <b>{t("Sıradaki: {title} · {n} sn", { title: queueHead.title, n: vidNextLeft })}</b>
+      <small>{room ? t("Video sırasından; herkeste açılır") : t("Video sırasından")}</small>
+    </span>
+    <div class="h-act">
+      {#if canPlayback}<button onclick={vidNextCancel}>{t("İptal")}</button>{/if}
+      <button class="white" onclick={vidNextGo}>▶ {t("Şimdi oynat")}</button>
     </div>
   </footer>
   {:else if nextOn && barOn}

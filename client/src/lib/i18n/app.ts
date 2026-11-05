@@ -299,5 +299,16 @@ const en: Record<string, string> = {
   "Sıradaki: {code}": "Up next: {code}",
   "Bölüm bitince dur": "Stop when an episode ends",
   "Sıradaki bölüm için açılan kaynak bulunamadı: {code}": "Couldn't find a working source for the next episode: {code}",
+  // Video sırası
+  "Video sırası": "Video queue",
+  "Sıra": "Queue",
+  "Sıradaki video açılamadı: {title}": "Couldn't open the next video: {title}",
+  "Bu sayfada video bulunamadı": "No video found on this page",
+  "Bu zaten sırada": "This is already in the queue",
+  "Sıraya eklendi: {title}": "Added to the queue: {title}",
+  "Sıradaki: {title} · {n} sn": "Up next: {title} · {n}s",
+  "Sıradaki: {title}": "Up next: {title}",
+  "Video sırasından; herkeste açılır": "From the video queue; opens for everyone",
+  "Video sırasından": "From the video queue",
 };
 export default en;
