@@ -223,7 +223,12 @@ export type FunMsg =
   | { t: "night_suggestions"; items: Movie[]; total: number; error?: string }
   | { t: "night_results"; query: string; items: Movie[]; error?: string }
   | { t: "night_detail"; item: Movie; error?: string }
-  | { t: "called"; user: string };
+  | { t: "called"; user: string }
+  | BreakMsg;
+/** p0.28 mola (PROTOCOL §4.19): süren molanın durumu ya da bitişi. */
+export type BreakMsg =
+  | { t: "break"; end?: false; by: string; min: number; until: number; ready: string[]; waiting: string[] }
+  | { t: "break"; end: true; cause?: string };
 /** Hızlı tepkiler (PROTOCOL p0.14); sunucu başka değeri yok sayar. */
 export const REACTIONS = ["😂", "😱", "😍", "👏", "😭", "🔥"] as const;
 /** Odaya keşif/çark/altyazı mesajı. */
@@ -430,6 +435,10 @@ export const accountLogout = (url: string) => invoke<void>("account_logout", { u
 
 /** Odanın ortak ekranı: Keşfet (ne izlesek), Sinema, Müzik. */
 export type RoomView = "browse" | "watch" | "listen";
+/** Mola ver (1–30 dk). */
+export const syncBreak = (min: number) => invoke<void>("sync_break", { min });
+/** Molada "Hazırım". */
+export const syncReady = () => invoke<void>("sync_ready");
 export const syncSetView = (view: RoomView) => invoke<void>("sync_set_view", { view });
 export interface SearchHit { url: string; title: string; channel?: string; durationSecs?: number; thumbnail?: string; live?: boolean }
 /** YouTube araması (yt-dlp). */

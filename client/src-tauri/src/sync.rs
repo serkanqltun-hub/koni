@@ -105,6 +105,7 @@ const FUN_TYPES: &[&str] = &[
     "night_results",
     "night_detail",
     "called",
+    "break",
 ];
 
 /// Hızlı tepki gönderildikten sonra bu süre içinde gelen `bad_message` eski sunucunun
@@ -159,6 +160,26 @@ fn fun_msg(text: &str) -> Option<serde_json::Value> {
         return None;
     }
     serde_json::from_str(text).ok()
+}
+
+/// `joined` mesajında süren mola (p0.28 `snapshot.break`) varsa `break` mesajı olarak döner;
+/// yoksa "mola yok" (`end`) döner ki yeniden girişte eski mola ekranı kalmasın.
+fn joined_break(text: &str) -> Option<serde_json::Value> {
+    if !text.contains(r#""t":"joined""#) {
+        return None;
+    }
+    let v: serde_json::Value = serde_json::from_str(text).ok()?;
+    if v["t"] != "joined" {
+        return None;
+    }
+    match v["snapshot"].get("break") {
+        Some(b) if b.is_object() => {
+            let mut b = b.clone();
+            b["t"] = "break".into();
+            Some(b)
+        }
+        _ => Some(serde_json::json!({ "t": "break", "end": true, "cause": "join" })),
+    }
 }
 
 /// Odaya nasıl girileceği.
@@ -989,6 +1010,10 @@ async fn run(
                     }
                     let _ = app.emit("sync://fun", v);
                     continue;
+                }
+                if let Some(v) = joined_break(text.as_str()) {
+                    // p0.28: süren mola (snapshot.break) arayüze `break` olarak gider.
+                    let _ = app.emit("sync://fun", v);
                 }
                 let mut msg: ServerMsg = match serde_json::from_str(text.as_str()) {
                     Ok(m) => m,
