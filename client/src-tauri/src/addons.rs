@@ -1047,7 +1047,7 @@ pub async fn download_subtitle_text(url: &str) -> Result<String, String> {
     Ok(decode_sub_bytes(&bytes))
 }
 
-fn decode_sub_bytes(b: &[u8]) -> String {
+pub(crate) fn decode_sub_bytes(b: &[u8]) -> String {
     let b = b.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(b);
     if let Ok(s) = std::str::from_utf8(b) {
         return s.to_string();
