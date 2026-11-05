@@ -176,6 +176,17 @@ export interface RecHolder { name: string; avatar?: string; stars?: number; word
 export interface RecEntry extends ListEntry { by?: RecHolder[]; mates?: RecHolder[] }
 export interface Recs { t: "recs"; because: { ref: string; title: string; items: Movie[] }[]; friends: RecEntry[]; together: RecEntry[] }
 export const recsGet = (url: string) => invoke<Recs | null>("recs_get", { url });
+/** p0.28 `recap` (PROTOCOL §3.0q): aylık özet. `month` `YYYY-MM`, yoksa bu ay. */
+export interface Recap {
+  t: "recap"; month: string; watchSec: number; days: number; hours: number[]; peakHour: number;
+  movies: number; series: number; genres: { name: string; count: number }[];
+  mates: { name: string; avatar?: string; sec: number; rooms: number }[];
+  badges: { id: string; title: string; rule: string }[];
+  best?: { ref: string; title: string; poster?: string; stars: number; votes: number };
+}
+export const recapGet = (url: string, month?: string) => invoke<Recap | null>("recap_get", { url, month });
+/** Özet kartını Resimler/KONI'ye PNG olarak yazar; dosya yolunu döner. */
+export const recapSavePng = (month: string, png: string) => invoke<string>("recap_save_png", { month, png });
 export interface Ratings { tmdb?: number; imdb?: string; rt?: string; meta?: string }
 export interface Movie {
   id: number; title: string; original?: string; year?: number; overview?: string; poster?: string;

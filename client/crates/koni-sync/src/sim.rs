@@ -508,6 +508,7 @@ impl SimRoom {
             | ClientMsg::Skip { .. }
             | ClientMsg::Upcoming { .. }
             | ClientMsg::Recs { .. }
+            | ClientMsg::Recap { .. }
             | ClientMsg::Friends { .. }
             | ClientMsg::Profile { .. }
             | ClientMsg::Admin { .. }

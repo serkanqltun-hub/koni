@@ -207,6 +207,16 @@ pub async fn recs(url: &str, msg: ClientMsg) -> Result<serde_json::Value, String
     Ok(v)
 }
 
+/// `recap` el sıkışması (p0.28): aylık özet olduğu gibi arayüze gider.
+pub async fn recap(url: &str, msg: ClientMsg) -> Result<serde_json::Value, String> {
+    let t = exchange(url, &msg).await?;
+    let v: serde_json::Value = serde_json::from_str(&t).map_err(|e| e.to_string())?;
+    if v["t"] != "recap" {
+        return Err(tr!("beklenmeyen cevap: {t}", "unexpected response: {t}"));
+    }
+    Ok(v)
+}
+
 /// `skip` el sıkışması (p0.27): intro / özet işaretleri olduğu gibi arayüze gider.
 pub async fn skip(url: &str, msg: ClientMsg) -> Result<serde_json::Value, String> {
     let t = exchange(url, &msg).await?;

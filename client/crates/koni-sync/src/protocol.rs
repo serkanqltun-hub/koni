@@ -125,6 +125,12 @@ pub enum ClientMsg {
     Recs {
         auth: String,
     },
+    /// Tek seferlik (p0.28): aylık özet; `month` `YYYY-AA`, yoksa bu ay.
+    Recap {
+        auth: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        month: Option<String>,
+    },
     /// Tek seferlik (p0.27): intro / özet işareti; `op` `get` | `set` | `clear`, `season` 0 = tüm sezonlar.
     Skip {
         auth: String,

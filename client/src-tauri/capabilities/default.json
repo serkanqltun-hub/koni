@@ -69,6 +69,8 @@
     "allow-watch-report",
     "allow-detail-get",
     "allow-recs-get",
+    "allow-recap-get",
+    "allow-recap-save-png",
     "allow-browse-get",
     "allow-skip-get",
     "allow-skip-set",
