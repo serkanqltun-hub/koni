@@ -588,6 +588,25 @@ pub async fn lists_call(
     Ok(Some(account::lists(&url, msg).await?))
 }
 
+/// Odaya girmeden künye + benzerleri (p0.25). Hesap yoksa `null`.
+#[tauri::command]
+pub async fn detail_get(
+    url: String,
+    reference: String,
+    kind: Option<String>,
+) -> CmdResult<Option<serde_json::Value>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    let msg = koni_sync::protocol::ClientMsg::Detail {
+        auth: acc.token,
+        reference,
+        kind: kind.unwrap_or_default(),
+    };
+    Ok(Some(account::detail(&url, msg).await?))
+}
+
 /// Ana ekran "Etkinlik" sekmesi (p0.22). Hesap yoksa `null`.
 #[tauri::command]
 pub async fn feed_get(url: String) -> CmdResult<Option<serde_json::Value>> {
