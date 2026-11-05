@@ -2,6 +2,7 @@ package hub
 
 import (
 	"math"
+	"strconv"
 	"strings"
 
 	"github.com/serkanqltun-hub/koni/server/store"
@@ -27,6 +28,10 @@ func (r *Room) markSeen() {
 	}
 	meta, _, _ := strings.Cut(md.File, "|")
 	kind, id, _ := strings.Cut(meta, ":")
+	if kind == "series" {
+		r.markTeam(md, id)
+		return
+	}
 	if kind != "movie" || !strings.HasPrefix(id, "tt") || strings.Contains(id, ":") {
 		return
 	}
@@ -53,6 +58,30 @@ func (r *Room) markSeen() {
 			_ = st.AddToList(w.user, store.ListSeen, store.Entry{Ref: id, Kind: "movie", Title: title, With: mates})
 		}
 	}()
+}
+
+// markTeam (p0.27): an episode ("tt…:s:e") the room watched past 80% becomes the
+// team_progress of the accounts in the room ("Bu ekip S2 B4'te").
+func (r *Room) markTeam(md *Media, id string) {
+	ref, se, _ := strings.Cut(id, ":")
+	s, e, _ := strings.Cut(se, ":")
+	season, err1 := strconv.Atoi(s)
+	episode, err2 := strconv.Atoi(e)
+	if !strings.HasPrefix(ref, "tt") || err1 != nil || err2 != nil || episode < 1 {
+		return
+	}
+	r.seenDone[md] = true
+	var ids []int64
+	for _, m := range r.members {
+		if m.User != 0 && !m.ghost && !m.closed {
+			ids = append(ids, m.User)
+		}
+	}
+	if len(ids) < 2 {
+		return
+	}
+	st, title, room := r.cfg.Store, md.Title, r.name
+	go func() { _ = st.SetTeamProgress(ids, ref, title, room, season, episode) }()
 }
 
 // Lists answers a `lists` handshake (p0.23): "İzleyeceklerim" / "İzlediklerim" on

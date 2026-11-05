@@ -98,6 +98,18 @@ func (h *Hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		writeJSON(ctx, c, h.Browse(ctx, in))
 		c.Close(websocket.StatusNormalClosure, "")
 		return
+	case "upcoming": // series tracking (p0.27)
+		writeJSON(ctx, c, h.Upcoming(ctx, in))
+		c.Close(websocket.StatusNormalClosure, "")
+		return
+	case "skip": // shared intro marks (p0.27)
+		writeJSON(ctx, c, h.Skip(in))
+		c.Close(websocket.StatusNormalClosure, "")
+		return
+	case "recs": // recommendation shelves (p0.27)
+		writeJSON(ctx, c, h.Recs(ctx, in))
+		c.Close(websocket.StatusNormalClosure, "")
+		return
 	case "feed":
 		writeJSON(ctx, c, h.Feed(in))
 		c.Close(websocket.StatusNormalClosure, "")
