@@ -3,9 +3,10 @@
   // Oynat'a basınca en yüksek kaliteden 720p'ye inerek Real-Debrid'de açılan ilk sağlam
   // kaynak bulunur (önbellekte olmayan ya da açılmayan atlanır), sonra kullanıcıya sorulur.
   import { untrack } from "svelte";
-  import { debridCheck, type Source } from "./player";
+  import type { Source } from "./player";
   import { t, tx } from "./i18n.svelte";
-  import { LADDER, failKind, huntOrder, type Rung, type SourceInfo } from "./sources";
+  import { LADDER, huntOrder, type Rung, type SourceInfo } from "./sources";
+  import { SLOW_WAIT, TOP_KEY, huntFrom, loadTop } from "./hunt";
 
   let { sources, kicker, heading, inRoom, onPlay, onAddon }: {
     sources: SourceInfo[];
@@ -16,15 +17,11 @@
     onAddon: () => void;
   } = $props();
 
-  const TOP_KEY = "koni.topQuality";
-  let top = $state<Rung>((() => {
-    try { const v = localStorage.getItem(TOP_KEY); return LADDER.includes(v as Rung) ? (v as Rung) : "4K"; } catch { return "4K"; }
-  })());
+  let top = $state<Rung>(loadTop());
   $effect(() => { try { localStorage.setItem(TOP_KEY, top); } catch { /* yok */ } });
 
   let phase = $state<"ready" | "search" | "found" | "none" | "slow">("ready");
   /** Real-Debrid istek sınırı: kalan bekleme (sn); bitince kaldığı yerden devam. */
-  const SLOW_WAIT = 30;
   let wait = $state(0);
   let timer: ReturnType<typeof setInterval> | undefined;
   let order = $state<SourceInfo[]>([]);
@@ -61,27 +58,22 @@
   async function run() {
     const my = ++token;
     phase = "search";
-    while (next < order.length) {
-      const i = next++;
-      cur = i;
-      try {
-        await debridCheck(order[i].src);
-        if (my !== token) return;
-        results[i] = "ok";
-        found = [...found, i];
-        view = found.length - 1;
-        cur = -1;
-        phase = "found";
-        return;
-      } catch (e) {
-        if (my !== token) return;
-        const k = failKind(String(e));
-        if (k === "slow") { next = i; cur = -1; pause(); return; }
-        results[i] = "fail";
-        if (k === "stop") { stopErr = String(e); break; }
-        counts[k]++;
-      }
+    const r = await huntFrom(order, next, {
+      alive: () => my === token,
+      onTry: (i) => { cur = i; next = i + 1; },
+      onFail: (i, k) => { results[i] = "fail"; if (k !== "stop") counts[k]++; },
+    });
+    if (r.at === "gone") return;
+    if (r.at === "ok") {
+      results[r.i] = "ok";
+      found = [...found, r.i];
+      view = found.length - 1;
+      cur = -1;
+      phase = "found";
+      return;
     }
+    if (r.at === "slow") { next = r.i; cur = -1; pause(); return; }
+    if (r.at === "stop") stopErr = r.err;
     cur = -1;
     exhausted = true;
     phase = found.length && !stopErr ? "found" : "none";

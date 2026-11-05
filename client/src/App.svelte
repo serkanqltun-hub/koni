@@ -49,6 +49,7 @@
   import NetBadge from "./lib/NetBadge.svelte";
   import BugReport from "./lib/BugReport.svelte";
   import { t, tx, locale } from "./lib/i18n.svelte";
+  import { cancelNext, epRef, nextEp, playNext, prefetchNext, setStop } from "./lib/nextep.svelte";
 
   const L = COCKPIT_LAYOUT;
   const speeds = [0.96, 1.0, 1.04];
@@ -604,6 +605,35 @@
     if (!eofArmed) return;
     eofArmed = false;
     untrack(() => stepList(1));
+  });
+  // Solo'da sıradaki bölüm: son 60 sn'de sonraki bölüm hazırlanır, son 10 sn'de şeritte geri
+  // sayım, bitince sessiz avla açılır. Odada çalışmaz.
+  const soloEp = $derived(!room && soloMedia ? epRef(soloMedia.src, soloMedia.file) : null);
+  /** Bölümün gerçekten oynadığı görüldü (yeni dosya yüklenirken eski dosyanın sonu sayılmaz). */
+  let epArmed = $state("");
+  const epLeft = $derived(soloEp && epArmed === soloEp.key && st?.duration && st.timePos != null ? st.duration - st.timePos : null);
+  $effect(() => {
+    const ep = soloEp;
+    if (ep && st?.duration && !st.eofReached && (st.timePos ?? 0) < st.duration - 15) epArmed = ep.key;
+  });
+  $effect(() => {
+    const ep = soloEp;
+    if (!ep || epLeft == null || epLeft > 60 || untrack(() => nextEp.for) === ep.key) return;
+    untrack(() => prefetchNext(ep, soloMedia?.title || soloTitle));
+  });
+  const nextReady = $derived(!!soloEp && nextEp.for === soloEp.key && nextEp.cancelled !== soloEp.key);
+  /** Şerit bandı: son 10 sn (sonraki bölüm ya da "Sezon bitti"). */
+  const nextOn = $derived(nextReady && !nextEp.stop && epLeft != null && epLeft <= 10 && !st?.eofReached && (nextEp.last || !!nextEp.id));
+  function nextNow() {
+    const key = soloEp?.key;
+    if (!key) return;
+    playNext(() => soloEp?.key === key, openDebrid).then((ok) => {
+      if (!ok && nextEp.cancelled === key) note("Sıradaki bölüm için açılan kaynak bulunamadı: {code}", { code: nextEp.code }, true);
+    });
+  }
+  $effect(() => {
+    if (!nextReady || nextEp.stop || !st?.eofReached || epArmed !== soloEp?.key || !nextEp.id || nextEp.busy) return;
+    untrack(nextNow);
   });
   // Odada listeden Lounge'a eklenenler: liste yeniden başlatılınca / durdurulunca
   // yalnızca bunlar kuyruktan çıkar (elle eklediğin şarkılar kalır).
@@ -1277,7 +1307,7 @@
     <div class="end-bd"></div>
     <div class="end-poster"><span>{ep ? ep[1] : title}</span></div>
     <div class="end-info">
-      <span class="end-k">{ep ? t("Bölüm bitti") : t("Bitti")} · {new Date().toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</span>
+      <span class="end-k">{ep ? (nextReady && nextEp.last ? t("Sezon bitti") : t("Bölüm bitti")) : t("Bitti")} · {new Date().toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</span>
       <h2>{title}</h2>
       <div class="end-stats">
         <div><b>{fmt(st?.duration)}</b><small>{room ? t("birlikte izlendi") : t("izlendi")}</small></div>
@@ -1285,7 +1315,12 @@
         <div><b>{pauses}</b><small>{t("mola")}</small></div>
       </div>
       <div class="end-row">
-        {#if ep}
+        {#if soloEp && nextEp.busy}
+          <button class="big w" disabled><Icon name="next" size={16} /> {t("{code} açılıyor…", { code: nextEp.code })}</button>
+          <button class="big g" onclick={cancelNext}>{t("İptal")}</button>
+        {:else if nextReady && nextEp.id}
+          <button class="big w" onclick={nextNow}><Icon name="next" size={16} /> {t("Sıradaki: {code}", { code: nextEp.code })}</button>
+        {:else if ep}
           <button class="big w" onclick={() => closeEnd(() => openTitles(ep[1]))}><Icon name="next" size={16} /> {t("Sonraki bölümü bul")}</button>
         {:else if room}
           <button class="big w" onclick={() => closeEnd(openNight)}><Icon name="spark" size={16} /> {t("Sıradaki ne? Ne izlesek")}</button>
@@ -1295,6 +1330,9 @@
         {#if room ? funControl : true}<button class="big g" onclick={() => closeEnd(() => pickView("listen"))}><Icon name="music" size={16} /> {t("Müziğe geç")}</button>{/if}
         <button class="big g" title={t("Videoya dön")} onclick={() => closeEnd()}><Icon name="x" size={16} /></button>
       </div>
+      {#if soloEp}
+        <label class="end-stop"><input type="checkbox" checked={nextEp.stop} onchange={(e) => setStop(e.currentTarget.checked)} /> {t("Bölüm bitince dur")}</label>
+      {/if}
     </div>
   </div>
 {/snippet}
@@ -1807,6 +1845,24 @@
       {/each}
     </div>
   </footer>
+  {:else if nextOn && barOn}
+  <!-- Solo, bölümün son 10 sn'si: şerit sıradaki bölüm bandına döner (video üstünde hiçbir şey yok). -->
+  <footer class="bar nextb" in:fade={{ duration: 200 }}>
+    {#if nextEp.last}
+      <span class="h-t"><b>{t("Sezon bitti")}</b><small>{t("Bu dizinin son bölümü")}</small></span>
+      <div class="h-act"><button onclick={cancelNext}>{t("Kapat")}</button></div>
+    {:else}
+      <span class="nx-n">{Math.max(0, Math.ceil(epLeft ?? 0))}</span>
+      <span class="h-t">
+        <b>{t("Sıradaki: {code} · {n} sn", { code: nextEp.code, n: Math.max(0, Math.ceil(epLeft ?? 0)) })}</b>
+        <small>{nextEp.busy ? t("Kaynak aranıyor…") : nextEp.sources ? t("Bölüm bitince kendiliğinden açılır") : t("Kaynaklar hazırlanıyor…")}</small>
+      </span>
+      <div class="h-act">
+        <button onclick={cancelNext}>{t("İptal")}</button>
+        <button class="white" disabled={nextEp.busy} onclick={nextNow}>▶ {t("Şimdi oynat")}</button>
+      </div>
+    {/if}
+  </footer>
   {:else}
   <footer class="bar" class:idle={!st?.duration} class:gone={!barOn} class:narrow={drawer !== null} inert={!barOn}>
     {#if roomView === "watch"}
@@ -2200,6 +2256,10 @@
     width: 16px; height: 16px; margin-left: -4px; border-radius: 50%; display: grid; place-items: center; font-size: 8px; font-weight: 700; color: #fff;
     background: hsl(var(--h) 55% 45%); border: 1.5px solid #0a0b0d;
   }
+  /* Sıradaki bölüm bandı (solo) */
+  .bar.nextb { gap: 16px; padding: 0 18px; background: linear-gradient(90deg, rgba(10, 132, 255, 0.2), rgba(10, 132, 255, 0.06) 60%, #0b0c0e); border-top: 1px solid rgba(10, 132, 255, 0.45); }
+  .nx-n { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 850; font-size: 15px; border: 2px solid var(--accent); }
+  .end-stop { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12.5px; color: var(--text-2); cursor: pointer; }
   /* Bekleme bandı */
   .bar.hold { gap: 16px; padding: 0 18px; background: linear-gradient(90deg, rgba(255, 159, 10, 0.2), rgba(255, 159, 10, 0.06) 60%, #0b0c0e); border-top: 1px solid rgba(255, 159, 10, 0.4); }
   .sp { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 3px solid rgba(255, 159, 10, 0.25); border-top-color: #ff9f0a; animation: spin 0.9s linear infinite; }
