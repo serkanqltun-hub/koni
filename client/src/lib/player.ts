@@ -256,6 +256,12 @@ export interface CastMedia { url: string; sub_url: string | null; mime: string; 
 export const castDevices = () => invoke<CastDevice[]>("cast_devices");
 export const castPrepare = () => invoke<CastMedia>("cast_prepare");
 export const castPlay = (device: CastDevice) => invoke<void>("cast_play", { device });
+/** TV'deki oynatma komutu; `seek` için `seconds` gerekir. */
+export type CastControl = { action: "play" | "pause" | "stop" } | { action: "seek"; seconds: number };
+export const castControl = (device: CastDevice, control: CastControl) => invoke<void>("cast_control", { device, control });
+/** TV'deki konum (saniye); TV bilmiyorsa `duration` 0. */
+export interface CastPosition { position: number; duration: number; playing: boolean }
+export const castPosition = (device: CastDevice) => invoke<CastPosition>("cast_position", { device });
 /** macOS: "Ekranı yansıt" (Windows Yayınla paneli) yok; AirPlay Denetim Merkezi'nden açılır. */
 export const isMac = /Macintosh|Mac OS X/.test(navigator.userAgent);
 

@@ -36,6 +36,8 @@
     "allow-cast-devices",
     "allow-cast-prepare",
     "allow-cast-play",
+    "allow-cast-control",
+    "allow-cast-position",
     "allow-sync-connect",
     "allow-sync-play",
     "allow-sync-pause",
