@@ -244,3 +244,19 @@ func (c *Client) Detail(ctx context.Context, kind string, id int) (Item, error) 
 	}
 	return it, nil
 }
+
+// Similar: up to n titles like kind/id (TMDB similar), without details.
+func (c *Client) Similar(ctx context.Context, kind string, id, n int) ([]Item, error) {
+	var p page
+	if err := c.tmdb(ctx, "/"+kind+"/"+strconv.Itoa(id)+"/similar", url.Values{"language": {lang}}, &p); err != nil {
+		return nil, err
+	}
+	out := []Item{}
+	for _, r := range p.Results {
+		if len(out) == n {
+			break
+		}
+		out = append(out, r.itemOf(kind))
+	}
+	return out, nil
+}

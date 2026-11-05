@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"math"
 	"strings"
 
 	"github.com/serkanqltun-hub/koni/server/store"
@@ -75,15 +76,38 @@ func (h *Hub) Lists(in Inbound) map[string]any {
 		}
 		err = st.AddToList(u.ID, in.List, *in.Entry)
 	case "remove":
-		err = st.RemoveFromList(u.ID, in.List, in.Ref)
+		if in.List == "progress" {
+			err = st.RemoveProgress(u.ID, in.Ref)
+		} else {
+			err = st.RemoveFromList(u.ID, in.List, in.Ref)
+		}
 	case "rate":
-		err = st.RateSeen(u.ID, in.Ref, in.Rating)
+		if in.Stars != 0 || in.Word != "" { // p0.25 stars; the ❤️/👎 rating stays
+			err = st.RateStars(u.ID, in.Ref, in.Stars, in.Word)
+		} else {
+			err = st.RateSeen(u.ID, in.Ref, in.Rating)
+		}
+	case "progress":
+		var pos float64
+		if in.Pos != nil {
+			pos = *in.Pos
+		}
+		err = st.SetProgress(u.ID, store.Progress{Ref: in.Ref, Kind: in.Kind, Season: in.Season, Episode: in.Episode,
+			Pos: pos, Duration: in.Duration, Title: in.Title, Poster: in.Poster})
+	case "seen_ep", "unseen_ep":
+		err = st.SeenEpisode(u.ID, in.Ref, in.Season, in.Episode, in.Op == "seen_ep")
 	case "who":
 		want, seen, err := st.Who(u.ID, in.Ref)
 		if err != nil {
 			return errMsg("server_error")
 		}
 		mine := map[string]any{}
+		var sum, n int
+		for _, h := range seen {
+			if h.Stars > 0 {
+				sum, n = sum+h.Stars, n+1
+			}
+		}
 		for _, l := range []string{store.ListWant, store.ListSeen} {
 			es, err := st.List(u.ID, l)
 			if err != nil {
@@ -94,11 +118,26 @@ func (h *Hub) Lists(in Inbound) map[string]any {
 					mine[l] = true
 					if l == store.ListSeen {
 						mine["rating"] = e.Rating
+						if e.Stars > 0 {
+							mine["stars"], mine["word"] = e.Stars, e.Word
+							sum, n = sum+e.Stars, n+1
+						}
 					}
 				}
 			}
 		}
-		return map[string]any{"t": "lists", "op": "who", "ref": in.Ref, "want": want, "seen": seen, "mine": mine}
+		eps, err := st.Episodes(u.ID)
+		if err != nil {
+			return errMsg("server_error")
+		}
+		if e := eps[in.Ref]; len(e) > 0 {
+			mine["episodes"] = e
+		}
+		out := map[string]any{"t": "lists", "op": "who", "ref": in.Ref, "want": want, "seen": seen, "mine": mine}
+		if n > 0 { // you and your mutual friends who rated it (p0.25)
+			out["stars"], out["starsCount"] = math.Round(float64(sum)/float64(n)*10)/10, n
+		}
+		return out
 	case "":
 	default:
 		return errMsg("bad_message")
@@ -139,6 +178,15 @@ func (h *Hub) Lists(in Inbound) map[string]any {
 			items[i] = wantItem{Entry: e, Mates: mates[e.Ref]}
 		}
 		out["want"] = items
+		prog, err := st.ProgressList(u.ID)
+		if err != nil {
+			return errMsg("server_error")
+		}
+		eps, err := st.Episodes(u.ID)
+		if err != nil {
+			return errMsg("server_error")
+		}
+		out["progress"], out["episodes"] = prog, eps
 		return out
 	}
 	// A friend's profile: their lists, and what both of you want ("ortak liste").

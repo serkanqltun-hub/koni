@@ -29,6 +29,10 @@ func fakeTMDB(t *testing.T) *httptest.Server {
 			fmt.Fprintf(w, `{"total_pages":1,"results":[%s]}`, strings.Join(res, ","))
 		case p == "/search/movie":
 			fmt.Fprint(w, `{"results":[{"id":500,"title":"Matrix","release_date":"1999-03-31"}]}`)
+		case strings.HasPrefix(p, "/movie/") && strings.HasSuffix(p, "/similar"):
+			fmt.Fprint(w, `{"results":[{"id":101,"title":"Film 101"},{"id":102,"title":"Film 102"}]}`)
+		case strings.HasPrefix(p, "/find/"):
+			fmt.Fprint(w, `{"movie_results":[{"id":100}],"tv_results":[]}`)
 		case strings.HasPrefix(p, "/movie/"):
 			id := strings.TrimPrefix(p, "/movie/")
 			fmt.Fprintf(w, `{"title":"Film %s","runtime":120,"imdb_id":"tt%s","genres":[{"name":"Dram"}],"videos":{"results":[{"key":"teaser%s","site":"YouTube","type":"Teaser"},{"key":"yt%s","site":"YouTube","type":"Trailer","iso_639_1":"en"}]}}`, id, id, id, id)

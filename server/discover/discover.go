@@ -23,10 +23,11 @@ const (
 	CacheTTL = 24 * time.Hour
 	DeckSize = 10
 
-	lang       = "tr-TR"
-	imgBase    = "https://image.tmdb.org/t/p/w342"
-	maxEntries = 4000
-	maxPages   = 8 // decks come from the most popular pages only
+	lang         = "tr-TR"
+	imgBase      = "https://image.tmdb.org/t/p/w342"
+	backdropBase = "https://image.tmdb.org/t/p/w1280"
+	maxEntries   = 4000
+	maxPages     = 8 // decks come from the most popular pages only
 )
 
 var (
@@ -88,6 +89,7 @@ type Item struct {
 	Director  string   `json:"director,omitempty"`
 	Cast      []string `json:"cast,omitempty"`
 	Countries []string `json:"countries,omitempty"`
+	Backdrop  string   `json:"backdrop,omitempty"` // detail only (p0.25)
 }
 
 // Client talks to TMDB (required) and OMDb (optional).
@@ -412,6 +414,7 @@ func (c *Client) details(ctx context.Context, it Item) Item {
 		Runtime     int    `json:"runtime"`
 		EpisodeRun  []int  `json:"episode_run_time"`
 		Seasons     int    `json:"number_of_seasons"`
+		Backdrop    string `json:"backdrop_path"`
 		IMDbID      string `json:"imdb_id"`
 		ExternalIDs struct {
 			IMDbID string `json:"imdb_id"`
@@ -459,6 +462,9 @@ func (c *Client) details(ctx context.Context, it Item) Item {
 			it = base
 		}
 		it.Runtime, it.IMDbID = d.Runtime, d.IMDbID
+		if d.Backdrop != "" {
+			it.Backdrop = backdropBase + d.Backdrop
+		}
 		if kind == KindTV {
 			it.IMDbID, it.Seasons = d.ExternalIDs.IMDbID, d.Seasons
 			if len(d.EpisodeRun) > 0 {

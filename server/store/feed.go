@@ -3,6 +3,7 @@ package store
 import (
 	"cmp"
 	"slices"
+	"strings"
 )
 
 // FeedItem is one line of the home screen's "Etkinlik" tab (p0.22): what you and your
@@ -15,6 +16,7 @@ type FeedItem struct {
 	Room  string   `json:"room,omitempty"`  // watch: room name
 	Sec   int64    `json:"sec,omitempty"`   // watch: the longest single watcher's time
 	By    string   `json:"by,omitempty"`    // joined: whose invite code
+	Solo  bool     `json:"solo,omitempty"`  // watch: watched alone (p0.25)
 }
 
 // Feed lists the viewer's and their mutual friends' activity since `since`, newest
@@ -54,7 +56,7 @@ GROUP BY e.room_id, 2, e.user_id`, viewer, viewer, since)
 		k := key{room, title}
 		g := groups[k]
 		if g == nil {
-			g = &FeedItem{Kind: "watch", Title: title, Room: roomName}
+			g = &FeedItem{Kind: "watch", Title: title, Room: roomName, Solo: strings.HasPrefix(room, "solo:")}
 			groups[k] = g
 		}
 		g.At = max(g.At, at)

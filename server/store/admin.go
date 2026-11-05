@@ -118,6 +118,9 @@ func (s *Store) Ban(user int64) (int64, error) {
 		`DELETE FROM sessions WHERE user_id = ?1`,
 		`DELETE FROM friends WHERE user_id = ?1 OR friend_id = ?1`,
 		`DELETE FROM events WHERE user_id = ?1`,
+		`DELETE FROM list_items WHERE user_id = ?1`,
+		`DELETE FROM progress WHERE user_id = ?1`,
+		`DELETE FROM seen_eps WHERE user_id = ?1`,
 		`DELETE FROM invites WHERE used_by = ?1 OR created_by = ?1`,
 		`DELETE FROM users WHERE id = ?1`,
 	} {

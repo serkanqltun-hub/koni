@@ -136,6 +136,10 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
+	if err := migrateStars(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
 	s := &Store{db: db, events: make(chan event, 4096), now: time.Now}
 	s.wg.Add(1)
 	go s.writeEvents()
