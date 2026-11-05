@@ -292,6 +292,27 @@ pub fn player_screenshot(app: AppHandle, state: State<'_, AppState>) -> CmdResul
     Ok(p)
 }
 
+/// Aylık özet kartını (PNG, base64) Resimler/KONI klasörüne kaydeder; dosya yolunu döner.
+#[tauri::command(async)]
+pub fn recap_save_png(app: AppHandle, month: String, png: String) -> CmdResult<String> {
+    use base64::Engine;
+    if month.len() != 7 || !month.chars().all(|c| c.is_ascii_digit() || c == '-') {
+        return Err(tr!("geçersiz ay: {month}", "invalid month: {month}"));
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(png.trim_start_matches("data:image/png;base64,"))
+        .map_err(|e| e.to_string())?;
+    let dir = app
+        .path()
+        .picture_dir()
+        .map_err(|e| e.to_string())?
+        .join("KONI");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("koni-ozet-{month}.png"));
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 #[tauri::command(async)]
 pub fn player_set_volume(state: State<'_, AppState>, volume: f64) -> CmdResult {
     if !(0.0..=130.0).contains(&volume) {
@@ -767,6 +788,17 @@ pub async fn recs_get(url: String) -> CmdResult<Option<serde_json::Value>> {
     };
     let msg = koni_sync::protocol::ClientMsg::Recs { auth: acc.token };
     Ok(Some(account::recs(&url, msg).await?))
+}
+
+/// Aylık özet (p0.28); `month` `YYYY-AA`, yoksa bu ay. Hesap yoksa `null`.
+#[tauri::command]
+pub async fn recap_get(url: String, month: Option<String>) -> CmdResult<Option<serde_json::Value>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    let msg = koni_sync::protocol::ClientMsg::Recap { auth: acc.token, month };
+    Ok(Some(account::recap(&url, msg).await?))
 }
 
 /// Dizinin intro / özet işaretleri (p0.27). Hesap yoksa `null`.
