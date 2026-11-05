@@ -13,11 +13,12 @@
     syncConnect, syncSeek, syncToggle, syncPause, syncSeekBy, syncLeave, syncContinueWithout, syncResync, syncDownload,
     syncSetCohost, syncSetPolicy, accountGet, accountLogin, accountRegister, accountLogout, snifferClose,
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, bugReport,
-    type SyncStatus, type ServerMsg, type Member, type MediaEvent, type LinkEvent, type DlStatus, type Policy,
+    type SyncStatus, type ServerMsg, type Member, type MediaEvent, type ListEntry, type LinkEvent, type DlStatus, type Policy,
     type SnifferEvent, type UpdateInfo, type FunMsg, type Movie, syncSetView, type RoomView,
-    debridOpen, type Source, playerMusicView, playerPlay, playerCover, relayOn, setRelay, setLangPrefs, langMode, subSize, lobbyRemoteState,
+    debridOpen, watchReport, type Source, playerMusicView, playerPlay, playerCover, relayOn, setRelay, setLangPrefs, langMode, subSize, lobbyRemoteState,
   } from "./lib/player";
   import BrowseView from "./lib/BrowseView.svelte";
+  import RateCard from "./lib/RateCard.svelte";
   import TitleBar from "./lib/TitleBar.svelte";
   import Logo from "./lib/Logo.svelte";
   import LoginView from "./lib/LoginView.svelte";
@@ -445,6 +446,11 @@
       lastMode = mode;
     });
   });
+  /** Puan kartı için başlık: medya `file` alanı `movie:tt…|…` ya da `series:tt…:s:e|…` ise. */
+  function titleEntry(file: string | undefined, title: string): ListEntry | null {
+    const m = file?.match(/^(movie|series):(tt\d+)/);
+    return m ? { ref: m[2], kind: m[1] as "movie" | "series", title } : null;
+  }
   function closeEnd(then?: () => void) {
     endClosed = nowMedia?.src ?? "";
     then?.();
@@ -792,6 +798,23 @@
   });
   $effect(() => { if (!canSleep && sleepSel !== 0) untrack(() => setSleep(0)); });
 
+  // Solo izleme süresi (p0.25): oynarken saniye say, dakikada bir sunucuya bildir. Odadayken oda sayar.
+  let soloAcc = 0;
+  function soloFlush() {
+    const sec = Math.min(Math.floor(soloAcc), 120);
+    soloAcc = 0;
+    if (sec < 1 || !social.server) return;
+    watchReport(social.server, sec, soloMedia?.title || undefined).catch(() => {});
+  }
+  $effect(() => {
+    if (view !== "solo" || roomView !== "watch") return;
+    const id = setInterval(() => {
+      const s = st;
+      if (s && s.duration != null && !s.paused && !s.pausedForCache && !s.eofReached && !s.seeking) soloAcc += 1;
+      if (soloAcc >= 60) soloFlush();
+    }, 1000);
+    return () => { clearInterval(id); soloFlush(); };
+  });
   // "Tam ekran başlat": yeni bir video açılınca (süre bilinince) tam ekrana geç.
   let hadDuration = false;
   $effect(() => {
@@ -1360,6 +1383,7 @@
 {#snippet endScreen()}
   {@const title = nowMedia?.title || soloTitle || t("Video")}
   {@const ep = title.match(/^(.*?)\s+S(\d{2})E(\d{2})$/)}
+  {@const rateEntry = titleEntry(nowMedia?.file, ep ? ep[1] : title)}
   {@const here = Object.values(members).filter((m) => !m.away).length}
   <div class="end" style="--h:{hue(title)}">
     <div class="end-bd"></div>
@@ -1372,6 +1396,7 @@
         {#if room}<div><b>{here}/{Object.keys(members).length}</b><small>{t("sonuna kadar kaldı")}</small></div>{/if}
         <div><b>{pauses}</b><small>{t("mola")}</small></div>
       </div>
+      {#if rateEntry}{#key rateEntry.ref}<RateCard entry={rateEntry} />{/key}{/if}
       <div class="end-row">
         {#if soloEp && nextEp.busy}
           <button class="big w" disabled><Icon name="next" size={16} /> {t("{code} açılıyor…", { code: nextEp.code })}</button>

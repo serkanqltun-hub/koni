@@ -67,11 +67,23 @@ pub enum ClientMsg {
         reference: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         rating: Option<i32>,
+        /// p0.25: 1–5 yıldız (`-1` siler) ve tek kelime.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stars: Option<i32>,
+        #[serde(skip_serializing_if = "String::is_empty")]
+        word: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         entry: Option<serde_json::Value>,
         /// p0.25 alanları (`kind`, `season`, `episode`, `pos`, `duration`, `title`, `poster` …) olduğu gibi eklenir.
         #[serde(flatten, default)]
         extra: Option<serde_json::Map<String, serde_json::Value>>,
+    },
+    /// Tek seferlik (p0.25): solo izleme süresi (dakikada bir, en fazla 120 sn).
+    Watch {
+        auth: String,
+        sec: u32,
+        #[serde(skip_serializing_if = "String::is_empty", default)]
+        title: String,
     },
     /// Tek seferlik (p0.22): ana ekran "Etkinlik" sekmesi, son 7 gün.
     Feed {
@@ -575,6 +587,8 @@ mod tests {
             list: String::new(),
             reference: "tt1".into(),
             rating: None,
+            stars: None,
+            word: String::new(),
             entry: None,
             extra: Some(extra),
         };
