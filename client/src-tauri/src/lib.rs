@@ -187,6 +187,7 @@ pub fn run() {
             commands::skip_set,
             commands::upcoming_get,
             commands::recs_get,
+            commands::event_op,
             commands::recap_get,
             commands::recap_save_png,
             commands::friends,

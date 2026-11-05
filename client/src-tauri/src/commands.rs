@@ -790,6 +790,23 @@ pub async fn recs_get(url: String) -> CmdResult<Option<serde_json::Value>> {
     Ok(Some(account::recs(&url, msg).await?))
 }
 
+/// Film gecesi (p0.28): `query` boşsa liste; `op` `create` | `rsvp` | `cancel`. Hesap yoksa `null`.
+#[tauri::command]
+pub async fn event_op(
+    url: String,
+    query: Option<serde_json::Map<String, serde_json::Value>>,
+) -> CmdResult<Option<serde_json::Value>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    let msg = koni_sync::protocol::ClientMsg::Event {
+        auth: acc.token,
+        query,
+    };
+    Ok(Some(account::event(&url, msg).await?))
+}
+
 /// Aylık özet (p0.28); `month` `YYYY-AA`, yoksa bu ay. Hesap yoksa `null`.
 #[tauri::command]
 pub async fn recap_get(url: String, month: Option<String>) -> CmdResult<Option<serde_json::Value>> {
