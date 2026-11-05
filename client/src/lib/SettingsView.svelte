@@ -5,6 +5,7 @@
   import DebridSettings from "./DebridSettings.svelte";
   import LangSwitch from "./LangSwitch.svelte";
   import { t, locale } from "./i18n.svelte";
+  import { qrDataUrl } from "./qr";
   import { DEFAULT_SERVER, serverLabel } from "./server";
 
   // Uygulama ayarları (UI-PLAN §5.9, E3). Yalnızca gerçekten çalışan ayarlar var.
@@ -94,6 +95,7 @@
         {#if account && remoteUrl}
           <div class="item">
             <div class="grow"><b>{t("Telefondan kumanda")}</b><small>{t("Telefonunun tarayıcısında bu adresi aç ve KONİ hesabınla giriş yap: oynat/duraklat, ileri/geri ve ses. Odadaysan herkeste aynı anda olur.")}</small><small class="mono sel">{remoteUrl}</small></div>
+            <img class="qr" src={qrDataUrl(remoteUrl)} alt={t("Kumanda adresi QR kodu")} />
             <button onclick={copyRemote}>{copied ? t("Kopyalandı") : t("Kopyala")}</button>
           </div>
         {/if}
@@ -145,6 +147,7 @@
   main { padding: 32px 48px; max-width: 760px; overflow-y: auto; }
   h1 { margin: 0 0 20px; font-size: 24px; font-weight: 650; letter-spacing: -0.02em; }
   .group { border-radius: 16px; overflow: hidden; }
+  .qr { width: 96px; height: 96px; border-radius: 8px; flex: none; }
   .item { display: flex; align-items: center; gap: 14px; padding: 14px 16px; }
   .item + .item { border-top: 1px solid var(--line); }
   .item.col { flex-direction: column; align-items: stretch; gap: 10px; }
