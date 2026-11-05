@@ -114,3 +114,159 @@ func resolveRef(ctx context.Context, d *discover.Client, ref, kind string) (stri
 	}
 	return "", 0, discover.ErrNotFound
 }
+
+// soloAccount checks auth like `detail`: required on an account server. It returns
+// the account id (0 on an open server) or an error code.
+func (h *Hub) soloAccount(auth string) (int64, string) {
+	st := h.cfg.Store
+	if st == nil {
+		return 0, ""
+	}
+	if auth == "" {
+		return 0, "auth_required"
+	}
+	u, err := st.UserByToken(auth)
+	if err != nil {
+		return 0, errCode(err)
+	}
+	return u.ID, ""
+}
+
+// SoloNight is "Ne izlesem?" (p0.26 `solo_night`): night_suggest for one person. It
+// deals up to DeckSize detailed cards for the filter, leaving out the account's seen
+// list and titles longer than budgetMin; the rest of the pool waits for
+// `solo_night_pick`. There is no vote: the client decides.
+func (h *Hub) SoloNight(ctx context.Context, in Inbound) map[string]any {
+	user, code := h.soloAccount(in.Auth)
+	if code != "" {
+		return errMsg(code)
+	}
+	kind := in.Kind
+	if kind == "series" {
+		kind = discover.KindTV
+	}
+	msg := map[string]any{"t": "solo_night", "kind": kind, "items": []discover.Item{}}
+	if in.Dub != "" {
+		msg["dub"] = in.Dub // not filtered here: the client applies it to sources
+	}
+	d := h.cfg.Discover
+	switch {
+	case d == nil:
+		msg["error"] = "Bu sunucuda keşif kapalı"
+		return msg
+	case !discover.ValidKind(kind):
+		msg["error"] = "Film ya da dizi seçilmeli"
+		return msg
+	}
+	var f discover.Filter
+	if in.Filter != nil {
+		f = *in.Filter
+	}
+	f.HideSeen = false
+	budget := max(in.BudgetMin, 0)
+	if budget > 0 && (f.RuntimeMax == 0 || budget < f.RuntimeMax) {
+		f.RuntimeMax = budget
+	}
+	seen := map[string]bool{}
+	if st := h.cfg.Store; st != nil {
+		list, _ := st.List(user, store.ListSeen)
+		for _, e := range list {
+			seen[e.Ref] = true
+		}
+	}
+	ctx, cancel := context.WithTimeout(ctx, upstreamTimeout)
+	defer cancel()
+	pool, _, err := d.Suggest(ctx, kind, f, nil)
+	if err != nil {
+		msg["error"] = err.Error()
+		return msg
+	}
+	var cards []discover.Item
+	for _, it := range d.Fill(ctx, pool) {
+		if !seenCard(seen, kind, it) && (budget == 0 || it.Runtime <= budget) {
+			cards = append(cards, it)
+		}
+	}
+	deal := cards[:min(len(cards), discover.DeckSize)]
+	rest := cards[len(deal):]
+	h.soloMu.Lock()
+	h.soloRest[user] = rest
+	h.soloMu.Unlock()
+	if len(deal) > 0 {
+		msg["items"] = deal
+	}
+	msg["more"] = len(rest)
+	return msg
+}
+
+// SoloNightPick (p0.26 `solo_night_pick`): the user is done with card ref (liked or
+// passed); the answer carries the next card of the last solo_night pool, if any.
+func (h *Hub) SoloNightPick(in Inbound) map[string]any {
+	user, code := h.soloAccount(in.Auth)
+	if code != "" {
+		return errMsg(code)
+	}
+	msg := map[string]any{"t": "solo_night_pick", "ref": in.Ref}
+	h.soloMu.Lock()
+	defer h.soloMu.Unlock()
+	rest := h.soloRest[user]
+	if len(rest) == 0 {
+		delete(h.soloRest, user)
+		msg["more"] = 0
+		return msg
+	}
+	msg["item"], h.soloRest[user] = rest[0], rest[1:]
+	msg["more"] = len(rest) - 1
+	return msg
+}
+
+// seenCard: a card is on the seen list by IMDb id or by its tmdb: ref.
+func seenCard(seen map[string]bool, kind string, it discover.Item) bool {
+	id := strconv.Itoa(it.ID)
+	if it.IMDbID != "" && seen[it.IMDbID] {
+		return true
+	}
+	if kind == discover.KindTV {
+		return seen["tmdb:tv:"+id] || seen["tmdb:series:"+id]
+	}
+	return seen["tmdb:movie:"+id]
+}
+
+// Browse is "Göz at" (p0.26 `browse`): one page of 30 titles for the filters,
+// without details (the card opens with `detail`).
+func (h *Hub) Browse(ctx context.Context, in Inbound) map[string]any {
+	if _, code := h.soloAccount(in.Auth); code != "" {
+		return errMsg(code)
+	}
+	kind := in.Kind
+	if kind == "series" {
+		kind = discover.KindTV
+	}
+	page := max(in.Page, 1)
+	msg := map[string]any{"t": "browse", "kind": kind, "page": page, "items": []discover.Item{}, "total": 0}
+	d := h.cfg.Discover
+	switch {
+	case d == nil:
+		msg["error"] = "Bu sunucuda keşif kapalı"
+		return msg
+	case !discover.ValidKind(kind):
+		msg["error"] = "Film ya da dizi seçilmeli"
+		return msg
+	}
+	lang := strings.ToLower(strings.TrimSpace(in.Lang))
+	if len(lang) != 2 {
+		lang = ""
+	}
+	ctx, cancel := context.WithTimeout(ctx, upstreamTimeout)
+	defer cancel()
+	items, total, err := d.Browse(ctx, kind, discover.BrowseQuery{
+		Genre: in.Genre, YearFrom: in.YearFrom, YearTo: in.YearTo, MinRating: in.MinRating,
+		MaxMin: in.MaxMin, Lang: lang, Sort: in.Sort, Page: page,
+	})
+	if err != nil {
+		msg["error"] = err.Error()
+		return msg
+	}
+	msg["items"], msg["total"] = items, total
+	return msg
+}

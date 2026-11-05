@@ -1,6 +1,6 @@
 # KONİ — WebSocket Protokolü (Faz 0)
 
-> Sürüm: **p0.25** (taslak) · Kaynak: [design/sync.md §4](design/sync.md), hesaplar [design/accounts.md §5.1](design/accounts.md), keşif [design/discovery.md §7](design/discovery.md)
+> Sürüm: **p0.26** (taslak) · Kaynak: [design/sync.md §4](design/sync.md), hesaplar [design/accounts.md §5.1](design/accounts.md), keşif [design/discovery.md §7](design/discovery.md)
 > Kapsam: hesap (davet kodu + kullanıcı adı + argon2id şifre, oturum belirteci), oda oluştur/katıl, play/pause/seek, oda medyası (`media`), HOLD/countdown, Host Only + yardımcı host, ping/saat senkronu, yeniden bağlanma (`resume`), kronik stall → "olmadan devam et" / DETACHED, "Herkes İndirsin" bariyeri.
 > Henüz yok: admin araçları.
 >
@@ -25,6 +25,7 @@
 > p0.23: profil listeleri (§3.0g): tek seferlik `lists` el sıkışması (İzleyeceklerim / İzlediklerim, arkadaşın listeleri, ortak liste, künyede kimler istiyor). Odada `debrid` film (`file` = `movie:tt…|…`) %80'i geçince odadakilerin İzlediklerim'ine kiminle izlendiğiyle girer. `night_pick` artık `itemId` yerine `imdb` (`tt…`) da alır (listeden öneri). `error.code=bad_entry`. Yalnızca ekleme.
 > p0.24: telefon kumandası (§3.0h): `remote` bağlantısı ve `remote` / `remote_state` mesajları; `/ws` adresine tarayıcıyla düz `GET` kumanda sayfasını döner. Yalnızca ekleme; p0.23 sunucusu `remote`'a `error` (`not_joined`) döner.
 > p0.25: solo desteği. `lists` (§3.0g) `op: "progress"` (kaldığın yer, kendi cevabında `progress`), `op: "seen_ep"` / `"unseen_ep"` (bölüm izledim; `seen` satırında ve cevapta `episodes`), `rate` için `stars` (1–5) + `word`, `who` cevabında `stars` ortalaması; `remove` `list: "progress"` alır. Tek seferlik `watch` (§3.0i, solo izleme süresi → istatistik, `feed` satırında `solo`) ve `detail` (§3.0j, odasız künye + `similar`). Kartlara `backdrop`. Yalnızca ekleme; p0.24 sunucusu `watch`/`detail`'e `error` (`not_joined`), yeni `lists` op'larına `bad_message` döner.
+> p0.26: "Ne izlesem?" ve "Göz at". Tek seferlik `solo_night` / `solo_night_pick` (§3.0k, odasız deste: görülenler ve süre bütçesini aşanlar gelmez) ve `browse` (§3.0l, filtreli 30'luk sayfa). `night_start` için `pool: "lists"` (§3.9a, havuz odadakilerin İzleyeceklerim listelerinden dolar; `night` mesajında `source`). Yalnızca ekleme; p0.25 sunucusu yeni tiplere `error` (`not_joined`) döner, `pool`'u yok sayar.
 >
 > p0.13: oda modu: `cmd` `set_view` (§3.3), `view` mesajı (§4.17), `snapshot.view` (§4.1). Yalnızca ekleme; p0.12 sunucusu `set_view`'a `denied` (`bad_op`) döner, istemci `view` yoksa Sinema varsayar.
 >
@@ -187,6 +188,25 @@ Tek seferlik; `night_detail`'in odasız hali. `ref` liste anahtarıdır: `tt…`
 ```
 Cevap `{ "t": "detail", "ref", "item": <kart>, "similar": [<kart>] }`: `item` `night_detail` kartının aynısı (puanlar, yönetmen, oyuncular, fragman, `seasons`) + `backdrop` (geniş arka plan görseli); `similar` en fazla 10 benzer başlık (ayrıntısız: başlık, yıl, afiş, özet, TMDB puanı). Bulunamazsa ya da sunucuda künye kapalıysa `{ "t": "detail", "ref", "error": "…" }`. Hesaplı sunucuda `auth` gerekir.
 
+### 3.0k `solo_night` / `solo_night_pick` — Ne izlesem (p0.26)
+Tek seferlik; `night_suggest`'in tek kişilik hali, oylama yok (seçim istemcide).
+```json
+{ "t": "solo_night", "auth": "…", "kind": "movie", "filter": { "genres": [53], "voteMin": 7 }, "budgetMin": 110, "dub": "tr" }
+{ "t": "solo_night_pick", "auth": "…", "ref": "tt0110413" }
+```
+- `solo_night`: `kind` `movie` | `tv` (`series` da olur), `filter` §3.9a filtresiyle aynı (hepsi isteğe bağlı, `hideSeen` yok sayılır). `budgetMin` (dakika): süresi (dizide bölüm süresi) bunu aşan gelmez. Hesabın İzlediklerim listesindekiler (IMDb kimliği ya da `tmdb:` anahtarıyla) elenir. `dub` süzülmez, cevapta aynen geri gelir (istemci kaynak seçerken kullanır).
+- Cevap `{ "t": "solo_night", "kind", "items": [<kart>], "more": 2, "dub"? }`: en fazla 10 künyeli kart (`night_detail` kartı gibi: süre, `imdb`, puanlar, fragman). `more`: sunucuda bekleyen kart sayısı. Uygun başlık yoksa `items` boş. Keşif kapalıysa ya da TMDB hata verirse `items` boş + `error`.
+- `solo_night_pick`: kullanıcı `ref` kartını geçti ya da beğendi; cevap `{ "t": "solo_night_pick", "ref", "item"?: <kart>, "more" }` son `solo_night` havuzundan sıradaki kartı taşır. `item` yoksa havuz bitti: yeni deste için yeniden `solo_night`. Havuz sunucunun belleğindedir; yeni bir `solo_night` onu değiştirir.
+- Hesaplı sunucuda `auth` gerekir (yoksa `error` `auth_required`).
+
+### 3.0l `browse` — Göz at (p0.26)
+Tek seferlik; filtreli başlık listesi, sayfa başına 30.
+```json
+{ "t": "browse", "auth": "…", "kind": "movie", "genre": 878, "yearFrom": 2000, "yearTo": 2024, "minRating": 7, "maxMin": 130, "lang": "en", "sort": "rating", "page": 1 }
+```
+- Hepsi isteğe bağlı (`kind` hariç). `genre` TMDB film türü (dizide en yakın dizi türü), `minRating` TMDB 0–10, `maxMin` süre (dizide bölüm), `lang` özgün dil (iki harf). `sort`: `popular` (varsayılan), `rating` (en yüksek puan), `new` (en yeni; çıkmamışlar gelmez). `page` 1–16.
+- Cevap `{ "t": "browse", "kind", "page", "items": [<kart>], "total": 4812 }`: kartlar ayrıntısız (başlık, yıl, afiş, özet, TMDB puanı); künye için `detail` (§3.0j, `ref: "tmdb:<kind>:<id>"`). Keşif kapalıysa ya da hata olursa `items` boş + `error`. Hesaplı sunucuda `auth` gerekir.
+
 ### 3.0f `admin` — yönetim (p0.19)
 Admin sunucuda verilir: `koni-server admin -db koni.db Ad#1234` (`-off` geri alır, `-list` hesapları listeler).
 ```json
@@ -348,6 +368,7 @@ Akış: **setup** (herkes kendi havasını/filtresini seçer) → **pick** (herk
 - `night_done`: önerilerim hazır (`ready: false` geri alır). Herkes hazır olunca öneriler birleştirilir (aynı başlık bir kez), karıştırılır ve `deck` olarak yayınlanır; kimin neyi önerdiği gönderilmez. Havuz boşsa `fun_error` gelir ve herkes yeniden seçer.
 - Eşleşme ve eşleşmesiz bitiş §3.9 ile aynı (`match`, ya da en çok beğenilen 3 kart çarka). İkisinde de oturum done olur.
 - `night_close`: hostlar oturumu kapatır.
+- `pool: "lists"` (p0.26, `night_start`'ta): havuz odadaki hesapların İzleyeceklerim listelerinden dolar: önce herkesin listesinde olanlar, öyle başlık yoksa herhangi birinin listesindekiler (en çok isteneni önce), en fazla 20, yalnızca seçilen türde (film/dizi). Kartlar çekilirken `night` mesajında `source: "lists"` ve aşama setup; hazır olunca pick atlanır, doğrudan `deck` yayınlanır (aşama vote). Listelerde uygun başlık yoksa `fun_error` gelir ve oturum olağan akışla sürer.
 
 ### 3.10 Altyazı: `subs_search` / `subs_pick`
 ```json

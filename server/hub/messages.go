@@ -8,7 +8,7 @@ import (
 )
 
 // Protocol version, see docs/PROTOCOL.md.
-const ProtocolVersion = "p0.25"
+const ProtocolVersion = "p0.26"
 
 // Inbound is the union of all client→server messages; fields are used per type "t".
 type Inbound struct {
@@ -105,6 +105,20 @@ type Inbound struct {
 	Duration float64 `json:"duration,omitempty"`
 	Title    string  `json:"title,omitempty"`
 	Poster   string  `json:"poster,omitempty"`
+
+	// solo_night (p0.26): Kind, Filter, BudgetMin (minutes), Dub (echoed back);
+	// solo_night_pick: Ref. night_start Pool "lists": the pool comes from want lists.
+	BudgetMin int    `json:"budgetMin,omitempty"`
+	Dub       string `json:"dub,omitempty"`
+	Pool      string `json:"pool,omitempty"`
+	// browse (p0.26): Kind, Genre, YearFrom, YearTo, MinRating, MaxMin, Lang, Sort, Page
+	Genre     int     `json:"genre,omitempty"`
+	YearFrom  int     `json:"yearFrom,omitempty"`
+	YearTo    int     `json:"yearTo,omitempty"`
+	MinRating float64 `json:"minRating,omitempty"`
+	MaxMin    int     `json:"maxMin,omitempty"`
+	Sort      string  `json:"sort,omitempty"`
+	Page      int     `json:"page,omitempty"`
 
 	// watch (p0.25): solo watching seconds since the last report (Title optional)
 	Sec int `json:"sec,omitempty"`
