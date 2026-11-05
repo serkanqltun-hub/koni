@@ -8,7 +8,7 @@
   import Icon from "./Icon.svelte";
   import FreeShelf from "./FreeShelf.svelte";
   import RoomHistory from "./RoomHistory.svelte";
-  import { roomHistory } from "./roomHistory.svelte";
+  import { roomHistory } from "./historyStore.svelte";
   import { t, tx, locale } from "./i18n.svelte";
 
   type Person = { id: string; name: string; me: boolean; ready: boolean };

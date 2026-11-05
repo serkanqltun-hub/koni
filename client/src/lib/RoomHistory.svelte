@@ -2,7 +2,7 @@
   // Odanın ortak geçmişi: kim neyi açtı, nerede kaldık. Karta basınca aynı medya odaya yeniden açılır.
   import Icon from "./Icon.svelte";
   import { t } from "./i18n.svelte";
-  import { roomHistory, reopen } from "./roomHistory.svelte";
+  import { roomHistory, reopen } from "./historyStore.svelte";
   import type { HistoryItem } from "./player";
 
   let { limit = 4, onError }: { limit?: number; onError?: (msg: string) => void } = $props();
