@@ -323,6 +323,17 @@ export const syncContinueWithout = (user: string) => invoke<void>("sync_continue
 export const syncResync = () => invoke<void>("sync_resync");
 export const syncDownload = (url: string) => invoke<void>("sync_download", { url });
 
+// ---------------------------------------------------------------- İndir, sonra izle (tek başına)
+
+/** Bu bilgisayara indirilmiş video (çevrimdışı raf). */
+export interface SavedDownload { key: string; title: string; url: string; video: string; audio: string | null; at: number; size: number }
+export interface OfflineProgress { url: string; state: "queued" | "downloading" | "ready" | "failed"; pct: number; speed: number; eta: number; error: string }
+/** İndirmeyi başlatır; ilerleme `offline://progress` olayıyla gelir. */
+export const offlineDownload = (url: string) => invoke<void>("offline_download", { url });
+export const offlineCancel = (url: string) => invoke<void>("offline_cancel", { url });
+export const offlineList = () => invoke<SavedDownload[]>("offline_list");
+export const offlineDelete = (key: string) => invoke<void>("offline_delete", { key });
+
 // ---------------------------------------------------------------- Hesap (PROTOCOL §3.0)
 
 /** Bu sunucuda kayıtlı hesabın adı (oturum belirteci anahtar zincirinde). */

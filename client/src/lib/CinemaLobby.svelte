@@ -1,10 +1,12 @@
 <script lang="ts">
   // Boş Sinema (lobi): tek kutu (link/dosya yolu açar, düz yazı Film & Dizi'de arar),
-  // Ne izlesek? / Film & Dizi / Herkes indirsin kartları ve "Kaldığınız yerden".
+  // Ne izlesek? / Film & Dizi / Herkes indirsin (tek başınaysa İndir) kartları,
+  // "Kaldığınız yerden" ve tek başınayken "Çevrimdışı" rafı (indirilenler).
   // mpv bu sırada gizli; sahneyi arayüz çizer (kokpit modeli bozulmaz).
   import { loadResume, removeResume, type ResumeEntry } from "./resume";
   import Icon from "./Icon.svelte";
   import { t, tx, locale } from "./i18n.svelte";
+  import { offline, initOffline, cancelOffline, deleteOffline } from "./offline.svelte";
 
   let { value = $bindable(""), people, room, busy, error, hue, onOpen, onTitles, onNight, onDownload, onResume }: {
     value: string;
@@ -66,6 +68,17 @@
   const whenTitle = $derived(t(hour < 5 ? "Bu gece ne izliyoruz?" : hour < 12 ? "Bu sabah ne izliyoruz?" : hour < 18 ? "Bugün ne izliyoruz?" : "Bu akşam ne izliyoruz?"));
 
   $effect(() => { input?.focus(); });
+
+  initOffline();
+  let offErr = $state<string | null>(null);
+  function size(b: number): string {
+    return b >= 1e9 ? `${(b / 1e9).toLocaleString(locale(), { maximumFractionDigits: 1 })} GB` : `${Math.max(1, Math.round(b / 1e6))} MB`;
+  }
+  const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
+  async function remove(key: string) {
+    offErr = null;
+    try { await deleteOffline(key); } catch (e) { offErr = tx(String(e)); }
+  }
 </script>
 
 <div class="lobby">
@@ -112,9 +125,13 @@
         <h3>{t("Film & Dizi")}</h3><p>{room ? t("Film ve dizi ara, herkes kendi hesabıyla açar") : t("Film ve dizi ara")}</p>
       </button>
       {#if onDownload}
-        <button class="src" onclick={download} title={isLink ? t("Bu linki herkes indirsin") : t("Önce kutuya bir link yapıştır")}>
+        <button class="src" onclick={download} title={isLink ? (room ? t("Bu linki herkes indirsin") : t("Bu linki indir")) : t("Önce kutuya bir link yapıştır")}>
           <span class="ico orange"><Icon name="down" size={20} /></span>
-          <h3>{t("Herkes indirsin")}</h3><p>{isLink ? t("Kutudaki linki herkes kendine indirir") : t("Herkes kendine indirir, hazır olunca birlikte başlar")}</p>
+          {#if room}
+            <h3>{t("Herkes indirsin")}</h3><p>{isLink ? t("Kutudaki linki herkes kendine indirir") : t("Herkes kendine indirir, hazır olunca birlikte başlar")}</p>
+          {:else}
+            <h3>{t("İndir")}</h3><p>{isLink ? t("Kutudaki linki bu bilgisayara indir") : t("Sonra internetsiz izlemek için bu bilgisayara indir")}</p>
+          {/if}
         </button>
       {/if}
     </div>
@@ -130,6 +147,25 @@
       {:else}
         <div class="none">{t("Yarım kalan film yok. İzlediğin her şeyin yeri burada tutulur.")}</div>
       {/each}
+      {#if !room && (offline.saved.length || offline.active.length)}
+        <h4 class="off-h">{t("Çevrimdışı")} <span>{t("bu bilgisayarda")}</span></h4>
+        {#each offline.active as a (a.url)}
+          <div class="ci">
+            <div class="th dl" style="--p:{a.pct}%;--h:{hue(a.url)}"><Icon name="down" size={18} /></div>
+            <span class="ct"><b title={a.url}>{host(a.url)}</b><small class:bad={a.state === "failed"}>{a.state === "failed" ? t("İndirilemedi: {err}", { err: tx(a.error) }) : a.state === "queued" ? t("Hazırlanıyor…") : t("İndiriliyor · %{n}", { n: Math.floor(a.pct) })}</small></span>
+            <button class="x on" title={a.state === "failed" ? t("Listeden çıkar") : t("İndirmeyi durdur")} onclick={() => cancelOffline(a.url)}><Icon name="x" size={12} /></button>
+          </div>
+        {/each}
+        {#each offline.saved as d (d.key)}
+          <div class="ci">
+            <div class="th" style="--p:0%;--h:{hue(d.title)}"><span>{d.title.slice(0, 1)}</span></div>
+            <span class="ct"><b title={d.title}>{d.title}</b><small>{size(d.size)} · {ago(d.at)}</small></span>
+            <button class="x" title={t("Sil")} onclick={() => remove(d.key)}><Icon name="trash" size={12} /></button>
+            <button class="resume" disabled={busy} onclick={() => onOpen(d.video)}><Icon name="play" size={12} /> {t("Aç")}</button>
+          </div>
+        {/each}
+        {#if offErr}<div class="none bad">{offErr}</div>{/if}
+      {/if}
       <div class="drop">
         <Icon name="file" size={20} />
         <span><b>{t("Dosyayı pencereye bırak")}</b><br />{room ? t("Herkes kendi kopyasını açar; altyazıyı da bırakabilirsin") : t("Altyazı dosyasını da bırakabilirsin")}</span>
@@ -209,7 +245,10 @@
   .ct b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ct small { color: var(--text-2); font-size: 11.5px; }
   .x { width: 24px; height: 24px; padding: 0; border-radius: 7px; display: grid; place-items: center; color: var(--text-3); background: transparent; border: 0; opacity: 0; transition: opacity 0.15s; }
-  .ci:hover .x { opacity: 1; }
+  .ci:hover .x, .x.on { opacity: 1; }
+  .off-h { margin-top: 6px; }
+  .th.dl { color: #ff9f0a; }
+  .bad { color: #ff8a80 !important; }
   .resume { height: 32px; padding: 0 12px; border-radius: 10px; font-weight: 650; font-size: 12px; white-space: nowrap; display: inline-flex; gap: 5px; align-items: center; }
   .none { padding: 16px; border-radius: 14px; border: 1px solid var(--line); color: var(--text-3); font-size: 12.5px; }
   .drop { border: 1.5px dashed rgba(255, 255, 255, 0.16); border-radius: 14px; padding: 14px; display: flex; align-items: center; gap: 12px; color: var(--text-2); font-size: 12.5px; margin-top: auto; }
