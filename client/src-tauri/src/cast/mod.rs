@@ -4,6 +4,7 @@
 //! TV'ye olduğu gibi verilir. Cihaz türleri (Chromecast, DLNA) kendi dosyalarında
 //! `devices` ve `play` içine eklenir.
 
+pub mod dlna;
 pub mod serve;
 
 use crate::i18n::trs;
@@ -28,18 +29,61 @@ pub struct Media {
     pub title: String,
 }
 
-/// Aynı ağdaki TV'ler. Şimdilik bulucu yok: liste boş.
-pub fn devices() -> Vec<Device> {
-    Vec::new()
+/// TV'ye giden kontrol komutu. JS'den `{ action: "seek", seconds: 30 }` biçiminde gelir.
+#[derive(Clone, Copy, Deserialize)]
+#[serde(tag = "action", content = "seconds", rename_all = "lowercase")]
+pub enum Control {
+    Play,
+    Pause,
+    Stop,
+    Seek(f64),
 }
 
-/// `media`yı cihazda oynatır.
-pub fn play(device: &Device, _media: &Media) -> Result<(), String> {
-    Err(format!(
+/// TV'deki oynatma konumu (saniye); TV bilmiyorsa süre 0.
+#[derive(Clone, Copy, Serialize)]
+pub struct Position {
+    pub position: f64,
+    pub duration: f64,
+    pub playing: bool,
+}
+
+/// Aynı ağdaki TV'ler. Her tür kendi bulucusunu buraya ekler.
+pub fn devices() -> Vec<Device> {
+    let mut out = Vec::new();
+    out.extend(dlna::devices());
+    out
+}
+
+fn unsupported(device: &Device) -> String {
+    format!(
         "{}: {}",
         trs("bu cihaza gönderilemiyor", "can't send to this device"),
         device.name
-    ))
+    )
+}
+
+/// `media`yı cihazda oynatır.
+pub fn play(device: &Device, media: &Media) -> Result<(), String> {
+    match device.kind.as_str() {
+        "dlna" => dlna::play(device, media),
+        _ => Err(unsupported(device)),
+    }
+}
+
+/// Oynat / duraklat / dur / sar.
+pub fn control(device: &Device, c: Control) -> Result<(), String> {
+    match device.kind.as_str() {
+        "dlna" => dlna::control(device, c),
+        _ => Err(unsupported(device)),
+    }
+}
+
+/// TV'deki konum.
+pub fn position(device: &Device) -> Result<Position, String> {
+    match device.kind.as_str() {
+        "dlna" => dlna::position(device),
+        _ => Err(unsupported(device)),
+    }
 }
 
 /// mpv'de açık olanı TV'ye hazırlar: yerel dosyayı ağa açar, altyazıyı VTT'ye çevirir.

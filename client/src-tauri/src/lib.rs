@@ -141,6 +141,8 @@ pub fn run() {
             commands::cast_devices,
             commands::cast_prepare,
             commands::cast_play,
+            commands::cast_control,
+            commands::cast_position,
             commands::sync_connect,
             commands::sync_play,
             commands::sync_pause,

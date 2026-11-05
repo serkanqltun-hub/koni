@@ -218,6 +218,9 @@ fn handle(mut conn: TcpStream) {
 
 const CORS: &str = "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: *\r\nAccess-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n";
 
+/// DLNA TV'lerin (özellikle Samsung) beklediği akış başlıkları; tarayıcılar yok sayar.
+const DLNA: &str = "transferMode.dlna.org: Streaming\r\ncontentFeatures.dlna.org: DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000\r\n";
+
 fn status(conn: &mut TcpStream, code: &str) -> std::io::Result<()> {
     write!(
         conn,
@@ -289,7 +292,7 @@ fn respond(
             };
             write!(
                 conn,
-                "HTTP/1.1 {first}\r\n{CORS}Content-Type: {mime}\r\nContent-Length: {len}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n"
+                "HTTP/1.1 {first}\r\n{CORS}Content-Type: {mime}\r\nContent-Length: {len}\r\nAccept-Ranges: bytes\r\n{DLNA}Connection: close\r\n\r\n"
             )?;
             if head || len == 0 {
                 return Ok(());

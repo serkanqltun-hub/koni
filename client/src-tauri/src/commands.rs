@@ -491,6 +491,18 @@ pub fn cast_play(state: State<'_, AppState>, device: crate::cast::Device) -> Cmd
     crate::cast::play(&device, &media)
 }
 
+/// TV'deki oynatmayı yönetir: oynat / duraklat / dur / sar.
+#[tauri::command(async)]
+pub fn cast_control(device: crate::cast::Device, control: crate::cast::Control) -> CmdResult {
+    crate::cast::control(&device, control)
+}
+
+/// TV'deki oynatma konumu.
+#[tauri::command(async)]
+pub fn cast_position(device: crate::cast::Device) -> CmdResult<crate::cast::Position> {
+    crate::cast::position(&device)
+}
+
 /// Win32 çağrıları pencerenin sahibi olan ana thread'de yapılmalı.
 fn on_main<F>(app: &AppHandle, f: F) -> CmdResult
 where
