@@ -797,7 +797,10 @@ pub async fn recap_get(url: String, month: Option<String>) -> CmdResult<Option<s
     let Some(acc) = account::get(&url) else {
         return Ok(None);
     };
-    let msg = koni_sync::protocol::ClientMsg::Recap { auth: acc.token, month };
+    let msg = koni_sync::protocol::ClientMsg::Recap {
+        auth: acc.token,
+        month,
+    };
     Ok(Some(account::recap(&url, msg).await?))
 }
 
