@@ -3,7 +3,7 @@
   // Ne izlesek? / Film & Dizi / Herkes indirsin (tek başınaysa İndir) kartları,
   // "Kaldığınız yerden" ve tek başınayken "Çevrimdışı" rafı (indirilenler).
   // mpv bu sırada gizli; sahneyi arayüz çizer (kokpit modeli bozulmaz).
-  import { loadResume, removeResume, type ResumeEntry } from "./resume";
+  import { loadResume, pullResume, removeResume, type ResumeEntry } from "./resume";
   import Icon from "./Icon.svelte";
   import { t, tx, locale } from "./i18n.svelte";
   import { offline, initOffline, cancelOffline, deleteOffline } from "./offline.svelte";
@@ -27,6 +27,7 @@
 
   let input = $state<HTMLInputElement>();
   let entries = $state(loadResume());
+  pullResume().then((l) => (entries = l));
   /** Odadayken önce bu odanın kayıtları; yoksa tümü. */
   const list = $derived.by(() => {
     const here = room ? entries.filter((r) => r.room === room) : [];
@@ -136,7 +137,7 @@
       {/if}
     </div>
     <div class="cont">
-      <h4>{t("Kaldığınız yerden")} {#if list.length}<span>{onlyHere ? t("bu oda") : t("bu bilgisayar")}</span>{/if}</h4>
+      <h4>{t("Kaldığınız yerden")} {#if list.length}<span>{onlyHere ? t("bu oda") : list.some((r) => r.kind === "ref") ? t("tüm cihazların") : t("bu bilgisayar")}</span>{/if}</h4>
       {#each list as r (r.src)}
         <div class="ci">
           <div class="th" style="--p:{(r.pos / r.duration) * 100}%;--h:{hue(r.title)}"><span>{r.title.slice(0, 1)}</span></div>

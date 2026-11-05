@@ -567,6 +567,7 @@ pub async fn lists_call(
     stars: Option<i32>,
     word: Option<String>,
     entry: Option<serde_json::Value>,
+    extra: Option<serde_json::Map<String, serde_json::Value>>,
 ) -> CmdResult<Option<serde_json::Value>> {
     let url = ws_url(&url)?;
     let Some(acc) = account::get(&url) else {
@@ -582,6 +583,7 @@ pub async fn lists_call(
         stars,
         word: word.unwrap_or_default(),
         entry,
+        extra,
     };
     Ok(Some(account::lists(&url, msg).await?))
 }

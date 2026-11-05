@@ -1,6 +1,6 @@
 <script lang="ts">
   // "Kaldığın yerden devam": oynarken konumu ~5 sn'de bir kaydeder; kayıt ilerideyse tek tıkla atlatır.
-  import { saveResume, loadResume, type ResumeMedia } from "./resume";
+  import { saveResume, findResume, flushResume, type ResumeMedia } from "./resume";
   import { t } from "./i18n.svelte";
 
   let {
@@ -35,9 +35,11 @@
   }
 
   // Medya açıldığında kayıtlı konumu bir kez oku.
+  // Aynı film başka bilgisayarda/kaynakta kaldıysa da bulunur. Medya değişince/kapanınca son konum sunucuya gider.
   $effect(() => {
-    const src = media?.src;
-    saved = src ? (loadResume().find((r) => r.src === src)?.pos ?? null) : null;
+    const src = media?.src, file = media?.file;
+    saved = src ? (findResume({ src, file })?.pos ?? null) : null;
+    return () => flushResume();
   });
 
   const show = $derived(
