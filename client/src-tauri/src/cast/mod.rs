@@ -11,6 +11,9 @@ pub mod serve;
 use crate::i18n::trs;
 use koni_player::Player;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 /// Ağda bulunan bir TV. `kind` hangi gönderim yolunun kullanılacağını söyler.
 #[derive(Clone, Serialize, Deserialize)]
@@ -89,6 +92,105 @@ pub fn position(device: &Device) -> Result<Position, String> {
         "dlna" => dlna::position(device),
         _ => Err(unsupported(device)),
     }
+}
+
+/// TV modundaki cihaz. Odadayken senkron motoru TV'yi bunun üzerinden yönetir
+/// (`sync.rs`): konum saniyede bir arka planda okunur, komutlar ayrı iş parçacığında
+/// gider; motorun döngüsü ağ beklemez.
+struct Link {
+    id: u64,
+    device: Device,
+    /// Son bilinen durum ve okunduğu an.
+    pos: Position,
+    at: Instant,
+    /// Komuttan hemen sonra TV eski durumu bildirebilir: bu ana kadar okumalar yok sayılır.
+    quiet_until: Instant,
+}
+
+static LINK: Mutex<Option<Link>> = Mutex::new(None);
+static LINK_ID: AtomicU64 = AtomicU64::new(0);
+
+/// Odadaki rapor bu tampon değeriyle gider: diğer üyeler "📺 TV'de" rozetini
+/// bundan anlar (protokole yeni alan eklemeden). mpv bu kadar tampon tutmaz.
+pub const TV_BUFFER_SEC: f64 = 9999.0;
+
+fn link_lock() -> std::sync::MutexGuard<'static, Option<Link>> {
+    LINK.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// TV modunu başlatır (`start` TV'nin başladığı konum) ya da bitirir (`None`).
+pub fn link(device: Option<(Device, Position)>) {
+    let id = LINK_ID.fetch_add(1, Ordering::Relaxed) + 1;
+    let now = Instant::now();
+    *link_lock() = device.clone().map(|(device, pos)| Link {
+        id,
+        device,
+        pos,
+        at: now,
+        quiet_until: now + Duration::from_secs(5),
+    });
+    let Some((device, _)) = device else { return };
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_secs(1));
+        let p = position(&device);
+        let mut g = link_lock();
+        let Some(l) = g.as_mut().filter(|l| l.id == id) else {
+            return;
+        };
+        if let Ok(p) = p {
+            if Instant::now() >= l.quiet_until {
+                l.pos = p;
+                l.at = Instant::now();
+            }
+        }
+    });
+}
+
+/// TV modundaki cihaz.
+pub fn linked() -> Option<Device> {
+    link_lock().as_ref().map(|l| l.device.clone())
+}
+
+/// TV modundaki cihazın tahmini durumu: son okunan konum + oynuyorsa geçen süre.
+/// `device` verilirse yalnızca o cihaz TV modundaysa döner.
+pub fn linked_position(device: Option<&Device>) -> Option<Position> {
+    let g = link_lock();
+    let l = g
+        .as_ref()
+        .filter(|l| device.is_none_or(|d| d.id == l.device.id))?;
+    let mut p = l.pos;
+    if p.playing {
+        p.position += l.at.elapsed().as_secs_f64();
+        if p.duration > 0.0 {
+            p.position = p.position.min(p.duration);
+        }
+    }
+    Some(p)
+}
+
+/// TV modundaki cihaza komutu arka planda gönderir; beklenen durum hemen yazılır.
+pub fn send(c: Control) {
+    let device = {
+        let mut g = link_lock();
+        let Some(l) = g.as_mut() else { return };
+        let now = Instant::now();
+        if l.pos.playing {
+            l.pos.position += now.duration_since(l.at).as_secs_f64();
+        }
+        l.at = now;
+        l.quiet_until = now + Duration::from_secs(2);
+        match c {
+            Control::Play => l.pos.playing = true,
+            Control::Pause | Control::Stop => l.pos.playing = false,
+            Control::Seek(s) => l.pos.position = s,
+        }
+        l.device.clone()
+    };
+    std::thread::spawn(move || {
+        if let Err(e) = control(&device, c) {
+            eprintln!("[koni] TV komutu gitmedi: {e}");
+        }
+    });
 }
 
 /// mpv'de açık olanı TV'ye hazırlar: yerel dosyayı ağa açar, altyazıyı VTT'ye çevirir.

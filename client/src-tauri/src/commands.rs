@@ -481,10 +481,12 @@ pub fn cast_devices() -> Vec<crate::cast::Device> {
 /// Açık videoyu TV'ye hazırlar: yerel dosya ev ağına açılır, adresler döner.
 #[tauri::command(async)]
 pub fn cast_prepare(state: State<'_, AppState>) -> CmdResult<crate::cast::Media> {
-    crate::cast::prepare(&player(&state)?)
+    let mpv = player(&state)?;
+    crate::cast::prepare(&mpv)
 }
 
 /// Açık videoyu `device` TV'sinde kaldığı yerden oynatır; bilgisayardaki oynatıcı durur.
+/// Odadaysa senkron bundan sonra TV'yi yönetir (`cast::link`).
 #[tauri::command(async)]
 pub fn cast_play(state: State<'_, AppState>, device: crate::cast::Device) -> CmdResult {
     let mpv = player(&state)?;
@@ -496,33 +498,60 @@ pub fn cast_play(state: State<'_, AppState>, device: crate::cast::Device) -> Cmd
             eprintln!("[koni] TV kaldığı yere sarılamadı: {e}");
         }
     }
-    mpv.pause().map_err(|e| e.to_string())
+    let start = crate::cast::Position {
+        position: at,
+        duration: mpv.duration().unwrap_or(0.0),
+        playing: true,
+    };
+    crate::cast::link(Some((device, start)));
+    mpv.pause().map_err(|e| e.to_string())?;
+    // Odadaysa TV oda konumuna ve oynat/duraklat durumuna hizalanır.
+    let _ = sync_send(&state, UiCmd::Realign);
+    Ok(())
 }
 
-/// "Bilgisayara geri al": TV'yi kapatır, videoyu bilgisayarda TV'nin kaldığı yerden sürdürür.
+/// "Bilgisayara geri al": TV'yi kapatır, videoyu bilgisayarda TV'nin kaldığı yerden sürdürür
+/// (TV duraklatılmışsa bilgisayarda da duraklatılmış kalır).
 #[tauri::command(async)]
 pub fn cast_back(state: State<'_, AppState>, device: crate::cast::Device) -> CmdResult {
     let mpv = player(&state)?;
-    let at = crate::cast::position(&device).map_or(0.0, |p| p.position);
+    crate::cast::link(None);
+    let (at, playing) = crate::cast::position(&device).map_or((0.0, true), |p| {
+        (p.position, p.playing || p.duration == 0.0)
+    });
     if let Err(e) = crate::cast::control(&device, crate::cast::Control::Stop) {
         eprintln!("[koni] TV durdurulamadı: {e}");
     }
     if at > 1.0 {
         mpv.seek_absolute(at).map_err(|e| e.to_string())?;
     }
-    mpv.play().map_err(|e| e.to_string())
+    // Odadaysa oynat/duraklat kararını oda verir.
+    if sync_send(&state, UiCmd::Realign).is_ok() {
+        return Ok(());
+    }
+    if playing {
+        mpv.play().map_err(|e| e.to_string())
+    } else {
+        mpv.pause().map_err(|e| e.to_string())
+    }
 }
 
-/// TV'deki oynatmayı yönetir: oynat / duraklat / dur / sar.
+/// TV'deki oynatmayı yönetir: oynat / duraklat / dur / sar. Durdurmak TV modunu bitirir.
 #[tauri::command(async)]
 pub fn cast_control(device: crate::cast::Device, control: crate::cast::Control) -> CmdResult {
+    if matches!(control, crate::cast::Control::Stop) {
+        crate::cast::link(None);
+    }
     crate::cast::control(&device, control)
 }
 
-/// TV'deki oynatma konumu.
+/// TV'deki oynatma konumu (TV modundaysa arka planda okunan son durumdan).
 #[tauri::command(async)]
 pub fn cast_position(device: crate::cast::Device) -> CmdResult<crate::cast::Position> {
-    crate::cast::position(&device)
+    match crate::cast::linked_position(Some(&device)) {
+        Some(p) => Ok(p),
+        None => crate::cast::position(&device),
+    }
 }
 
 /// Win32 çağrıları pencerenin sahibi olan ana thread'de yapılmalı.

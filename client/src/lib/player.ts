@@ -262,7 +262,9 @@ export const castControl = (device: CastDevice, control: CastControl) => invoke<
 /** TV'deki konum (saniye); TV bilmiyorsa `duration` 0. */
 export interface CastPosition { position: number; duration: number; playing: boolean }
 export const castPosition = (device: CastDevice) => invoke<CastPosition>("cast_position", { device });
-/** "Bilgisayara geri al": TV kapanır, video bilgisayarda TV'nin kaldığı yerden sürer. */
+/** Odada TV'den izleyenin raporundaki tampon değeri (Rust `cast::TV_BUFFER_SEC`): "📺 TV'de" rozeti. */
+export const TV_BUFFER_SEC = 9999;
+/** "Bilgisayara geri al": TV kapanır, video bilgisayarda TV'nin kaldığı yerden sürer (odadaysa odaya hizalanır). */
 export const castBack = (device: CastDevice) => invoke<void>("cast_back", { device });
 /** macOS: "Ekranı yansıt" (Windows Yayınla paneli) yok; AirPlay Denetim Merkezi'nden açılır. */
 export const isMac = /Macintosh|Mac OS X/.test(navigator.userAgent);
@@ -347,7 +349,7 @@ export type ServerMsg =
   | { t: "policy"; policy: Policy }
   | { t: "detach_offer"; user: string; name: string; stalls: number }
   | { t: "detached"; by?: string }
-  | { t: "member_status"; id: string; driftMs: number; state: string; bufferPct: number; rttMs?: number }
+  | { t: "member_status"; id: string; driftMs: number; state: string; bufferPct: number; bufferSec?: number; rttMs?: number }
   | { t: "buffer_status"; user: string; name?: string; bufferPct: number }
   | { t: "denied"; ack: string; reason: string }
   | { t: "error"; code: string; message: string }
