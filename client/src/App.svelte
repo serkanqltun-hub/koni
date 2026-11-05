@@ -9,7 +9,7 @@
     COCKPIT_LAYOUT, playerLoad, playerPause, playerTogglePause, playerSeek, playerSetSpeed, playerScreenshot,
     playerSetVolume, playerAddSubtitle, playerSubDelay, playerTracks, playerSetTrack,
     type Tracks, type TrackKind,
-    playerState, setLayout, setFullscreen, openCastPanel, isMac, type PlayerState,
+    playerState, setLayout, setFullscreen, openCastPanel, isMac, castDevices, castPrepare, castPlay, type CastDevice, type PlayerState,
     syncConnect, syncSeek, syncToggle, syncPause, syncSeekBy, syncLeave, syncContinueWithout, syncResync, syncDownload,
     syncSetCohost, syncSetPolicy, accountGet, accountLogin, accountRegister, accountLogout, snifferClose,
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, mediaList, bugReport,
@@ -151,9 +151,9 @@
   ];
   /** Her sahne yalnızca kendi araçlarını gösterir (sağ ray, çekmece, kontrol şeridi). */
   const SCENE_TOOLS: Record<RoomView, Drawer[]> = {
-    browse: ["queue", "people", "feed", "settings"],
-    watch: ["add", "tracks", "discover", "queue", "people", "feed", "settings"],
-    listen: ["queue", "people", "feed", "settings"],
+    browse: ["queue", "people", "feed", "settings", "cast"],
+    watch: ["add", "tracks", "discover", "queue", "people", "feed", "settings", "cast"],
+    listen: ["queue", "people", "feed", "settings", "cast"],
   };
   const allowed = (d: Drawer, v: RoomView = roomView) => SCENE_TOOLS[v].includes(d);
   /** Çekmeceyi yalnızca o sahnede yeri varsa açar. */
@@ -208,7 +208,7 @@
   }
 
   // Sağ ray + çekmece (UI-PLAN §5.3, Yön C). Çekmece açıkken video DRAWER_DIP kadar daralır.
-  type Drawer = "add" | "discover" | "queue" | "people" | "feed" | "settings" | "tracks";
+  type Drawer = "add" | "discover" | "queue" | "people" | "feed" | "settings" | "tracks" | "cast";
   const DRAWER_DIP = 320;
   const DRAWERS: Record<Drawer, { eyebrow: string; title: string }> = {
     add: { eyebrow: "Oda", title: "Video ekle" },
@@ -218,7 +218,26 @@
     feed: { eyebrow: "Oda", title: "Etkinlik" },
     settings: { eyebrow: "Oda", title: "Oda ayarları" },
     tracks: { eyebrow: "Oynatıcı", title: "Altyazı · ses · kalite" },
+    cast: { eyebrow: "Oynatıcı", title: "TV'de oynat" },
   };
+  /** "TV'de oynat": aynı ağdaki TV'ler (çekmece açıkken tazelenir) ve açık videonun ev ağı adresi. */
+  let castList = $state<CastDevice[]>([]);
+  let castAddr = $state<string | null>(null);
+  $effect(() => {
+    if (drawer !== "cast") return;
+    const load = () => castDevices().then((d) => (castList = d), () => {});
+    load();
+    const id = setInterval(load, 3000);
+    return () => clearInterval(id);
+  });
+  async function copyCastAddr() {
+    try {
+      const m = await castPrepare();
+      castAddr = m.url;
+      await navigator.clipboard.writeText(m.url);
+      note("Ağ adresi kopyalandı");
+    } catch (e) { add(String(e), true); }
+  }
   /** Odada Müzik çekmecesi: ortak Lounge kuyruğu ya da kendi çalma listelerin. */
   let musicTab = $state<"lounge" | "lists">("lounge");
   /** Çekmece açıkken iz listesi tazelenir (dosya açılınca izler sonradan gelir). */
@@ -1793,6 +1812,25 @@
               <span><button class="chip" onclick={() => (drawer = "people")}><Icon name="users" size={13} />{t("Kişiler'den çağır")}</button></span>
             </div>
           {/if}
+        {:else if shown === "cast"}
+          <div class="eyebrow">{t("Aynı ağdaki TV'ler")}</div>
+          {#each castList as d (d.id)}
+            <button class="opt" onclick={() => run(`TV: ${d.name}`, castPlay(d), false, () => t("TV: {name}", { name: d.name }))}>
+              <span class="opt-ic"><Icon name="cast" /></span><span class="opt-txt"><b>{d.name}</b><small>{d.kind}</small></span>
+            </button>
+          {:else}
+            <div class="hint">{t("Aynı ağda TV bulunamadı. TV ile bu bilgisayar aynı ağda olmalı.")}</div>
+          {/each}
+          <button class="opt" disabled={!st?.duration} onclick={copyCastAddr}>
+            <span class="opt-ic"><Icon name="copy" /></span>
+            <span class="opt-txt"><b>{t("Ağ adresini kopyala")}</b><small>{castAddr ?? t("Açık video evdeki başka bir cihazın tarayıcısında açılır")}</small></span>
+          </button>
+          {#if !isMac}
+            <button class="opt" onclick={() => run("Ekranı yansıt", openCastPanel())}>
+              <span class="opt-ic"><Icon name="cast" /></span>
+              <span class="opt-txt"><b>{t("Ekranı yansıt (Miracast)")}</b><small>{t("Windows'un Yayınla paneli açılır; oynatma bu bilgisayarda kalır.")}</small></span>
+            </button>
+          {/if}
         {:else if shown === "tracks"}
           <div class="seg tabs" role="tablist">
             {#each [["sub", "Altyazı"], ["audio", "Ses"], ["video", "Kalite"]] as [k, l] (k)}
@@ -2149,7 +2187,7 @@
         <input class="vol" type="range" min="0" max="130" step="1" value={volume} style="--p:{(volume / 130) * 100}%"
           oninput={(e) => setVolume(+e.currentTarget.value)} />
       </div>
-      {#if !isMac}<button class="icon" title={t("TV'ye yansıt")} onclick={() => run("TV'ye yansıt", openCastPanel())}><Icon name="cast" size={15} /></button>{/if}
+      <button class="icon" class:on={drawer === "cast"} title={t("TV'de oynat")} onclick={() => toggle("cast")}><Icon name="cast" size={15} /></button>
       {#if roomView === "watch"}
         <button class="icon" title={t("Tam ekran (F)")} onclick={() => setFs(true)}><Icon name="max" size={15} /></button>
       {/if}

@@ -472,6 +472,25 @@ pub fn open_cast_panel() -> CmdResult {
     Ok(())
 }
 
+/// "TV'de oynat": aynı ağdaki TV'ler.
+#[tauri::command(async)]
+pub fn cast_devices() -> Vec<crate::cast::Device> {
+    crate::cast::devices()
+}
+
+/// Açık videoyu TV'ye hazırlar: yerel dosya ev ağına açılır, adresler döner.
+#[tauri::command(async)]
+pub fn cast_prepare(state: State<'_, AppState>) -> CmdResult<crate::cast::Media> {
+    crate::cast::prepare(&player(&state)?)
+}
+
+/// Açık videoyu `device` TV'sinde oynatır.
+#[tauri::command(async)]
+pub fn cast_play(state: State<'_, AppState>, device: crate::cast::Device) -> CmdResult {
+    let media = crate::cast::prepare(&player(&state)?)?;
+    crate::cast::play(&device, &media)
+}
+
 /// Win32 çağrıları pencerenin sahibi olan ana thread'de yapılmalı.
 fn on_main<F>(app: &AppHandle, f: F) -> CmdResult
 where

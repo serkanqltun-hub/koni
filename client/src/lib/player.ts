@@ -249,7 +249,14 @@ export const playerState = () => invoke<PlayerState>("player_state");
 export const setLayout = (layout: LayoutConfig) => invoke<void>("set_layout", { layout });
 export const setFullscreen = (on: boolean) => invoke<void>("set_fullscreen", { on });
 export const openCastPanel = () => invoke<void>("open_cast_panel");
-/** macOS: "TV'ye yansıt" (Windows Yayınla paneli) yok; AirPlay Denetim Merkezi'nden açılır. */
+/** "TV'de oynat": aynı ağdaki TV (Chromecast, DLNA). */
+export interface CastDevice { id: string; name: string; kind: string }
+/** TV'nin açacağı adresler; yerel dosya bu bilgisayardan ev ağına sunulur. */
+export interface CastMedia { url: string; sub_url: string | null; mime: string; title: string }
+export const castDevices = () => invoke<CastDevice[]>("cast_devices");
+export const castPrepare = () => invoke<CastMedia>("cast_prepare");
+export const castPlay = (device: CastDevice) => invoke<void>("cast_play", { device });
+/** macOS: "Ekranı yansıt" (Windows Yayınla paneli) yok; AirPlay Denetim Merkezi'nden açılır. */
 export const isMac = /Macintosh|Mac OS X/.test(navigator.userAgent);
 
 // ---------------------------------------------------------------- Oda senkronu

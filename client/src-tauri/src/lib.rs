@@ -8,6 +8,7 @@ mod i18n;
 mod account;
 mod adblock;
 mod addons;
+mod cast;
 mod commands;
 mod debrid;
 mod download;
@@ -137,6 +138,9 @@ pub fn run() {
             commands::set_layout,
             commands::set_fullscreen,
             commands::open_cast_panel,
+            commands::cast_devices,
+            commands::cast_prepare,
+            commands::cast_play,
             commands::sync_connect,
             commands::sync_play,
             commands::sync_pause,
