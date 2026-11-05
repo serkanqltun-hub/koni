@@ -55,6 +55,8 @@ pub enum LocalState {
 }
 
 /// Motorun dışarıya söylediği şeyler.
+// Olaylar kısa ömürlü; Send(ClientMsg) büyük olsa da kutulamaya değmez.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)] // olaylar kısa ömürlü; ClientMsg büyüdükçe kutulamaya değmez
 pub enum EngineEvent {
