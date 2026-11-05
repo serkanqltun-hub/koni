@@ -145,3 +145,23 @@ func TestDebridFailedDetachesOnly(t *testing.T) {
 		return m.s("t") == "pong"
 	})
 }
+
+// In Keşfet/Sinema the queue is a video queue: a paused video keeps the room, the added
+// one waits for its end. In Müzik the paused leftover is replaced at once.
+func TestQueueWaitsForPausedVideo(t *testing.T) {
+	a, b := loungePair(t)
+	const film, v1 = "https://youtu.be/film", "https://youtu.be/v1"
+	a.send(msg{"t": "cmd", "cid": "w", "op": "set_view", "view": "watch"})
+	a.waitType("view")
+	a.send(msg{"t": "cmd", "cid": "m", "op": "media", "media": msg{"kind": "url", "src": film, "title": "Film"}})
+	waitMedia(b, film)
+	a.send(queueAddMsg(v1))
+	b.wait("v1 queued", func(m msg) bool {
+		if m.s("t") == "state" && m.s("cause") == "media" {
+			t.Fatalf("paused video replaced by %s", mediaSrc(m))
+		}
+		return m.s("t") == "queue" && len(items(t, m)) == 1
+	})
+	b.send(msg{"t": "track_end", "src": film})
+	waitMedia(a, v1)
+}

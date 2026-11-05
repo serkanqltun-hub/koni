@@ -82,5 +82,15 @@ const en: Record<string, string> = {
   "Gönder": "Send",
   "Sorun bildir": "Report a problem",
   "Bir şey ters gittiyse loglarla birlikte geliştiriciye gönder.": "If something went wrong, send it to the developer along with the logs.",
+  // Video sırası
+  "Bu linkte video bulunamadı": "No videos found at this link",
+  "Sıraya eklendi: ": "Added to the queue: ",
+  "{n} video sıraya eklendi": "{n} {video|videos} added to the queue",
+  "Video ya da YouTube listesi linki": "Video or YouTube playlist link",
+  'Keşfet\'te videoyu bulup "Sıraya ekle"ye de basabilirsin.': 'You can also find a video in Discover and press "Add to queue".',
+  "Şimdi oynuyor": "Now playing",
+  "Bir şey oynamıyor.": "Nothing is playing.",
+  "Sıra boş. Video ekle; oynayan bitince 10 sn sonra sıradaki başlar.": "The queue is empty. Add a video; when the current one ends, the next starts after 10 seconds.",
+  "Sıra boş. Video ekle; oynayan bitince 10 sn sonra sıradaki herkeste başlar, en çok oy alan öne geçer.": "The queue is empty. Add a video; when the current one ends, the next starts for everyone after 10 seconds, and the most-voted goes first.",
 };
 export default en;
