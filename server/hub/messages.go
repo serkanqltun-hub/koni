@@ -8,7 +8,7 @@ import (
 )
 
 // Protocol version, see docs/PROTOCOL.md.
-const ProtocolVersion = "p0.26"
+const ProtocolVersion = "p0.27"
 
 // Inbound is the union of all client→server messages; fields are used per type "t".
 type Inbound struct {
@@ -119,6 +119,12 @@ type Inbound struct {
 	MaxMin    int     `json:"maxMin,omitempty"`
 	Sort      string  `json:"sort,omitempty"`
 	Page      int     `json:"page,omitempty"`
+
+	// skip (p0.27): Op "set" | "get" | "clear", Ref, Season (0 = every season),
+	// IntroStart/IntroEnd/RecapEnd seconds.
+	IntroStart float64 `json:"introStart,omitempty"`
+	IntroEnd   float64 `json:"introEnd,omitempty"`
+	RecapEnd   float64 `json:"recapEnd,omitempty"`
 
 	// watch (p0.25): solo watching seconds since the last report (Title optional)
 	Sec int `json:"sec,omitempty"`

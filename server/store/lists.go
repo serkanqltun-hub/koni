@@ -56,6 +56,37 @@ CREATE TABLE IF NOT EXISTS seen_eps (
 	at      INTEGER NOT NULL,
 	PRIMARY KEY (user_id, ref, ep)
 );
+CREATE TABLE IF NOT EXISTS episodes (
+	ref     TEXT PRIMARY KEY,
+	title   TEXT NOT NULL DEFAULT '',
+	poster  TEXT NOT NULL DEFAULT '',
+	season  INTEGER NOT NULL DEFAULT 0,
+	episode INTEGER NOT NULL DEFAULT 0,
+	name    TEXT NOT NULL DEFAULT '',
+	airs    TEXT NOT NULL DEFAULT '',
+	aired   INTEGER NOT NULL DEFAULT 0,
+	checked INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS team_progress (
+	team    TEXT NOT NULL,
+	ref     TEXT NOT NULL,
+	title   TEXT NOT NULL DEFAULT '',
+	room    TEXT NOT NULL DEFAULT '',
+	season  INTEGER NOT NULL,
+	episode INTEGER NOT NULL,
+	at      INTEGER NOT NULL,
+	PRIMARY KEY (team, ref)
+);
+CREATE TABLE IF NOT EXISTS skips (
+	ref         TEXT NOT NULL,
+	season      INTEGER NOT NULL DEFAULT 0,
+	intro_start REAL NOT NULL DEFAULT 0,
+	intro_end   REAL NOT NULL DEFAULT 0,
+	recap_end   REAL NOT NULL DEFAULT 0,
+	by_user     INTEGER NOT NULL,
+	at          INTEGER NOT NULL,
+	PRIMARY KEY (ref, season)
+);
 `
 
 // migrateStars adds the p0.25 star rating columns to a pre-p0.25 list_items table.

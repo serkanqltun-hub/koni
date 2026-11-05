@@ -550,3 +550,61 @@ func (c *Client) details(ctx context.Context, it Item) Item {
 	}
 	return it
 }
+
+// Schedule is a series' air calendar (p0.27 `upcoming`).
+type Schedule struct {
+	Title  string
+	Poster string
+	Next   *NextEpisode // nil: nothing announced
+	Aired  int          // episodes aired so far, specials not counted
+}
+
+// NextEpisode is the next announced episode of a series.
+type NextEpisode struct {
+	Season  int
+	Episode int
+	Name    string
+	Airs    string // YYYY-MM-DD
+}
+
+// Schedule reads series id's next episode and how many episodes have aired.
+func (c *Client) Schedule(ctx context.Context, id int) (Schedule, error) {
+	type ep struct {
+		AirDate string `json:"air_date"`
+		Season  int    `json:"season_number"`
+		Episode int    `json:"episode_number"`
+		Name    string `json:"name"`
+	}
+	var r struct {
+		Name    string `json:"name"`
+		Poster  string `json:"poster_path"`
+		Next    *ep    `json:"next_episode_to_air"`
+		Last    *ep    `json:"last_episode_to_air"`
+		Seasons []struct {
+			Season int `json:"season_number"`
+			Count  int `json:"episode_count"`
+		} `json:"seasons"`
+	}
+	if err := c.tmdb(ctx, "/tv/"+strconv.Itoa(id), url.Values{"language": {lang}}, &r); err != nil {
+		return Schedule{}, err
+	}
+	if r.Name == "" {
+		return Schedule{}, ErrNotFound
+	}
+	s := Schedule{Title: r.Name}
+	if r.Poster != "" {
+		s.Poster = imgBase + r.Poster
+	}
+	if r.Last != nil && r.Last.Season > 0 {
+		s.Aired = r.Last.Episode
+		for _, x := range r.Seasons {
+			if x.Season > 0 && x.Season < r.Last.Season {
+				s.Aired += x.Count
+			}
+		}
+	}
+	if n := r.Next; n != nil && n.Episode > 0 && n.AirDate != "" {
+		s.Next = &NextEpisode{Season: n.Season, Episode: n.Episode, Name: n.Name, Airs: n.AirDate}
+	}
+	return s, nil
+}

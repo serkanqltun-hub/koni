@@ -1,6 +1,6 @@
 # KONİ — WebSocket Protokolü (Faz 0)
 
-> Sürüm: **p0.26** (taslak) · Kaynak: [design/sync.md §4](design/sync.md), hesaplar [design/accounts.md §5.1](design/accounts.md), keşif [design/discovery.md §7](design/discovery.md)
+> Sürüm: **p0.27** (taslak) · Kaynak: [design/sync.md §4](design/sync.md), hesaplar [design/accounts.md §5.1](design/accounts.md), keşif [design/discovery.md §7](design/discovery.md)
 > Kapsam: hesap (davet kodu + kullanıcı adı + argon2id şifre, oturum belirteci), oda oluştur/katıl, play/pause/seek, oda medyası (`media`), HOLD/countdown, Host Only + yardımcı host, ping/saat senkronu, yeniden bağlanma (`resume`), kronik stall → "olmadan devam et" / DETACHED, "Herkes İndirsin" bariyeri.
 > Henüz yok: admin araçları.
 >
@@ -26,6 +26,7 @@
 > p0.24: telefon kumandası (§3.0h): `remote` bağlantısı ve `remote` / `remote_state` mesajları; `/ws` adresine tarayıcıyla düz `GET` kumanda sayfasını döner. Yalnızca ekleme; p0.23 sunucusu `remote`'a `error` (`not_joined`) döner.
 > p0.25: solo desteği. `lists` (§3.0g) `op: "progress"` (kaldığın yer, kendi cevabında `progress`), `op: "seen_ep"` / `"unseen_ep"` (bölüm izledim; `seen` satırında ve cevapta `episodes`), `rate` için `stars` (1–5) + `word`, `who` cevabında `stars` ortalaması; `remove` `list: "progress"` alır. Tek seferlik `watch` (§3.0i, solo izleme süresi → istatistik, `feed` satırında `solo`) ve `detail` (§3.0j, odasız künye + `similar`). Kartlara `backdrop`. Yalnızca ekleme; p0.24 sunucusu `watch`/`detail`'e `error` (`not_joined`), yeni `lists` op'larına `bad_message` döner.
 > p0.26: "Ne izlesem?" ve "Göz at". Tek seferlik `solo_night` / `solo_night_pick` (§3.0k, odasız deste: görülenler ve süre bütçesini aşanlar gelmez) ve `browse` (§3.0l, filtreli 30'luk sayfa). `night_start` için `pool: "lists"` (§3.9a, havuz odadakilerin İzleyeceklerim listelerinden dolar; `night` mesajında `source`). Yalnızca ekleme; p0.25 sunucusu yeni tiplere `error` (`not_joined`) döner, `pool`'u yok sayar.
+> p0.27: dizi takibi, intro işareti, öneriler. Tek seferlik `upcoming` (§3.0m, izlenen dizilerin sıradaki bölümü + izlenmemiş sayısı + `team`: odada birlikte izlenen dizide ekibin son bölümü), `skip` (§3.0n, sunucudaki herkesin paylaştığı intro/özet işareti, son yazan kazanır) ve `recs` (§3.0o, öneri rafları). Odada `series:tt…:s:e` bölümü %80'i geçince odadaki hesapların ekip kaydı güncellenir. Yalnızca ekleme; p0.26 sunucusu yeni tiplere `error` (`not_joined`) döner.
 >
 > p0.13: oda modu: `cmd` `set_view` (§3.3), `view` mesajı (§4.17), `snapshot.view` (§4.1). Yalnızca ekleme; p0.12 sunucusu `set_view`'a `denied` (`bad_op`) döner, istemci `view` yoksa Sinema varsayar.
 >
@@ -206,6 +207,59 @@ Tek seferlik; filtreli başlık listesi, sayfa başına 30.
 ```
 - Hepsi isteğe bağlı (`kind` hariç). `genre` TMDB film türü (dizide en yakın dizi türü), `minRating` TMDB 0–10, `maxMin` süre (dizide bölüm), `lang` özgün dil (iki harf). `sort`: `popular` (varsayılan), `rating` (en yüksek puan), `new` (en yeni; çıkmamışlar gelmez). `page` 1–16.
 - Cevap `{ "t": "browse", "kind", "page", "items": [<kart>], "total": 4812 }`: kartlar ayrıntısız (başlık, yıl, afiş, özet, TMDB puanı); künye için `detail` (§3.0j, `ref: "tmdb:<kind>:<id>"`). Keşif kapalıysa ya da hata olursa `items` boş + `error`. Hesaplı sunucuda `auth` gerekir.
+
+### 3.0m `upcoming` — dizi takibi (p0.27)
+Tek seferlik. Hesaplı sunucuda `auth` gerekir (açık sunucuda `no_accounts`).
+```json
+{ "t": "upcoming", "auth": "…" }
+```
+Cevap:
+```json
+{ "t": "upcoming",
+  "items": [ { "ref": "tt0903747", "title": "Breaking Bad", "poster": "https://…", "season": 2, "episode": 1, "name": "Dönüş", "airs": "2026-11-10", "unseen": 8 } ],
+  "team":  [ { "ref": "tt0903747", "title": "Breaking Bad · S2E4", "room": "Cuma", "season": 2, "episode": 4,
+               "members": [ { "name": "Savaş#0412", "avatar": "…" } ], "ahead": [ "Savaş#0412" ], "at": 1762370000000 } ] }
+```
+- `items`: hesabın kaldığın yer (`progress`) ve İzleyeceklerim (`want`) listelerindeki diziler (`kind: "series"`, en fazla 40; önce `progress`). Bölüm takvimi TMDB'den başlık başına günde bir kez çekilir ve sunucuda saklanır; `ref` IMDb kimliği ya da `tmdb:tv:<id>` olabilir.
+  - `season`, `episode`, `name`, `airs` (`YYYY-MM-DD`, yayın tarihi): duyurulmuş sıradaki bölüm; yoksa bu alanlar gelmez. Tarih geçmiş de olabilir (takvim günde bir yenilenir); "Bu hafta" süzmesi istemcidedir.
+  - `unseen`: yayınlanmış bölüm sayısı (özel bölümler, sezon 0, hariç) eksi hesabın `seen_ep` ile işaretlediği bölüm sayısı (sezon ≥ 1), en az 0.
+  - Sıradaki bölümü olmayan ve `unseen` 0 olan dizi listede yer almaz. Sıra: `airs` olanlar tarihe göre, sonra diğerleri.
+  - `title`/`poster` listedeki satırdan gelir, boşsa TMDB'den.
+- `team`: hesabın bir odada en az bir hesapla birlikte izlediği diziler, yeniden eskiye (en fazla 20). Ekip = o anda odada bulunan hesapların kümesi; aynı küme aynı dizide tek satırdır. Odadaki medyanın `file`'ı `series:tt…:s:e|…` ise ve bölüm %80'i geçerse kaydedilir; satır yalnızca ileri gider (daha önceki bölümü izlemek geri almaz).
+  - `title` oda medyasının başlığı, `room` oda adı, `season`/`episode` ekibin birlikte bitirdiği son bölüm.
+  - `members`: ekipteki diğer hesaplar (sen hariç) `{name: "Ad#1234", avatar}`. `ahead`: bunlardan, bu bölümden sonraki bir bölümü `seen_ep` ile işaretlemiş olanlar ("⚠ Savaş önde"); kimse yoksa alan gelmez.
+- Keşif kapalıysa (`items` takvimi çekilemez) yalnızca sunucuda daha önce saklanmış takvimler kullanılır.
+
+### 3.0n `skip` — intro / özet işareti (p0.27)
+Tek seferlik. Sunucudaki tüm hesaplar aynı işaretleri görür; son yazan kazanır. Hesaplı sunucuda `auth` gerekir.
+```json
+{ "t": "skip", "auth": "…", "op": "set", "ref": "tt0903747", "season": 2, "introStart": 32.5, "introEnd": 96, "recapEnd": 30 }
+{ "t": "skip", "auth": "…", "op": "get", "ref": "tt0903747" }
+{ "t": "skip", "auth": "…", "op": "clear", "ref": "tt0903747", "season": 2 }
+```
+- `ref`: dizinin liste anahtarı (`tt…` ya da `tmdb:tv:<id>`). `season` isteğe bağlı: yoksa ya da `0` ise işaret tüm sezonlar içindir; varsa yalnızca o sezon. İstemci önce bölümün sezonuna, yoksa `season: 0`'a bakar.
+- Süreler bölüm başından saniye (0–3600). `introStart` < `introEnd` olmalı. `recapEnd` isteğe bağlı: özet bölümün başından `recapEnd`'e kadardır. Yalnızca özet işaretlemek için `introStart`/`introEnd` 0, `recapEnd` > 0. Geçersizse `error` `bad_entry`.
+- `op` `get` (varsayılan) | `set` | `clear` (o sezonun işaretini siler). Başka `op` → `bad_message`.
+- Cevap her op için aynı: `{ "t": "skip", "ref", "marks": [ { "season": 0, "introStart": 32.5, "introEnd": 96, "recapEnd"?: 30, "by": "Ayşe#0412", "at": 1762370000000 } ] }`, `season`'a göre sıralı (0 önce). İşaret yoksa `marks` boş.
+
+### 3.0o `recs` — öneri rafları (p0.27)
+Tek seferlik. Hesaplı sunucuda `auth` gerekir.
+```json
+{ "t": "recs", "auth": "…" }
+```
+Cevap:
+```json
+{ "t": "recs",
+  "because":  [ { "ref": "tt2543164", "title": "Arrival", "items": [<kart>] } ],
+  "friends":  [ { "ref": "tt0816692", "kind": "movie", "title": "Interstellar", "year": 2014, "poster": "https://…", "at": 1762370000000,
+                  "by": [ { "name": "Ayşe#0412", "avatar": "…", "stars": 5, "word": "efsane" } ] } ],
+  "together": [ { "ref": "tt1375666", "kind": "movie", "title": "Inception", "poster": "https://…", "at": 1762370000000,
+                  "mates": [ { "name": "Ayşe#0412", "avatar": "…" } ] } ] }
+```
+- `because` ("Çünkü X'i izledin"): İzlediklerim'de 4–5 yıldız verdiğin en yeni 3 başlık için birer raf; her rafta TMDB benzerlerinden en fazla 8 kart (ayrıntısız: başlık, yıl, afiş, özet, TMDB puanı; dizide `kind: "tv"`). Listelerinde (`want`/`seen`) `tmdb:<kind>:<id>` anahtarıyla bulunanlar elenir; kartın künyesi için `detail` (§3.0j, `ref: "tmdb:<kind>:<id>"`). Kartı kalmayan raf gelmez. Keşif kapalıysa `because` boş.
+- `friends` ("Arkadaşların beğendi"): karşılıklı arkadaşlarının 4–5 yıldız verdiği ve senin İzlediklerim'inde olmayan başlıklar; liste satırı (§3.0g `entry`) + `by` (puan verenler, `stars`, `word`). Çok kişinin beğendiği önce, sonra en yeni; en fazla 20.
+- `together` ("Ayşe de izleyecek"): İzleyeceklerim'inde olup karşılıklı arkadaşlarından en az birinin de istediği başlıklar; liste satırı + `mates`. Listedeki sırayla (yeniden eskiye), en fazla 20.
+- Boş raf boş dizi olarak gelir.
 
 ### 3.0f `admin` — yönetim (p0.19)
 Admin sunucuda verilir: `koni-server admin -db koni.db Ad#1234` (`-off` geri alır, `-list` hesapları listeler).
