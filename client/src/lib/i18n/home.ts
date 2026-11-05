@@ -302,5 +302,18 @@ const en: Record<string, string> = {
   "Per": "Thu",
   "Cuma": "Fri",
   "Cmt": "Sat",
+  // dizi takibi (p0.27)
+  "Yarın": "Tomorrow",
+  "S{s} B{e}": "S{s} E{e}",
+  "takip ettiğin dizilerde yeni bölümler": "new episodes of the shows you follow",
+  "Henüz yayınlanmadı": "Not out yet",
+  "{n} izlenmemiş": "{n} unwatched",
+  "{n} izlenmemiş bölüm": "{n} unwatched episodes",
+  "Ekiple izlediklerin": "Watching with your crew",
+  "aynı ekiple sonraki bölüm: oda kurulur, onlar çağrılır": "next episode with the same crew: a room is set up and they're called",
+  "Aynı ekiple sonraki bölüm": "Next episode with the same crew",
+  "Bu ekip {ep}'te · {names}": "This crew is on {ep} · {names}",
+  "⚠ {names} önde": "⚠ {names} is ahead",
+  "▶ Sonraki bölüm": "▶ Next episode",
 };
 export default en;

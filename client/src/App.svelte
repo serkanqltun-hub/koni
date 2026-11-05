@@ -191,7 +191,7 @@
   let fdOpen = $state(false);
   let fdQuery = $state("");
   /** Profildeki listeden "İzle" ile açılan başlık (TitlesPane kendiliğinden açar ve kaynak arar). */
-  let watchReq = $state<{ ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; prefer?: Prefer; detailOnly?: boolean } | null>(null);
+  let watchReq = $state<{ ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; prefer?: Prefer; detailOnly?: boolean; season?: number; episode?: number } | null>(null);
   /** Solo lobide "Ne izlesem?" sihirbazı (açıkken mpv gizli). */
   let soloNightOpen = $state(false);
   function openTitles(q: string) {
@@ -1181,7 +1181,7 @@
     const p = refOf(r.file);
     if (!p) return;
     openTitles("");
-    watchReq = { ref: p.ref, kind: p.kind, title: p.kind === "series" ? r.title.replace(/\s+S\d+E\d+$/, "") : r.title, poster: r.poster };
+    watchReq = { ref: p.ref, kind: p.kind, title: p.kind === "series" ? r.title.replace(/\s+S\d+E\d+$/, "") : r.title, poster: r.poster, season: p.season, episode: p.episode };
   }
   /** Yarım kalan filmi aynı oda adıyla yeniden kurup medyayı açar. */
   function resumeMovie(r: ResumeEntry) {
@@ -1641,7 +1641,7 @@
     </TitleBar>
     <HomeView name={account ?? username} bind:roomName busy={connecting} error={noticeText} {welcome}
       onCreate={createRoom} onJoin={(code) => connect(true, code)} onSolo={() => { notice = null; solo = true; }} onResume={resumeMovie}
-      onWatch={(e) => { notice = null; solo = true; openTitles(""); watchReq = { ref: e.ref, kind: e.kind, title: e.title, year: e.year, poster: e.poster }; }} />
+      onWatch={(e) => { notice = null; solo = true; openTitles(""); watchReq = { ref: e.ref, kind: e.kind, title: e.title, year: e.year, poster: e.poster, season: e.season, episode: e.episode }; }} />
   </div>
 {:else if !fullscreen}
 {@const barOn = roomView === "watch" ? !sceneOwned : roomView !== "browse" || st?.duration != null}

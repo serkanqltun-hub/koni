@@ -70,6 +70,7 @@
     "allow-detail-get",
     "allow-recs-get",
     "allow-browse-get",
+    "allow-upcoming-get",
     "allow-solo-night",
     "allow-solo-night-pick",
     "allow-friends",

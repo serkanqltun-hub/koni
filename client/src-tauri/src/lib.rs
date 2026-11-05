@@ -176,6 +176,7 @@ pub fn run() {
             commands::solo_night,
             commands::solo_night_pick,
             commands::browse_get,
+            commands::upcoming_get,
             commands::recs_get,
             commands::friends,
             commands::profile,

@@ -117,6 +117,10 @@ pub enum ClientMsg {
         #[serde(flatten, default)]
         query: Option<serde_json::Map<String, serde_json::Value>>,
     },
+    /// Tek seferlik (p0.27): dizi takibi; izlenen dizilerin sıradaki bölümü + ekip kaydı.
+    Upcoming {
+        auth: String,
+    },
     /// Tek seferlik (p0.27): öneri rafları (`because` / `friends` / `together`).
     Recs {
         auth: String,
