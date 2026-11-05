@@ -99,6 +99,8 @@ export type StatsPeriod = "week" | "month" | "all";
 /** Hesap yoksa `null`. */
 export const statsGet = (url: string, period: StatsPeriod) => invoke<Stats | null>("stats_get", { url, period });
 /** Ana ekran "Etkinlik" (p0.22). */
+export const watchReport = (url: string, sec: number, title?: string) => invoke<number | null>("watch_report", { url, sec, title });
+
 export interface FeedItem { kind: "watch" | "joined"; at: number; users: string[]; title?: string; room?: string; sec?: number; by?: string }
 export const feedGet = (url: string) => invoke<{ you: string; items: FeedItem[] } | null>("feed_get", { url });
 /** Profil listeleri (p0.23, PROTOCOL §3.0g): "want" İzleyeceklerim, "seen" İzlediklerim. */
