@@ -6,7 +6,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import {
-    COCKPIT_LAYOUT, playerLoad, playerPause, playerTogglePause, playerSeek, playerSetSpeed,
+    COCKPIT_LAYOUT, playerLoad, playerPause, playerTogglePause, playerSeek, playerSetSpeed, playerScreenshot,
     playerSetVolume, playerAddSubtitle, playerSubDelay, playerTracks, playerSetTrack,
     type Tracks, type TrackKind,
     playerState, setLayout, setFullscreen, openCastPanel, isMac, type PlayerState,
@@ -51,7 +51,7 @@
   import { t, tx, locale } from "./lib/i18n.svelte";
 
   const L = COCKPIT_LAYOUT;
-  const speeds = [0.96, 1.0, 1.04];
+  const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
   const DENIED: Record<string, string> = {
     host_only: "Bu odada yalnızca host ve yardımcı hostlar kontrol edebilir",
     rate_limited: "Çok hızlı komut gönderdin",
@@ -1089,6 +1089,11 @@
     return tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
   }
 
+  async function screenshot() {
+    try { const p = await playerScreenshot(); add(`Ekran görüntüsü: ${p}`, false, () => t("Ekran görüntüsü kaydedildi: {p}", { p })); }
+    catch (e) { add(`Ekran görüntüsü: ${String(e)}`, true, () => `${t("Ekran görüntüsü alınamadı")}: ${tx(String(e))}`); }
+  }
+
   function onKey(e: KeyboardEvent) {
     if (nightOpen) return; // NightView kendi tuşlarını işler
     const tag = (e.target as HTMLElement | null)?.tagName;
@@ -1101,6 +1106,11 @@
       else setFs(false);
     } else if ((e.key === "f" || e.key === "F") && !typing(e) && !e.ctrlKey && !e.altKey && (view === "room" || view === "solo") && roomView === "watch") {
       setFs(!fullscreen);
+    } else if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && !typing(e) && !e.ctrlKey && !e.altKey && (view === "room" || view === "solo") && roomView === "watch") {
+      e.preventDefault();
+      seekBy(e.key === "ArrowLeft" ? -10 : 10);
+    } else if ((e.key === "s" || e.key === "S") && !typing(e) && !e.ctrlKey && !e.altKey && (view === "room" || view === "solo") && roomView === "watch" && st?.duration) {
+      screenshot();
     } else if ((e.key === "g" || e.key === "h") && !typing(e) && !e.ctrlKey && !e.altKey) {
       // altyazı gecikmesi: g = 50 ms erken, h = 50 ms geç
       nudgeSub(e.key === "g" ? -0.05 : 0.05);
@@ -1877,7 +1887,7 @@
       {#if room}<Reactions compact={roomView === "watch"} />{/if}
       {#if !inRoom}
         <select value={st?.speed ?? 1} title={t("Hız")} onchange={(e) => { const v = e.currentTarget.value; run("Hız " + v, playerSetSpeed(+v), false, () => t("Hız {v}", { v })); }}>
-          {#each speeds as s}<option value={s}>{s.toFixed(2)}x</option>{/each}
+          {#each speeds as s}<option value={s}>{s}x</option>{/each}
         </select>
       {/if}
       <div class="volume" title={t("Ses %{v}", { v: volume })}>

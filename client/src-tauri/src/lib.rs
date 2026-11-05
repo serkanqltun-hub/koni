@@ -124,6 +124,7 @@ pub fn run() {
             commands::player_toggle_pause,
             commands::player_seek,
             commands::player_set_speed,
+            commands::player_screenshot,
             commands::player_set_volume,
             commands::player_add_subtitle,
             commands::player_sub_delay,

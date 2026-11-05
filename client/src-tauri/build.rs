@@ -9,6 +9,7 @@ const COMMANDS: &[&str] = &[
     "player_toggle_pause",
     "player_seek",
     "player_set_speed",
+    "player_screenshot",
     "player_set_volume",
     "player_add_subtitle",
     "player_sub_delay",
