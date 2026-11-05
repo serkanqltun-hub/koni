@@ -67,6 +67,11 @@ pub enum ClientMsg {
         reference: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         rating: Option<i32>,
+        /// p0.25: 1–5 yıldız (`-1` siler) ve tek kelime.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stars: Option<i32>,
+        #[serde(skip_serializing_if = "String::is_empty")]
+        word: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         entry: Option<serde_json::Value>,
     },

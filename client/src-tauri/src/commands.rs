@@ -564,6 +564,8 @@ pub async fn lists_call(
     list: Option<String>,
     reference: Option<String>,
     rating: Option<i32>,
+    stars: Option<i32>,
+    word: Option<String>,
     entry: Option<serde_json::Value>,
 ) -> CmdResult<Option<serde_json::Value>> {
     let url = ws_url(&url)?;
@@ -577,6 +579,8 @@ pub async fn lists_call(
         list: list.unwrap_or_default(),
         reference: reference.unwrap_or_default(),
         rating,
+        stars,
+        word: word.unwrap_or_default(),
         entry,
     };
     Ok(Some(account::lists(&url, msg).await?))
