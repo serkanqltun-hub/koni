@@ -271,6 +271,12 @@ impl Player for MpvAdapter {
     }
     fn cache_ahead(&self) -> f64 {
         if page::active() {
+            // Sayfada video daha bulunmadı: hazır değil (oda bu üyeyi bekler, süre sınırı yok;
+            // gerekirse "olmadan devam et").
+            if !page::found() {
+                self.paused_plateau.set(None);
+                return 0.0;
+            }
             if !page::buffering() {
                 self.paused_plateau.set(None);
                 return 30.0;

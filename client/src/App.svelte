@@ -1643,7 +1643,7 @@
     </TitleBar>
     <HomeView name={account ?? username} bind:roomName busy={connecting} error={noticeText} {welcome}
       onCreate={createRoom} onJoin={(code) => connect(true, code)} onSolo={() => { notice = null; solo = true; }} onResume={resumeMovie}
-      onWatch={(e) => { notice = null; solo = true; openTitles(""); watchReq = { ref: e.ref, kind: e.kind, title: e.title, year: e.year, poster: e.poster, season: e.season, episode: e.episode }; }} />
+      onWatch={(e) => { notice = null; solo = true; if (e.kind === "video") { pageWait = "https://www.youtube.com/watch?v=" + e.ref.slice(3); return applyView("browse"); } openTitles(""); watchReq = { ref: e.ref, kind: e.kind, title: e.title, year: e.year, poster: e.poster, season: e.season, episode: e.episode }; }} />
   </div>
 {:else if !fullscreen}
 {@const barOn = roomView === "watch" ? !sceneOwned : roomView !== "browse" || st?.duration != null}

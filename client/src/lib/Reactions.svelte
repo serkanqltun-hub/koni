@@ -14,13 +14,13 @@
 
 <div class="reacts">
   {#if compact}
-    <button class="face" class:on={open} title={t("Tepki")} onclick={() => (open = !open)}>
+    <button type="button" class="face" class:on={open} title={t("Tepki")} onclick={() => (open = !open)}>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" /></svg>
     </button>
   {/if}
   {#if !compact || open}
     {#each REACTIONS as e (e)}
-      <button title={t("Tepki: {e}", { e })} onclick={() => react(e)}>{e}</button>
+      <button type="button" title={t("Tepki: {e}", { e })} onclick={() => react(e)}>{e}</button>
     {/each}
   {/if}
   <div class="bubbles" aria-live="polite">

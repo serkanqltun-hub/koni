@@ -4,9 +4,13 @@
   // altında bant olarak çıkar. "KONİ'de izle": önce yt-dlp (KONİ'nin oynatıcısında açılır),
   // tanımazsa video sitenin oynatıcısında kalır ve odada herkeste eşitlenir (tarayıcıda senkron).
   import { onMount } from "svelte";
-  import { browseOpen, browseEmbed, browseNav, browseState, snifferClose, syncPage, syncPlay, syncSeek, type BrowseState } from "./player";
+  import { listen } from "@tauri-apps/api/event";
+  import { browseOpen, browseEmbed, browseNav, browseState, listsAdd, mediaList, queueAdd, snifferClose, syncPage, syncPlay, syncSeek, type BrowseState } from "./player";
   import Icon from "./Icon.svelte";
   import FreeShelf from "./FreeShelf.svelte";
+  import Reactions from "./Reactions.svelte";
+  import { vqAdd } from "./videoQueue.svelte";
+  import { social } from "./social.svelte";
   import { t, tx, locale } from "./i18n.svelte";
 
   type Person = { id: string; name: string; me: boolean; ready: boolean };
@@ -50,8 +54,9 @@
   let st = $state<BrowseState>({ url: null, title: "", video: null, blocked: 0 });
   let q = $state("");
   let editing = $state(false);
-  /** `probe`: yt-dlp deniyor; `opened`: KONİ'nin oynatıcısında açıldı; `wait`: sayfada oynatılsın; `solo`: odada değil. */
-  let phase = $state<"idle" | "probe" | "opened" | "wait" | "solo">("idle");
+  /** `probe`: yt-dlp deniyor; `opened`: KONİ'nin oynatıcısında açıldı; `wait`: sayfada oynatılsın; `solo`: odada değil;
+   *  `gate`: sayfa odada açıldı, herkesin sayfasında video bulununca 3-2-1 ile başlar. */
+  let phase = $state<"idle" | "probe" | "opened" | "wait" | "solo" | "gate">("idle");
   let openedTitle = $state("");
   let waitUrl = "";
   /** Oynatıcıda açılamadıysa nedeni (bantta görünür). */
@@ -120,13 +125,44 @@
     const title = st.title || split(url).host;
     remember({ url, title, how: "page" });
     if (!inRoom) { phase = "solo"; return; }
-    phase = "idle";
     openedFor = url;
-    const pos = v.pos;
+    gatePos = v.pos;
+    // Odada başkası varsa hemen oynatma: herkesin sayfasında video bulununca başlar.
+    const alone = people.length < 2;
+    phase = alone ? "idle" : "gate";
     syncPage(url, title)
-      .then(() => (pos > 2 ? syncSeek(pos) : syncPlay()))
-      .catch((e) => fail(String(e)));
+      .then(() => {
+        if (alone) return start();
+        gateAt = Date.now();
+      })
+      .catch((e) => { phase = "idle"; fail(String(e)); });
   });
+
+  /** D4 "herkes hazır olunca başlat": sayfayı açan bekler, son kişinin videosu bulununca oda geri sayımla başlar. */
+  let gatePos = 0;
+  let gateAt = $state(0);
+  let now = $state(Date.now());
+  const start = () => (gatePos > 2 ? syncSeek(gatePos) : syncPlay()).catch((e) => fail(String(e)));
+  function startNow() {
+    if (phase !== "gate") return;
+    phase = "idle";
+    gateAt = 0;
+    start();
+  }
+  // Üyelerin durumu ~1 sn'de bir gelir: eski "hazır" bilgisiyle erken başlamamak için kısa bir pay.
+  $effect(() => {
+    if (phase !== "gate" || !gateAt || !live) return;
+    if (now - gateAt < 2500) return;
+    if (people.length < 2 || people.every((p) => p.ready)) startNow();
+  });
+  $effect(() => {
+    if (phase !== "gate") return;
+    const id = setInterval(() => (now = Date.now()), 500);
+    return () => clearInterval(id);
+  });
+
+  /** "Hazır mısınız?" 3-2-1 (oda geri sayımı; 0 = bitti). */
+  let countdown = $state(0);
 
   // Oda sayfaya geçti: herkes aynı sayfayı açar (açansa zaten oradadır).
   $effect(() => {
@@ -191,6 +227,71 @@
     }
   }
 
+  // D3: YouTube oynatma listesi ya da kanal adresi → videolar sıraya. Kanal sayfası "Videolar" sekmesine çevrilir.
+  function listOf(u: string | null): string | null {
+    if (!u) return null;
+    try {
+      const x = new URL(u);
+      if (!/(^|\.)youtube\.com$/i.test(x.hostname)) return null;
+      if (x.searchParams.get("list")) return u;
+      const m = x.pathname.match(/^\/(@[^/]+|channel\/[^/]+|c\/[^/]+|user\/[^/]+)(\/(featured|videos))?\/?$/);
+      return m ? `https://www.youtube.com/${m[1]}/videos` : null;
+    } catch { return null; }
+  }
+  const listUrl = $derived(listOf(st.url));
+  /** Odada kişi başı sıra sınırı (sunucu 10), tek başına 50. */
+  const LIST_MAX = $derived(inRoom ? 10 : 50);
+  let pouring = $state(false);
+  let done = $state("");
+  async function pour() {
+    const url = listUrl;
+    if (!url || pouring) return;
+    pouring = true;
+    err = "";
+    try {
+      const hits = (await mediaList(url)).filter((h) => !h.live).slice(0, LIST_MAX);
+      if (!hits.length) throw new Error(t("Bu listede video bulunamadı"));
+      let n = 0;
+      for (const h of hits) {
+        if (inRoom) { await queueAdd(h.url, h.title || undefined); n++; }
+        else if (vqAdd(h.url, h.title || h.url)) n++;
+      }
+      done = t("{n} video sıraya eklendi", { n });
+    } catch (e) {
+      fail(String(e));
+    } finally {
+      pouring = false;
+    }
+  }
+
+  // D8: YouTube videosu İzleyeceklerim'e (p0.28 `kind: "video"`, `ref: "yt:<id>"`).
+  const ytId = (u: string | null) => {
+    if (!isYtWatch(u)) return null;
+    try {
+      const x = new URL(u!);
+      return x.searchParams.get("v") ?? x.pathname.match(/^\/shorts\/([\w-]+)/)?.[1] ?? null;
+    } catch { return null; }
+  };
+  const vid = $derived(ytId(st.url));
+  let wanted = $state<Record<string, boolean>>({});
+  let wanting = $state(false);
+  async function want() {
+    const id = vid;
+    if (!id || wanting || !social.server) return;
+    wanting = true;
+    try {
+      await listsAdd(social.server, "want", {
+        ref: "yt:" + id, kind: "video", title: st.title.replace(/\s+-\s+YouTube$/, "") || id,
+        poster: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, source: "browse",
+      });
+      wanted[id] = true;
+    } catch (e) {
+      fail(String(e));
+    } finally {
+      wanting = false;
+    }
+  }
+
   function cancelWait() { phase = "idle"; }
   function home() { phase = "idle"; snifferClose().catch(() => {}); }
 
@@ -221,8 +322,10 @@
       if (alive) setTimeout(poll, 700);
     };
     poll();
+    const un = listen<number>("sync://countdown", (e) => (countdown = e.payload));
     return () => {
       alive = false;
+      un.then((f) => f());
       ro.disconnect();
       browseEmbed(null).catch(() => {});
       snifferClose().catch(() => {});
@@ -251,11 +354,23 @@
         </button>
       {/if}
     </label>
+    {#if inRoom}<Reactions compact />{/if}
+    {#if st.url && vid && social.server}
+      <button type="button" class="ib" class:on={wanted[vid]} disabled={wanting || wanted[vid]}
+        title={wanted[vid] ? t("İzleyeceklerimde") : t("İzleyeceklerime ekle")} onclick={want}>
+        {#if wanted[vid]}✓{:else}<Icon name="plus" size={15} />{/if}
+      </button>
+    {/if}
     {#if live}
       <span class="koni live"><i></i>{t("Senkronda")} · {readyCount}/{people.length}</span>
     {:else if phase === "probe" || phase === "wait"}
       <button type="button" class="koni busy" onclick={phase === "wait" ? cancelWait : undefined}><span class="sp"></span>{t("Video aranıyor…")}</button>
     {:else}
+      {#if listUrl}
+        <button type="button" class="koni q" disabled={pouring} title={t("Listedeki videoları sıraya ekle (en fazla {n})", { n: LIST_MAX })} onclick={pour}>
+          {#if pouring}<span class="sp"></span>{:else}<Icon name="plus" size={13} />{/if}{t("Listeyi sıraya ekle")}
+        </button>
+      {/if}
       {#if st.url && (st.video || isYtWatch(st.url))}
         <button type="button" class="koni q" disabled={queuing} title={t("Video sırasına ekle; oynayan bitince sırayla açılır")} onclick={enqueue}>
           {#if queuing}<span class="sp"></span>{:else}<Icon name="plus" size={13} />{/if}{t("Sıraya ekle")}
@@ -270,6 +385,21 @@
       <span class="ic">!</span>
       <div class="grow"><b>{t("Olmadı")}</b><small>{short(tx(err))}</small></div>
       <button type="button" class="btn" onclick={() => (err = "")}>{t("Tamam")}</button>
+    </div>
+  {/if}
+
+  {#if done}
+    <div class="band">
+      <span class="ic"><Icon name="plus" size={15} /></span>
+      <div class="grow"><b>{done}</b><small>{inRoom ? t("Oynayan bitince sırayla herkese açılır.") : t("Oynayan bitince sırayla açılır.")}</small></div>
+      <button type="button" class="btn" onclick={() => (done = "")}>{t("Tamam")}</button>
+    </div>
+  {/if}
+
+  {#if live && countdown > 0}
+    <div class="band wait">
+      <span class="ic cd">{countdown}</span>
+      <div class="grow"><b>{t("Hazır mısınız?")}</b><small>{t("Herkesin sayfasında video hazır, birlikte başlıyor.")}</small></div>
     </div>
   {/if}
 
@@ -311,7 +441,18 @@
   {/if}
 
   {#if live}
-    {#if mine}
+    {#if phase === "gate"}
+      <div class="band hold">
+        <span class="ic"><span class="sp"></span></span>
+        <div class="grow"><b>{t("Herkes hazır olunca başlıyor · {n}/{m}", { n: readyCount, m: people.length })}</b><small>{t("Odadakilere aynı sayfa açıldı. Herkesin sayfasında video bulununca 3-2-1 ile birlikte başlar.")}</small></div>
+        <div class="ppl">
+          {#each people as p (p.id)}
+            <span class="pp"><i>{initial(p.name)}</i>{p.me ? t("Sen") : p.name}{#if !p.me}<u class:o={!p.ready}>{p.ready ? "✓" : t("bekleniyor")}</u>{/if}</span>
+          {/each}
+        </div>
+        <button type="button" class="btn" onclick={startNow}>{t("Beklemeden başlat")}</button>
+      </div>
+    {:else if mine}
       <div class="band">
         <span class="ic"><Icon name="sync" size={15} /></span>
         <div class="grow"><b>{t("Tarayıcıda senkron")}</b><small>{t("Bu sayfadaki video herkeste aynı anda oynuyor. Sitenin oynatıcısını kullan; durdurunca, sarınca herkes seninle.")}</small></div>
@@ -428,6 +569,8 @@
   .band.bad { border-color: rgba(255, 105, 97, 0.5); background: linear-gradient(90deg, rgba(255, 105, 97, 0.16), rgba(255, 105, 97, 0.03)); }
   .band.bad .ic { background: rgba(255, 105, 97, 0.22); color: var(--red); font-weight: 900; }
   .band.hold { border-color: rgba(255, 159, 10, 0.5); background: linear-gradient(90deg, rgba(255, 159, 10, 0.18), rgba(255, 159, 10, 0.04)); }
+  .band .ic.cd { font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .ib.on { color: var(--green); font-weight: 900; }
   .band .ic { width: 34px; height: 34px; border-radius: 10px; background: rgba(48, 209, 88, 0.22); display: grid; place-items: center; flex: none; }
   .band.wait .ic { background: rgba(10, 132, 255, 0.22); }
   .band.hold .ic { background: rgba(255, 159, 10, 0.22); }
