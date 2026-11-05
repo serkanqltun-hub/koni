@@ -26,6 +26,49 @@ struct Current {
 
 static CURRENT: Mutex<Option<Current>> = Mutex::new(None);
 
+/// Dil tercihi: `dub` (Türkçe dublaj → Türkçe altyazı), `sub` (Türkçe altyazı), `off` (dokunma).
+static LANG_MODE: Mutex<String> = Mutex::new(String::new());
+
+fn is_tr(t: &T) -> bool {
+    let l = t.lang.to_lowercase();
+    let ti = t.title.to_lowercase();
+    l.starts_with("tr") || l == "tur" || ti.contains("türk") || ti.contains("turk")
+}
+
+/// Tercihi kaydeder, altyazı boyutunu (`small|medium|large`) mpv'ye verir.
+pub fn set_prefs(mpv: &Player, mode: &str, size: &str) {
+    *LANG_MODE.lock().unwrap() = mode.to_string();
+    let scale = match size {
+        "small" => "0.8",
+        "large" => "1.4",
+        _ => "1",
+    };
+    let _ = mpv.set_property_string("sub-scale", scale);
+    apply_prefs(mpv);
+}
+
+/// Açık dosyadaki izlere tercihi uygular (dosya açılınca ve altyazılar eklenince).
+pub fn apply_prefs(mpv: &Player) {
+    let mode = LANG_MODE.lock().unwrap().clone();
+    if mode != "dub" && mode != "sub" {
+        return;
+    }
+    let ts = read_tracks(mpv);
+    if mode == "dub" {
+        if let Some(a) = ts.iter().find(|t| t.kind == "audio" && is_tr(t)) {
+            if !a.selected {
+                let _ = mpv.set_property_string("aid", &a.id);
+            }
+            return;
+        }
+    }
+    if let Some(s) = ts.iter().find(|t| t.kind == "sub" && is_tr(t)) {
+        if !s.selected {
+            let _ = mpv.set_property_string("sid", &s.id);
+        }
+    }
+}
+
 /// `media::load` çağırır: yüklenen akışın alternatifleri.
 pub fn set_current(s: &Stream) {
     *CURRENT.lock().unwrap() = Some(Current {
@@ -61,6 +104,10 @@ pub fn on_file_loaded(mpv: &Arc<Player>) {
         .is_some_and(|f| !f.is_empty())
     {
         let _ = mpv.set_property_string("file-local-options/demuxer-lavf-format", "");
+    }
+    {
+        let mpv = mpv.clone();
+        std::thread::spawn(move || apply_prefs(&mpv));
     }
     let subs = {
         let mut cur = CURRENT.lock().unwrap();
@@ -104,6 +151,7 @@ fn add_subs(mpv: &Player, subs: Vec<SubFile>) {
             pick = false;
         }
     }
+    apply_prefs(mpv);
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]

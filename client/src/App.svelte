@@ -15,7 +15,7 @@
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, bugReport,
     type SyncStatus, type ServerMsg, type Member, type MediaEvent, type LinkEvent, type DlStatus, type Policy,
     type SnifferEvent, type UpdateInfo, type FunMsg, type Movie, syncSetView, type RoomView,
-    debridOpen, type Source, playerMusicView, playerPlay, playerCover, relayOn, setRelay, lobbyRemoteState,
+    debridOpen, type Source, playerMusicView, playerPlay, playerCover, relayOn, setRelay, setLangPrefs, langMode, subSize, lobbyRemoteState,
   } from "./lib/player";
   import BrowseView from "./lib/BrowseView.svelte";
   import TitleBar from "./lib/TitleBar.svelte";
@@ -1121,6 +1121,7 @@
   onMount(() => {
     if (volume !== 100) playerSetVolume(volume).catch(() => {});
     if (relayOn()) setRelay(true).catch(() => {});
+    setLangPrefs(langMode(), subSize()).catch(() => {});
     refreshAccount();
     checkUpdate(true);
     // Uygulama kapalıyken tıklanan link (argv) ve çalışırken gelen linkler.

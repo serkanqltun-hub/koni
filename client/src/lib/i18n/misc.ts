@@ -1,6 +1,15 @@
 // Ortak ve küçük bileşenler (SettingsView, LangSwitch, TitleBar …).
 const en: Record<string, string> = {
   "Ana ekran": "Home",
+  "Ses ve altyazı dili": "Audio and subtitle language",
+  "Dosya açılınca Türkçe ses ya da altyazı varsa kendiliğinden seçilir.": "When a file opens, Turkish audio or subtitles are picked automatically if available.",
+  "Önce Türkçe dublaj, yoksa Türkçe altyazı": "Turkish dub first, else Turkish subtitles",
+  "Türkçe altyazı": "Turkish subtitles",
+  "Dokunma": "Leave as is",
+  "Altyazı boyutu": "Subtitle size",
+  "Küçük": "Small",
+  "Orta": "Medium",
+  "Büyük": "Large",
   "Hesap": "Account",
   "Sağlayıcı": "Provider",
   "Kısayollar": "Shortcuts",

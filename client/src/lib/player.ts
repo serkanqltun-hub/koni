@@ -396,3 +396,21 @@ export const debridCheck = (s: Source) =>
   invoke<void>("debrid_check", { hash: s.hash ?? null, url: s.url ?? null, name: s.name, rawTitle: s.title, file: s.file, idx: s.idx });
 /** Çalan akışın kapak görseli (yt-dlp); yoksa `null`. */
 export const playerCover = () => invoke<string | null>("player_cover");
+
+/** Ayarlar: ses/altyazı dili tercihi ve altyazı boyutu (bu bilgisayarda saklanır). */
+export type LangMode = "dub" | "sub" | "off";
+export type SubSize = "small" | "medium" | "large";
+const LANG_KEY = "koni.langMode";
+const SUBSIZE_KEY = "koni.subSize";
+export const langMode = (): LangMode => {
+  try { const v = localStorage.getItem(LANG_KEY); if (v === "dub" || v === "sub" || v === "off") return v; } catch { /* depolama kapalı */ }
+  return "off";
+};
+export const subSize = (): SubSize => {
+  try { const v = localStorage.getItem(SUBSIZE_KEY); if (v === "small" || v === "large") return v; } catch { /* depolama kapalı */ }
+  return "medium";
+};
+export function setLangPrefs(mode: LangMode, size: SubSize) {
+  try { localStorage.setItem(LANG_KEY, mode); localStorage.setItem(SUBSIZE_KEY, size); } catch { /* depolama kapalı */ }
+  return invoke<void>("player_set_lang_prefs", { mode, size });
+}
