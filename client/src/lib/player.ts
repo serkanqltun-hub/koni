@@ -162,7 +162,7 @@ export type NightPhase = "setup" | "pick" | "vote" | "done";
 export interface NightMember { id: string; name: string; ready: boolean; mood?: string; picks: number; done: boolean }
 export interface Night {
   id: string; kind: NightKind; perUser: number; by: string; phase: NightPhase; deckId?: string;
-  members: NightMember[]; pool: number; mine: Movie[]; pending: number;
+  source?: "lists"; members: NightMember[]; pool: number; mine: Movie[]; pending: number;
 }
 export interface NightPreview { tag: string; total: number; posters: string[] }
 export interface Mood { id: string; label: string; emoji: string }
