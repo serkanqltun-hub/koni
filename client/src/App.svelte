@@ -176,7 +176,10 @@
   /** Sinema içinde Film & Dizi (mpv gizli; açılan kaynak ya da yeni oda medyası kapatır). */
   let fdOpen = $state(false);
   let fdQuery = $state("");
+  /** Profildeki listeden "İzle" ile açılan başlık (TitlesPane kendiliğinden açar ve kaynak arar). */
+  let watchReq = $state<{ ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string } | null>(null);
   function openTitles(q: string) {
+    watchReq = null;
     if (roomView !== "watch") applyView("watch");
     nightOpen = false;
     drawer = null;
@@ -1366,7 +1369,8 @@
       {/snippet}
     </TitleBar>
     <HomeView name={account ?? username} bind:roomName busy={connecting} error={noticeText} {welcome}
-      onCreate={createRoom} onJoin={(code) => connect(true, code)} onSolo={() => { notice = null; solo = true; }} onResume={resumeMovie} />
+      onCreate={createRoom} onJoin={(code) => connect(true, code)} onSolo={() => { notice = null; solo = true; }} onResume={resumeMovie}
+      onWatch={(e) => { notice = null; solo = true; openTitles(""); watchReq = { ref: e.ref, kind: e.kind, title: e.title, year: e.year, poster: e.poster }; }} />
   </div>
 {:else if !fullscreen}
 {@const barOn = roomView === "watch" ? !sceneOwned : roomView !== "browse" || st?.duration != null}
@@ -1465,7 +1469,7 @@
   <div class="video">
     {#if fdOpen}
       <div class="stage" in:fade={{ duration: 200 }}>
-        <TitlesPane withSearch inRoom={room !== null} initial={fdQuery} onPlay={openDebrid} onExit={() => (fdOpen = false)} onError={(m) => add(m, true)} />
+        <TitlesPane withSearch inRoom={room !== null} initial={fdQuery} watch={watchReq} onPlay={openDebrid} onExit={() => { fdOpen = false; watchReq = null; }} onError={(m) => add(m, true)} />
       </div>
     {:else if endOn}
       <div class="stage" in:fade={{ duration: 300 }}>{@render endScreen()}</div>

@@ -7,13 +7,15 @@
   import { t, tx } from "./i18n.svelte";
   import { LADDER, failKind, huntOrder, type Rung, type SourceInfo } from "./sources";
 
-  let { sources, kicker, heading, inRoom, onPlay, onAddon }: {
+  let { sources, kicker, heading, inRoom, onPlay, onAddon, autostart = false }: {
     sources: SourceInfo[];
     kicker: string;
     heading: string;
     inRoom: boolean;
     onPlay: (s: Source) => void;
     onAddon: () => void;
+    /** Kaynaklar gelince aramayı kendiliğinden başlat (listeden "İzle"). */
+    autostart?: boolean;
   } = $props();
 
   const TOP_KEY = "koni.topQuality";
@@ -56,7 +58,7 @@
     stopErr = "";
   }
   // Başka bölüm/kaynak listesi gelince baştan.
-  $effect(() => { void sources; untrack(() => { reset(); phase = "ready"; }); });
+  $effect(() => { void sources; untrack(() => { reset(); phase = "ready"; if (autostart && sources.length) run(); }); });
 
   async function run() {
     const my = ++token;
