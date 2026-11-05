@@ -14,6 +14,7 @@
   import { rankSources, type SourceInfo } from "./sources";
   import { untrack } from "svelte";
   import { loadResume } from "./resume";
+  import { prefs } from "./prefs.svelte";
   import { t, tx } from "./i18n.svelte";
 
   let { inRoom, onPlay, onError, withSearch = false, onExit, initial = "", watch = null }: {
@@ -93,6 +94,18 @@
     void picked;
     return new Map(loadResume().map((r) => [r.title, r]));
   });
+
+  /** Spoiler gizleme: yarım kalan en ileri bölümden sonrakiler (hiç kayıt yoksa 1. bölümden sonrakiler) bulanık; tıklayınca açılır. */
+  let revealed = $state(new Set<string>());
+  const seenUpTo = $derived.by(() => {
+    if (!picked || !episodes) return 0;
+    const ord = (e: Episode) => e.season * 10000 + e.episode;
+    const done = episodes.filter((e) => resume.has(`${picked!.name} ${code(e)}`)).map(ord);
+    const first = Math.min(...episodes.filter((e) => e.season > 0).map(ord), Infinity);
+    return Math.max(first, ...done);
+  });
+  const hidden = (e: Episode) =>
+    prefs.hideSpoilers && e.season > 0 && e.season * 10000 + e.episode > seenUpTo && !revealed.has(e.id);
 
   /** BrowseView arama çubuğundan da çağrılır. */
   export async function search(text: string) {
@@ -290,7 +303,8 @@
         <div class="eps">
           {#each shownEps as e (e.id)}
             {@const r = resume.get(`${picked.name} ${code(e)}`)}
-            <button class="ep" class:on={episode?.id === e.id} onclick={() => pickEpisode(e)}>
+            <button class="ep" class:on={episode?.id === e.id} class:spoiler={hidden(e)} title={hidden(e) ? t("Spoiler olabilir · göstermek için tıkla") : undefined}
+              onclick={() => { if (hidden(e)) revealed = new Set(revealed).add(e.id); else pickEpisode(e); }}>
               <span class="n">{e.episode}</span>
               {#if e.thumbnail}<span class="th" style="--w:{r ? (r.pos / r.duration) * 100 : 0}%"><img src={e.thumbnail} alt="" loading="lazy" referrerpolicy="no-referrer" onerror={(e) => { (e.currentTarget as HTMLElement).style.display = "none"; }} /></span>{/if}
               <span class="et"><b>{e.name || t("{n}. bölüm", { n: e.episode })}</b>{#if r}<small class="pink">{left(r)} · {t("kaldığınız yer")}</small>{/if}</span>
@@ -458,6 +472,7 @@
   .ep.on { border-color: rgba(10, 132, 255, 0.6); background: rgba(10, 132, 255, 0.12); }
   .ep .n { font: 700 12px var(--font-mono); color: var(--text-3); width: 20px; text-align: center; flex: none; }
   .ep .th { position: relative; width: 104px; height: 58px; border-radius: 8px; overflow: hidden; flex: none; background: #0d1218; }
+  .ep.spoiler .th img, .ep.spoiler .et { filter: blur(7px); }
   .ep .th img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .ep .th::after { content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--w, 0); background: #ff375f; }
   .et { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }

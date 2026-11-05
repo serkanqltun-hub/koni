@@ -10,7 +10,7 @@
     playerSetVolume, playerAddSubtitle, playerSubDelay, playerTracks, playerSetTrack,
     type Tracks, type TrackKind,
     playerState, setLayout, setFullscreen, openCastPanel, isMac, type PlayerState,
-    syncConnect, syncSeek, syncToggle, syncSeekBy, syncLeave, syncContinueWithout, syncResync, syncDownload,
+    syncConnect, syncSeek, syncToggle, syncPause, syncSeekBy, syncLeave, syncContinueWithout, syncResync, syncDownload,
     syncSetCohost, syncSetPolicy, accountGet, accountLogin, accountRegister, accountLogout, snifferClose,
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, bugReport,
     type SyncStatus, type ServerMsg, type Member, type MediaEvent, type LinkEvent, type DlStatus, type Policy,
@@ -26,6 +26,7 @@
   import Avatar from "./lib/Avatar.svelte";
   import { onRemote, pic, social, startSocial, stopSocial, type RemoteOp } from "./lib/social.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
+  import { prefs } from "./lib/prefs.svelte";
   import { DEFAULT_SERVER, normServer } from "./lib/server";
   import { loadRecent, rememberRoom, forgetRoom, type RecentRoom } from "./lib/recent";
   import ResumeBar from "./lib/ResumeBar.svelte";
@@ -735,6 +736,37 @@
     return `⬇ %${Math.floor(d.pct)}${speed}${eta}`;
   }
   const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
+
+  // Uyku zamanlayıcı: dakika sonra ya da bölüm/parça bitince duraklat (solo + oda host/yardımcı host).
+  let sleepSel = $state(0); // 0 kapalı, -1 bölüm bitince, >0 dakika
+  let sleepTimer: ReturnType<typeof setTimeout> | undefined;
+  const canSleep = $derived(!room || amControl);
+  function sleepPause() {
+    sleepSel = 0;
+    if (inRoom) { if (amControl) run("Uyku zamanlayıcı: duraklatıldı", syncPause()); } else run("Uyku zamanlayıcı: duraklatıldı", playerPause());
+  }
+  function setSleep(v: number) {
+    sleepSel = v;
+    clearTimeout(sleepTimer);
+    if (v > 0) sleepTimer = setTimeout(sleepPause, v * 60_000);
+  }
+  let sleepEofArmed = false;
+  $effect(() => {
+    const eof = st?.eofReached ?? false;
+    if (sleepSel !== -1) { sleepEofArmed = false; return; }
+    if (!eof) { sleepEofArmed = true; return; }
+    if (sleepEofArmed) { sleepEofArmed = false; untrack(sleepPause); }
+  });
+  $effect(() => { if (!canSleep && sleepSel !== 0) untrack(() => setSleep(0)); });
+
+  // "Tam ekran başlat": yeni bir video açılınca (süre bilinince) tam ekrana geç.
+  let hadDuration = false;
+  $effect(() => {
+    const has = st?.duration != null;
+    const fresh = has && !hadDuration;
+    hadDuration = has;
+    if (fresh && roomView === "watch" && (view === "room" || view === "solo") && prefs.fullscreenStart && !fullscreen) untrack(() => setFs(true));
+  });
 
   async function setFs(on: boolean) {
     fullscreen = on;
@@ -1889,6 +1921,13 @@
         </button>
       {/if}
       {#if room}<Reactions compact={roomView === "watch"} />{/if}
+      {#if canSleep && roomView === "watch"}
+        <select class="sleep" value={sleepSel} title={t("Uyku zamanlayıcı")} onchange={(e) => setSleep(+e.currentTarget.value)}>
+          <option value={0}>{t("Uyku: kapalı")}</option>
+          {#each [15, 30, 45, 60] as m}<option value={m}>{t("{n} dk sonra duraklat", { n: m })}</option>{/each}
+          <option value={-1}>{t("Bölüm bitince duraklat")}</option>
+        </select>
+      {/if}
       {#if !inRoom}
         <select value={st?.speed ?? 1} title={t("Hız")} onchange={(e) => { const v = e.currentTarget.value; run("Hız " + v, playerSetSpeed(+v), false, () => t("Hız {v}", { v })); }}>
           {#each speeds as s}<option value={s}>{s}x</option>{/each}

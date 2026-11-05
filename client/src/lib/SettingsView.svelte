@@ -7,6 +7,7 @@
   import { t, locale } from "./i18n.svelte";
   import { qrDataUrl } from "./qr";
   import { DEFAULT_SERVER, serverLabel } from "./server";
+  import { prefs } from "./prefs.svelte";
 
   // Uygulama ayarları (UI-PLAN §5.9, E3). Yalnızca gerçekten çalışan ayarlar var.
   let {
@@ -33,9 +34,10 @@
     onBugReport: (note: string) => Promise<unknown>;
   } = $props();
 
-  type Section = "account" | "debrid" | "keys" | "about";
+  type Section = "account" | "player" | "debrid" | "keys" | "about";
   const SECTIONS: { id: Section; label: string }[] = [
     { id: "account", label: "Hesap" },
+    { id: "player", label: "Oynatıcı" },
     { id: "debrid", label: "Sağlayıcı" },
     { id: "keys", label: "Kısayollar" },
     { id: "about", label: "Hakkında" },
@@ -100,6 +102,18 @@
           </div>
         {/if}
         <div class="item"><small class="grow">{t('Başka bir sunucuya geçmek için çıkış yap; giriş ekranının altındaki "Kendi sunucunu kur" ile adresi yaz.')}</small></div>
+      </div>
+    {:else if section === "player"}
+      <h1>{t("Oynatıcı")}</h1>
+      <div class="group glass-card">
+        <div class="item">
+          <div class="grow"><b>{t("Tam ekran başlat")}</b><small>{t("Bir video açılınca otomatik tam ekrana geçer.")}</small></div>
+          <input type="checkbox" role="switch" bind:checked={prefs.fullscreenStart} />
+        </div>
+        <div class="item">
+          <div class="grow"><b>{t("Spoiler gizle")}</b><small>{t("Dizilerde henüz izlemediğin bölümlerin adı ve küçük resmi bulanık görünür; tıklayınca açılır.")}</small></div>
+          <input type="checkbox" role="switch" bind:checked={prefs.hideSpoilers} />
+        </div>
       </div>
     {:else if section === "debrid"}
       <h1>{t("Sağlayıcı")}</h1>
