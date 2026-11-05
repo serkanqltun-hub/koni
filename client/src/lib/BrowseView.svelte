@@ -6,6 +6,7 @@
   import { onMount } from "svelte";
   import { browseOpen, browseEmbed, browseNav, browseState, snifferClose, syncPage, syncPlay, syncSeek, type BrowseState } from "./player";
   import Icon from "./Icon.svelte";
+  import FreeShelf from "./FreeShelf.svelte";
   import { t, tx, locale } from "./i18n.svelte";
 
   type Person = { id: string; name: string; me: boolean; ready: boolean };
@@ -355,6 +356,7 @@
             {/if}
           </div>
         </div>
+        <FreeShelf {inRoom} onPlay={onProbe} onChannel={go} />
         <div class="how">
           <div><em>1</em><span><b>{t("Siteye git")}</b><small>{t("Adres yaz ya da yukarıdan ara. Reklamlar engellenir.")}</small></span></div>
           <div><em>2</em><span><b>{t("KONİ'de izle'ye bas")}</b><small>{t("KONİ videoyu tanırsa kendi oynatıcısında herkese açar.")}</small></span></div>

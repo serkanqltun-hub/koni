@@ -30,5 +30,13 @@ const en: Record<string, string> = {
   "Kartlara dön": "Back to the cards",
   "Karar veremiyor musun?": "Can't decide?",
   "Havanı ve ne kadar vaktin olduğunu seç, kartları kaydır, çark seçsin.": "Pick your mood and how much time you have, swipe the cards, let the wheel choose.",
+  // Ücretsiz & klasik rafı
+  "Ücretsiz & klasik": "Free & classic",
+  "Hesap ya da kurulum gerekmez: kamu malı klasikler, tek tıkla oynatıcıda.": "No account or setup needed: public-domain classics, one click to the player.",
+  "Kamu malı filmler · Internet Archive": "Public-domain films · Internet Archive",
+  "Odadaki herkeste açılır.": "Opens for everyone in the room.",
+  "Liste yüklenemedi.": "Couldn't load the list.",
+  "Ücretsiz resmi kanal": "Free official channel",
+  "Bu filmin oynatılabilir dosyası yok": "This film has no playable file",
 };
 export default en;

@@ -1,12 +1,15 @@
 <script lang="ts">
   // Boş Sinema (lobi): tek kutu (link/dosya yolu açar, düz yazı Film & Dizi'de arar),
   // Ne izlesek? (tek başınaysa Ne izlesem?) / Film & Dizi / Herkes indirsin (tek başınaysa İndir) kartları,
-  // "Kaldığınız yerden" ve tek başınayken "Çevrimdışı" rafı (indirilenler).
+  // "Kaldığınız yerden" ve tek başınayken "Çevrimdışı" rafı (indirilenler), "Ücretsiz & klasik" rafı
+  // (film sağlayıcısı kurulu değilse kutunun hemen altında, öne çıkmış).
   // mpv bu sırada gizli; sahneyi arayüz çizer (kokpit modeli bozulmaz).
   import { loadResume, pullResume, removeResume, type ResumeEntry } from "./resume";
   import Icon from "./Icon.svelte";
   import { t, tx, locale } from "./i18n.svelte";
   import { offline, initOffline, cancelOffline, deleteOffline } from "./offline.svelte";
+  import { debridStatus, addonsList } from "./player";
+  import FreeShelf from "./FreeShelf.svelte";
 
   let { value = $bindable(""), people, room, busy, error, hue, onOpen, onTitles, onNight, onDownload, onResume }: {
     value: string;
@@ -71,6 +74,9 @@
   $effect(() => { input?.focus(); });
 
   initOffline();
+  /** Film sağlayıcısı kurulu değil (ilk açılış): "Ücretsiz & klasik" rafı öne çıkar. */
+  let noProvider = $state<boolean | null>(null);
+  Promise.all([debridStatus(), addonsList()]).then(([rd, ad]) => (noProvider = !rd.configured && !ad.length)).catch(() => (noProvider = false));
   let offErr = $state<string | null>(null);
   function size(b: number): string {
     return b >= 1e9 ? `${(b / 1e9).toLocaleString(locale(), { maximumFractionDigits: 1 })} GB` : `${Math.max(1, Math.round(b / 1e6))} MB`;
@@ -110,6 +116,8 @@
     {#if !text}<span class="keys"><kbd>Ctrl</kbd><kbd>V</kbd> {t("yapıştır")}</span>{/if}
     <button class="go" type="submit" disabled={!text || busy}>{busy ? t("Açılıyor…") : !text || direct(text) ? t("Aç") : t("Ara")}</button>
   </form>
+
+  {#if noProvider}<FreeShelf inRoom={!!room} {busy} featured onPlay={onOpen} />{/if}
 
   <div class="lb-grid">
     <div class="srcs" class:few={!onNight}>
@@ -179,6 +187,8 @@
       </div>
     </div>
   </div>
+
+  {#if noProvider === false}<FreeShelf inRoom={!!room} {busy} onPlay={onOpen} />{/if}
 </div>
 
 <style>
