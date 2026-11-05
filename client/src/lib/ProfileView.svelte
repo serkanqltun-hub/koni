@@ -4,6 +4,7 @@
   import Avatar from "./Avatar.svelte";
   import Icon from "./Icon.svelte";
   import { catalogSearch, listsAdd, listsGet, listsRate, listsRemove, type CatalogTitle, type ListEntry, type ListName, type Lists } from "./player";
+  import { loadResume } from "./resume";
   import { social, splitHandle } from "./social.svelte";
   import { t, tx, locale } from "./i18n.svelte";
 
@@ -14,6 +15,7 @@
     onAvatar,
     onNight,
     onJoin,
+    onWatch,
   }: {
     /** Arkadaşın `Ad#1234`'ü; boşsa kendi profilin. */
     user?: string;
@@ -23,6 +25,8 @@
     /** Ne izlesek? odası kur ve bu arkadaşı çağır. */
     onNight: (friend: string) => void;
     onJoin: (invite: string) => void;
+    /** Listeden "İzle": tek başına Sinema'da başlığı açar. */
+    onWatch?: (e: ListEntry) => void;
   } = $props();
 
   const own = $derived(!user);
@@ -117,6 +121,13 @@
     return d < 365 ? t("{n} ay", { n: Math.floor(d / 30) }) : t("{n} yıl", { n: Math.floor(d / 365) });
   }
   const SOURCES: Record<string, string> = { night: "Ne izlesek?'ten", titles: "Film & Dizi'den", friend: "arkadaş listesinden" };
+  /** Dizide yarım kalan son bölüm ("S2 B4'te kaldın"), yerel kayıttan. */
+  function stoppedAt(e: ListEntry): string {
+    if (e.kind !== "series" || !own) return "";
+    const r = loadResume().filter((x) => x.title.startsWith(`${e.title} S`)).sort((a, b) => b.at - a.at)[0];
+    const m = r?.title.match(/ S(\d+)E(\d+)$/);
+    return m ? t("S{s} B{e}'te kaldın", { s: +m[1], e: +m[2] }) : "";
+  }
   function wantLine(e: (typeof want)[number]): string {
     if (e.mates?.length) {
       const n = e.mates.map((m) => splitHandle(m.name)[0]);
@@ -228,11 +239,12 @@
                 <span class="ortak">{t("ORTAK")}</span>
               {/if}
               <span class="hov">
+                {#if own && onWatch}<button title={t("Şimdi izle")} onclick={() => onWatch(e)}>▶ {t("İzle")}</button>{/if}
                 <button title={t("İzledim olarak işaretle")} onclick={() => markSeen(e)}>{t("✓ İzledim")}</button>
                 <button class="x2" title={t("Listemden çıkar")} aria-label={t("Listemden çıkar")} onclick={() => remove("want", e.ref)}><Icon name="x" size={11} /></button>
               </span>
             </div>
-            <b>{e.title}</b><small>{wantLine(e)}</small>
+            <b>{e.title}</b><small>{wantLine(e)}</small>{#if stoppedAt(e)}<small class="resume">{stoppedAt(e)}</small>{/if}
           </div>
         {/each}
         {#if !adding}<button class="card addc" onclick={() => (adding = true)}><span>+</span>{t("Film ya da dizi ekle")}</button>{/if}
@@ -313,6 +325,7 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 14px 12px; }
   .card { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .card > b { font-size: 12.5px; font-weight: 650; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card > small.resume { color: var(--pink, #ff6fa8); font-weight: 600; }
   .card > small { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pw { position: relative; }
   .po { position: relative; display: block; aspect-ratio: 2 / 3; border-radius: 10px; overflow: hidden; border: 1px solid var(--line-2);

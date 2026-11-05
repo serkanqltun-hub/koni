@@ -9,7 +9,7 @@
   import SocialModals from "./SocialModals.svelte";
   import ProfileView from "./ProfileView.svelte";
   import { loadResume, removeResume } from "./resume";
-  import { feedGet, friendsCall, lobbyDecline, statsGet, type FeedItem, type OpenRoom, type PresenceFriend, type RoomView, type Stats, type StatsPeriod } from "./player";
+  import { feedGet, friendsCall, lobbyDecline, statsGet, type FeedItem, type ListEntry, type OpenRoom, type PresenceFriend, type RoomView, type Stats, type StatsPeriod } from "./player";
   import { refreshProfile, social, splitHandle } from "./social.svelte";
   import { i18n, t, tx, locale } from "./i18n.svelte";
 
@@ -23,6 +23,7 @@
     onJoin,
     onSolo,
     onResume,
+    onWatch,
   }: {
     name: string;
     roomName: string;
@@ -36,6 +37,8 @@
     onJoin: (code: string) => void;
     onSolo: () => void;
     onResume: (r: ResumeEntry) => void;
+    /** Profildeki İzleyeceklerim'den "İzle". */
+    onWatch: (e: ListEntry) => void;
   } = $props();
 
   /** Açık profil (p0.23): "" kendi profilin, `Ad#1234` arkadaşın; `null` ana ekran. */
@@ -235,7 +238,7 @@
   {#if prof !== null}
   {#key prof}
   <ProfileView user={prof} {busy} onBack={() => (prof = null)} onAvatar={() => (modal = "avatar")}
-    onNight={(f) => onCreate("night", [f])} onJoin={onJoin} />
+    onNight={(f) => onCreate("night", [f])} onJoin={onJoin} {onWatch} />
   {/key}
   {:else}
   <div class="main">
