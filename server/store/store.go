@@ -128,7 +128,7 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
-	if _, err := db.Exec(schema + listsSchema); err != nil {
+	if _, err := db.Exec(schema + listsSchema + plansSchema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("schema: %w", err)
 	}

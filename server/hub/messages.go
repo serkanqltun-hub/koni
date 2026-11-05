@@ -8,7 +8,7 @@ import (
 )
 
 // Protocol version, see docs/PROTOCOL.md.
-const ProtocolVersion = "p0.27"
+const ProtocolVersion = "p0.28"
 
 // Inbound is the union of all client→server messages; fields are used per type "t".
 type Inbound struct {
@@ -126,6 +126,16 @@ type Inbound struct {
 	IntroEnd   float64 `json:"introEnd,omitempty"`
 	RecapEnd   float64 `json:"recapEnd,omitempty"`
 
+	// p0.28: cmd op "break" takes Min (minutes). event (film night): Op "create"
+	// (Title, At unix ms, Guests Ad#1234) | "rsvp" (ID, Rsvp "yes"|"no"|"maybe") |
+	// "cancel" (ID) | "" (list). recap: Month "YYYY-MM" ("" = this month).
+	Min    int      `json:"min,omitempty"`
+	At     int64    `json:"at,omitempty"`
+	Guests []string `json:"guests,omitempty"`
+	Rsvp   string   `json:"rsvp,omitempty"`
+	ID     int64    `json:"id,omitempty"`
+	Month  string   `json:"month,omitempty"`
+
 	// watch (p0.25): solo watching seconds since the last report (Title optional)
 	Sec int `json:"sec,omitempty"`
 
@@ -230,6 +240,9 @@ type Snapshot struct {
 	Members   []MemberInfo `json:"members"`
 	State     StateMsg     `json:"state"`
 	Downloads []DlStatus   `json:"downloads,omitempty"` // current task, join order
+	// p0.28: the running break (same as the `break` message) and the room history
+	Break   map[string]any `json:"break,omitempty"`
+	History []histItem     `json:"history,omitempty"`
 }
 
 func enc(v any) []byte {

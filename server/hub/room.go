@@ -177,6 +177,13 @@ type Room struct {
 	// Accounts that were ever in the room → when they left (unix ms, 0 = inside).
 	// They may come back without a call while the room is open (p0.22).
 	alumni map[int64]int64
+
+	// p0.28 (together.go, plans.go)
+	brk       *breakState
+	readyLead bool           // next countdown gets the "Hazır mısınız?" lead (after a break)
+	history   []histItem     // last media, newest first
+	plan      int64          // film night this room was opened for (0 = none)
+	guests    map[int64]bool // film night host and guests: may enter without a call; set before the room is shared
 }
 
 func newRoom(id, name, invite, policy string, cfg Config, onEmpty func(*Room)) *Room {
@@ -348,6 +355,7 @@ func (r *Room) join(username string, user int64, host bool) joinResult {
 	r.sendFunState(m)
 	r.afterVotes() // a new voter: progress counts change
 	r.nightMembersChanged()
+	r.checkBreak()
 	return joinResult{m: m, out: m.send, token: m.token, snap: r.snapshot()}
 }
 
@@ -368,11 +376,13 @@ func (r *Room) resume(id, tok string) joinResult {
 	r.activity("join", m.ID, m.Name+" geri bağlandı")
 	r.sendFunState(m)
 	r.nightMembersChanged()
+	r.checkBreak()
 	return joinResult{m: m, out: m.send, token: m.token, snap: r.snapshot()}
 }
 
 func (r *Room) snapshot() Snapshot {
-	s := Snapshot{Room: r.id, Name: r.name, Policy: r.policy, View: r.view, State: r.stateMsg("snapshot", nil, ""), Downloads: r.downloads()}
+	s := Snapshot{Room: r.id, Name: r.name, Policy: r.policy, View: r.view, State: r.stateMsg("snapshot", nil, ""), Downloads: r.downloads(),
+		Break: r.breakMsg(), History: r.historyOut()}
 	for _, id := range r.order {
 		m := r.members[id]
 		s.Members = append(s.Members, m.info())
@@ -406,6 +416,7 @@ func (r *Room) disconnect(m *Member, out chan []byte) {
 		r.afterWaitingChanged(nil)
 	}
 	r.checkBarrier()
+	r.checkBreak()
 }
 
 func (r *Room) leave(m *Member) {
@@ -450,6 +461,7 @@ func (r *Room) leave(m *Member) {
 	r.checkBarrier()
 	r.afterVotes()
 	r.nightMembersChanged()
+	r.checkBreak()
 }
 
 // idle runs when the last member left: playback stops where it was and the room
@@ -457,6 +469,7 @@ func (r *Room) leave(m *Member) {
 func (r *Room) idle() {
 	r.cancelTimer()
 	r.waiting = nil
+	r.brk = nil
 	if r.mode != ModePaused {
 		r.anchorPos = r.position(r.nowMs())
 		r.mode = ModePaused
@@ -566,7 +579,8 @@ func (r *Room) startCountdown(pos float64, cause string, by *Member, ack string)
 	r.cancelTimer()
 	now := r.cfg.Now()
 	lead := r.lead()
-	if r.media != nil && !r.started && lead < r.cfg.ReadyLead {
+	defer func() { r.readyLead = false }()
+	if r.media != nil && (!r.started || r.readyLead) && lead < r.cfg.ReadyLead {
 		lead = r.cfg.ReadyLead // first start of this media: "Hazır mısınız?" 3-2-1
 	}
 	r.mode = ModeCountdown
@@ -778,6 +792,14 @@ func (r *Room) handleCmd(m *Member, in Inbound) {
 		} else {
 			r.playbackCmd(m, in)
 		}
+	case "break": // p0.28 "Mola ver"
+		if r.policy == PolicyHostOnly && !m.canControl() {
+			r.deny(m, in.Cid, "host_only")
+			return
+		}
+		r.startBreak(m, in)
+	case "ready": // p0.28 back from the break
+		r.breakReady(m, in)
 	case "continue_without":
 		r.continueWithout(m, in)
 	case "resync":
@@ -862,6 +884,7 @@ func (r *Room) detach(t, by *Member) {
 		r.afterWaitingChanged(by)
 	}
 	r.checkBarrier()
+	r.checkBreak()
 }
 
 // setCoHost (host only) appoints or removes a co-host. Idempotent.
@@ -917,6 +940,7 @@ func (r *Room) resync(m *Member, in Inbound) {
 		m.stalls = nil
 		r.broadcast(enc(map[string]any{"t": "member_detached", "id": m.ID, "detached": false}))
 		r.activity("resync", m.ID, m.Name+" odayla yeniden senkronlandı")
+		r.checkBreak()
 	}
 	r.sendTo(m, enc(r.stateMsg("snapshot", nil, in.Cid)))
 }
@@ -961,6 +985,8 @@ func (r *Room) closeMedia(m *Member, cid string) {
 		return
 	}
 	title := r.media.Title
+	r.noteLeftAt()
+	r.endBreak("media")
 	r.cancelTimer()
 	r.dl = nil
 	r.media = nil
@@ -971,6 +997,7 @@ func (r *Room) closeMedia(m *Member, cid string) {
 	r.anchorPos, r.anchorTs, r.startAt = 0, r.nowMs(), 0
 	r.publish("media", m, cid)
 	r.activity("media", m.ID, fmt.Sprintf("%s kapattı: %s", m.Name, title))
+	r.broadcastHistory()
 }
 
 // setView changes what every client shows; by nil = the server switched it.
@@ -996,6 +1023,8 @@ func (r *Room) setView(v string, by *Member, cid string) {
 
 // switchMedia makes md the room media; by nil = the queue advanced on its own.
 func (r *Room) switchMedia(md *Media, by *Member, cid string) {
+	r.noteLeftAt()
+	r.endBreak("media")
 	r.cancelTimer()
 	r.dl = nil
 	if md.Kind == "download" {
@@ -1021,6 +1050,9 @@ func (r *Room) switchMedia(md *Media, by *Member, cid string) {
 		r.activity("media", by.ID, fmt.Sprintf("%s herkes için indirme başlattı: %s", by.Name, md.Title))
 	default:
 		r.activity("media", by.ID, fmt.Sprintf("%s açtı: %s", by.Name, md.Title))
+	}
+	if by != nil { // songs the queue moves on to are not history
+		r.addHistory(md, by)
 	}
 }
 
@@ -1152,6 +1184,7 @@ func (r *Room) playbackCmd(m *Member, in Inbound) {
 			return
 		}
 		r.waiting = nil
+		r.endBreak("play")
 		if r.dl != nil {
 			r.dl.started = true // "start with whoever is ready"
 		}
@@ -1178,6 +1211,7 @@ func (r *Room) playbackCmd(m *Member, in Inbound) {
 			return
 		}
 		r.waiting = nil
+		r.endBreak("seek")
 		if r.dl != nil {
 			r.dl.started = true
 		}
