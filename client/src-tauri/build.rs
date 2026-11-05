@@ -58,6 +58,8 @@ const COMMANDS: &[&str] = &[
     "watch_report",
     "detail_get",
     "browse_get",
+    "skip_get",
+    "skip_set",
     "upcoming_get",
     "recs_get",
     "solo_night",

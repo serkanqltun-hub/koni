@@ -70,6 +70,8 @@
     "allow-detail-get",
     "allow-recs-get",
     "allow-browse-get",
+    "allow-skip-get",
+    "allow-skip-set",
     "allow-upcoming-get",
     "allow-solo-night",
     "allow-solo-night-pick",

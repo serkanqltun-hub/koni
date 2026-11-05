@@ -1,0 +1,25 @@
+// İntro / özet atla (T28).
+const en: Record<string, string> = {
+  "İntro'yu atla": "Skip intro",
+  "Özeti atla": "Skip recap",
+  "İntro atlandı": "Intro skipped",
+  "Özet atlandı": "Recap skipped",
+  "İntro'yu işaretle": "Mark the intro",
+  "İntro işaretli · düzenle": "Intro marked · edit",
+  "İşaret kapsamı": "Mark applies to",
+  "Bu sezon": "This season",
+  "Tüm sezonlar": "All seasons",
+  "Burası intro'nun başı": "Intro starts here",
+  "Burası intro'nun sonu": "Intro ends here",
+  "Özet burada bitti": "Recap ends here",
+  "Bölümün başından buraya kadar özet": "Recap from the start of the episode to here",
+  "İntro işaretlendi": "Intro marked",
+  "Özet işaretlendi": "Recap marked",
+  "İşaret silindi": "Mark deleted",
+  "İşaret kaydedilemedi": "Couldn't save the mark",
+  "İşaret silinemedi": "Couldn't delete the mark",
+  "İntro'nun sonu başından sonra olmalı": "The intro's end must come after its start",
+  "İntro'yu otomatik atla": "Skip intros automatically",
+  "Dizide işaretli intro ya da özet gelince sormadan atlar. Odada yalnızca host atlatır.": "Skips a marked intro or recap without asking. In a room only the host skips.",
+};
+export default en;

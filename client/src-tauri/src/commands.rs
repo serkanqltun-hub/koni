@@ -769,6 +769,53 @@ pub async fn recs_get(url: String) -> CmdResult<Option<serde_json::Value>> {
     Ok(Some(account::recs(&url, msg).await?))
 }
 
+/// Dizinin intro / özet işaretleri (p0.27). Hesap yoksa `null`.
+#[tauri::command]
+pub async fn skip_get(url: String, reference: String) -> CmdResult<Option<serde_json::Value>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    let msg = koni_sync::protocol::ClientMsg::Skip {
+        auth: acc.token,
+        op: "get".into(),
+        reference,
+        season: None,
+        intro_start: None,
+        intro_end: None,
+        recap_end: None,
+    };
+    Ok(Some(account::skip(&url, msg).await?))
+}
+
+/// İntro / özet işaretini yazar ya da (`clear`) siler; `season` 0 = tüm sezonlar (p0.27).
+#[tauri::command]
+pub async fn skip_set(
+    url: String,
+    reference: String,
+    season: u32,
+    intro_start: f64,
+    intro_end: f64,
+    recap_end: Option<f64>,
+    clear: Option<bool>,
+) -> CmdResult<Option<serde_json::Value>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    let clear = clear.unwrap_or(false);
+    let msg = koni_sync::protocol::ClientMsg::Skip {
+        auth: acc.token,
+        op: if clear { "clear" } else { "set" }.into(),
+        reference,
+        season: Some(season),
+        intro_start: (!clear).then_some(intro_start),
+        intro_end: (!clear).then_some(intro_end),
+        recap_end: if clear { None } else { recap_end },
+    };
+    Ok(Some(account::skip(&url, msg).await?))
+}
+
 /// Ana ekran "Etkinlik" sekmesi (p0.22). Hesap yoksa `null`.
 #[tauri::command]
 pub async fn feed_get(url: String) -> CmdResult<Option<serde_json::Value>> {

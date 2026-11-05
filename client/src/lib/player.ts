@@ -144,6 +144,15 @@ export const soloNight = (url: string, kind: NightKind, filter: NightFilter | nu
   invoke<SoloDeal | null>("solo_night", { url, kind, filter, budgetMin: budgetMin ?? null, dub: dub ?? null });
 export const soloNightPick = (url: string, ref: string) =>
   invoke<SoloNext | null>("solo_night_pick", { url, reference: ref });
+/** p0.27 `skip` (PROTOCOL §3.0n): dizinin intro / özet işaretleri; herkes paylaşır, son yazan kazanır.
+ *  `season` 0 = tüm sezonlar. `ref` dizinin liste anahtarı (`tt…`). Hesap yoksa `null`. */
+export interface SkipMark { season: number; introStart: number; introEnd: number; recapEnd?: number; by: string; at: number }
+export interface SkipMarks { t: "skip"; ref: string; marks: SkipMark[] }
+export const skipGet = (url: string, ref: string) => invoke<SkipMarks | null>("skip_get", { url, reference: ref });
+export const skipSet = (url: string, ref: string, season: number, introStart: number, introEnd: number, recapEnd?: number) =>
+  invoke<SkipMarks | null>("skip_set", { url, reference: ref, season, introStart, introEnd, recapEnd: recapEnd ?? null });
+export const skipClear = (url: string, ref: string, season: number) =>
+  invoke<SkipMarks | null>("skip_set", { url, reference: ref, season, introStart: 0, introEnd: 0, clear: true });
 /** "Sorun bildir": not + etkinlik logu (eskiden yeniye) + son senkron CSV'si sunucuya gider; döner: rapor adı. */
 export const bugReport = (url: string, username: string, note: string, log: string[]) =>
   invoke<string>("bug_report", { url, username, note, log });

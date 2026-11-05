@@ -125,6 +125,21 @@ pub enum ClientMsg {
     Recs {
         auth: String,
     },
+    /// Tek seferlik (p0.27): intro / özet işareti; `op` `get` | `set` | `clear`, `season` 0 = tüm sezonlar.
+    Skip {
+        auth: String,
+        op: String,
+        #[serde(rename = "ref")]
+        reference: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        season: Option<u32>,
+        #[serde(rename = "introStart", skip_serializing_if = "Option::is_none")]
+        intro_start: Option<f64>,
+        #[serde(rename = "introEnd", skip_serializing_if = "Option::is_none")]
+        intro_end: Option<f64>,
+        #[serde(rename = "recapEnd", skip_serializing_if = "Option::is_none")]
+        recap_end: Option<f64>,
+    },
     /// Tek seferlik (p0.22): ana ekran "Etkinlik" sekmesi, son 7 gün.
     Feed {
         auth: String,
