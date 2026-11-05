@@ -287,5 +287,17 @@ const en: Record<string, string> = {
   "Tam ekran (F)": "Fullscreen (F)",
   "TV'ye yansıt": "Cast to TV",
   "Yayınla paneli açılamadı": "Couldn't open the Cast panel",
+  // Solo'da sıradaki bölüm
+  "Sezon bitti": "Season over",
+  "Bu dizinin son bölümü": "Last episode of this show",
+  "Sıradaki: {code} · {n} sn": "Up next: {code} · {n} s",
+  "Kaynak aranıyor…": "Finding a source…",
+  "Bölüm bitince kendiliğinden açılır": "Starts automatically when this episode ends",
+  "Kaynaklar hazırlanıyor…": "Getting sources ready…",
+  "Şimdi oynat": "Play now",
+  "{code} açılıyor…": "Opening {code}…",
+  "Sıradaki: {code}": "Up next: {code}",
+  "Bölüm bitince dur": "Stop when an episode ends",
+  "Sıradaki bölüm için açılan kaynak bulunamadı: {code}": "Couldn't find a working source for the next episode: {code}",
 };
 export default en;
