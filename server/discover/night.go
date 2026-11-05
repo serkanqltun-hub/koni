@@ -260,3 +260,83 @@ func (c *Client) Similar(ctx context.Context, kind string, id, n int) ([]Item, e
 	}
 	return out, nil
 }
+
+// Fill adds details (runtime, IMDb id, cast, ratings…) to cards, in parallel (p0.26
+// solo_night needs the IMDb id and runtime to drop seen and too long titles).
+func (c *Client) Fill(ctx context.Context, items []Item) []Item {
+	out := make([]Item, len(items))
+	var wg sync.WaitGroup
+	for i, it := range items {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			out[i] = c.details(ctx, it)
+		}()
+	}
+	wg.Wait()
+	return out
+}
+
+// BrowseSize: titles on one "Göz at" page (p0.26 `browse`).
+const BrowseSize = 30
+
+// BrowseQuery is a `browse` request; zero fields don't filter.
+type BrowseQuery struct {
+	Genre     int // TMDB movie genre (series: closest TV genre)
+	YearFrom  int
+	YearTo    int
+	MinRating float64
+	MaxMin    int    // runtime (series: episode)
+	Lang      string // original language, two letters
+	Sort      string // "popular" (default) | "rating" | "new"
+	Page      int    // 1-based
+}
+
+// Browse lists one page of BrowseSize titles (two TMDB pages of 20 make one), without
+// details. total is TMDB's match count.
+func (c *Client) Browse(ctx context.Context, kind string, b BrowseQuery) ([]Item, int, error) {
+	f := Filter{YearFrom: b.YearFrom, YearTo: b.YearTo, VoteMin: b.MinRating, RuntimeMax: b.MaxMin}
+	if b.Genre > 0 {
+		f.Genres = []int{b.Genre}
+	}
+	if b.Lang != "" {
+		f.Languages = []string{b.Lang}
+	}
+	if b.Sort == "new" {
+		f.VoteCountMin = 20
+	}
+	q := c.filterQuery(ctx, kind, f)
+	switch b.Sort {
+	case "rating":
+		q.Set("sort_by", "vote_average.desc")
+	case "new":
+		date := "primary_release_date"
+		if kind == KindTV {
+			date = "first_air_date"
+		}
+		q.Set("sort_by", date+".desc")
+		if q.Get(date+".lte") == "" || q.Get(date+".lte") > c.Now().Format("2006-01-02") {
+			q.Set(date+".lte", c.Now().Format("2006-01-02")) // nothing unreleased
+		}
+	}
+	page := min(max(b.Page, 1), 16) // TMDB serves at most 500 pages; 16 × 30 is plenty
+	start := (page - 1) * BrowseSize
+	out, total := []Item{}, 0
+	for n := start/20 + 1; n <= (start+BrowseSize-1)/20+1; n++ {
+		q.Set("page", strconv.Itoa(n))
+		var p countPage
+		if err := c.tmdb(ctx, "/discover/"+kind, q, &p); err != nil {
+			return nil, 0, err
+		}
+		total = p.TotalResults
+		for i, r := range p.Results {
+			if at := (n-1)*20 + i; at >= start && at < start+BrowseSize {
+				out = append(out, r.itemOf(kind))
+			}
+		}
+		if n >= p.TotalPages {
+			break
+		}
+	}
+	return out, total, nil
+}

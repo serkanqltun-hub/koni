@@ -7,9 +7,11 @@ import (
 	"math/rand/v2"
 	"slices"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/serkanqltun-hub/koni/server/discover"
+	"github.com/serkanqltun-hub/koni/server/store"
 )
 
 // "Ne izlesek?" v2 (docs/PROTOCOL.md §3.9a, p0.17). The host locks film or series and
@@ -25,6 +27,9 @@ const (
 
 	maxPerUser  = 5
 	maxPreviews = 8
+	maxListPool = 20 // pool:"lists" deals at most this many titles
+
+	poolLists = "lists"
 )
 
 type nightState struct {
@@ -38,6 +43,7 @@ type nightState struct {
 	pending map[string]int // detail fetches in flight per member
 	done    map[string]bool
 	deckID  string
+	source  string // poolLists: the pool is being filled from want lists (p0.26)
 }
 
 func (r *Room) handleNightStart(m *Member, in Inbound) {
@@ -57,12 +63,102 @@ func (r *Room) handleNightStart(m *Member, in Inbound) {
 		id: fmt.Sprintf("n%d", r.nightSeq), kind: in.Kind, perUser: min(max(in.PerUser, 1), maxPerUser), by: m.Name,
 		phase: nightSetup, ready: map[string]string{}, picks: map[string][]discover.Item{}, pending: map[string]int{}, done: map[string]bool{},
 	}
+	if in.Pool == poolLists {
+		r.nightFromLists()
+	}
 	r.broadcastNight()
 	what := "Film gecesi"
 	if in.Kind == discover.KindTV {
 		what = "Dizi gecesi"
 	}
 	r.activity("night", m.ID, fmt.Sprintf("%s Ne izlesek? başlattı: %s", m.Name, what))
+}
+
+// nightFromLists (p0.26 pool:"lists") fills the pool from the present members'
+// "İzleyeceklerim": titles everyone wants, or if there are none, titles anyone wants
+// (most wanted first). The deck is dealt as soon as the cards are fetched; with no
+// listed titles the night goes on as usual (setup) after a fun_error.
+func (r *Room) nightFromLists() {
+	n, st := r.night, r.cfg.Store
+	listKind := "movie"
+	if n.kind == discover.KindTV {
+		listKind = "series"
+	}
+	var refs []string // first seen order
+	count := map[string]int{}
+	users := 0
+	if st != nil {
+		for _, a := range r.presentMembers() {
+			if a.User == 0 {
+				continue
+			}
+			users++
+			list, _ := st.List(a.User, store.ListWant)
+			for _, e := range list {
+				if e.Kind != listKind {
+					continue
+				}
+				if count[e.Ref] == 0 {
+					refs = append(refs, e.Ref)
+				}
+				count[e.Ref]++
+			}
+		}
+	}
+	var all []string
+	for _, ref := range refs {
+		if count[ref] == users {
+			all = append(all, ref)
+		}
+	}
+	if len(all) == 0 {
+		all = slices.Clone(refs)
+		slices.SortStableFunc(all, func(a, b string) int { return count[b] - count[a] })
+	}
+	all = all[:min(len(all), maxListPool)]
+	if len(all) == 0 {
+		r.broadcast(enc(map[string]any{"t": "fun_error", "message": "İzleyeceklerim listelerinde bu türde başlık yok: herkes kendi önerisini seçsin"}))
+		return
+	}
+	n.source = poolLists
+	d, kind := r.cfg.Discover, n.kind
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), upstreamTimeout)
+		defer cancel()
+		got := make([]discover.Item, len(all))
+		var wg sync.WaitGroup
+		for i, ref := range all {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if k, id, err := resolveRef(ctx, d, ref, kind); err == nil && k == kind {
+					got[i], _ = d.Detail(ctx, kind, id)
+				}
+			}()
+		}
+		wg.Wait()
+		var pool []discover.Item
+		in := map[int]bool{}
+		for _, it := range got {
+			if it.ID > 0 && it.Title != "" && !in[it.ID] {
+				in[it.ID] = true
+				pool = append(pool, it)
+			}
+		}
+		r.do(func() {
+			if r.night != n || n.source != poolLists {
+				return // closed or restarted meanwhile
+			}
+			n.source = ""
+			if len(pool) == 0 {
+				r.broadcast(enc(map[string]any{"t": "fun_error", "message": "Listelerdeki başlıklar açılamadı: herkes kendi önerisini seçsin"}))
+				r.broadcastNight()
+				return
+			}
+			r.nightDeal(pool)
+			r.broadcastNight()
+		})
+	}()
 }
 
 func (r *Room) handleNightClose(m *Member) {
@@ -268,6 +364,9 @@ func (r *Room) nightAdvance() {
 		}
 		return true
 	}
+	if n.source == poolLists {
+		return // the pool is being filled from the lists
+	}
 	switch n.phase {
 	case nightSetup:
 		if all(func(id string) bool { _, ok := n.ready[id]; return ok }) {
@@ -292,16 +391,22 @@ func (r *Room) nightAdvance() {
 			r.broadcast(enc(map[string]any{"t": "fun_error", "message": "Havuz boş: en az bir öneri seçin"}))
 			return
 		}
-		rand.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] })
-		r.deckSeq++
-		r.deck = &deckState{id: fmt.Sprintf("k%d", r.deckSeq), mood: "✦ Ne izlesek?", by: n.by, items: pool, votes: map[string]map[int]bool{}}
-		for _, it := range pool {
-			r.seen[it.ID] = true
-		}
-		n.phase, n.deckID = nightVote, r.deck.id
-		r.broadcast(r.deckMsg(nil))
-		r.feed("night", "", fmt.Sprintf("Havuz hazır: %d başlık oylamada", len(pool)))
+		r.nightDeal(pool)
 	}
+}
+
+// nightDeal shuffles the pool into the vote deck.
+func (r *Room) nightDeal(pool []discover.Item) {
+	n := r.night
+	rand.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] })
+	r.deckSeq++
+	r.deck = &deckState{id: fmt.Sprintf("k%d", r.deckSeq), mood: "✦ Ne izlesek?", by: n.by, items: pool, votes: map[string]map[int]bool{}}
+	for _, it := range pool {
+		r.seen[it.ID] = true
+	}
+	n.phase, n.deckID = nightVote, r.deck.id
+	r.broadcast(r.deckMsg(nil))
+	r.feed("night", "", fmt.Sprintf("Havuz hazır: %d başlık oylamada", len(pool)))
 }
 
 // nightDeckOver: the night's deck found a match or went to the wheel.
@@ -341,6 +446,9 @@ func (r *Room) nightMsg(m *Member) []byte {
 	}
 	if n.deckID != "" {
 		msg["deckId"] = n.deckID
+	}
+	if n.source != "" {
+		msg["source"] = n.source // p0.26: pool being filled from want lists
 	}
 	return enc(msg)
 }

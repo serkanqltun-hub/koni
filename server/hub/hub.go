@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/serkanqltun-hub/koni/server/discover"
 	"github.com/serkanqltun-hub/koni/server/store"
 )
 
@@ -23,6 +24,9 @@ type Hub struct {
 
 	watchMu sync.Mutex
 	watchAt map[int64]int64 // last solo watch report per account, unix ms (solo.go)
+
+	soloMu   sync.Mutex
+	soloRest map[int64][]discover.Item // undealt cards of each account's last solo_night (solo.go)
 }
 
 func New(cfg Config) *Hub {
@@ -31,7 +35,7 @@ func New(cfg Config) *Hub {
 		limit:   limiter{n: authAttempts, window: authWindow},
 		reports: limiter{n: reportsPerHour, window: time.Hour},
 		soc:     social{conns: map[int64]map[*lobbyConn]struct{}{}, calls: map[int64][]roomCall{}, poke: make(chan struct{}, 1)},
-		watchAt: map[int64]int64{},
+		watchAt: map[int64]int64{}, soloRest: map[int64][]discover.Item{},
 	}
 }
 
