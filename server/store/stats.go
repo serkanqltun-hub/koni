@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"math"
 	"sort"
 	"time"
 )
@@ -77,6 +78,11 @@ func NightMs(from, to int64) int64 {
 // Stats returns totals since `since` (unix ms) for viewer and viewer's mutual friends:
 // metrics are visible only to people who added each other (friends.go).
 func (s *Store) Stats(viewer, since int64) ([]UserStats, error) {
+	return s.StatsRange(viewer, since, math.MaxInt64)
+}
+
+// StatsRange is Stats for [since, until) (unix ms).
+func (s *Store) StatsRange(viewer, since, until int64) ([]UserStats, error) {
 	rows, err := s.db.Query(`
 WITH mates AS (
   SELECT a.friend_id AS user_id FROM friends a
@@ -100,9 +106,9 @@ SELECT u.username || '#' || u.tag, u.avatar,
   COALESCE(SUM(CASE WHEN e.type = 'listen' THEN json_extract(e.payload, '$.ms') END), 0) / 1000
 FROM mates m
 JOIN users u ON u.id = m.user_id
-LEFT JOIN events e ON e.user_id = m.user_id AND e.ts >= ?
+LEFT JOIN events e ON e.user_id = m.user_id AND e.ts >= ? AND e.ts < ?
 GROUP BY u.id
-ORDER BY u.username COLLATE NOCASE`, viewer, viewer, since)
+ORDER BY u.username COLLATE NOCASE`, viewer, viewer, since, until)
 	if err != nil {
 		return nil, err
 	}
@@ -185,4 +191,156 @@ func (s *Store) Daily(user int64, now time.Time) ([7]int64, error) {
 		}
 	}
 	return out, rows.Err()
+}
+
+// MonthRange is the unix ms range of month "YYYY-MM", Turkey time; "" is the
+// current month. The label is the month in "YYYY-MM" form.
+func MonthRange(month string, now time.Time) (from, to int64, label string, ok bool) {
+	t := now.In(trt)
+	start := time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, trt)
+	if month != "" {
+		p, err := time.ParseInLocation("2006-01", month, trt)
+		if err != nil || p.Year() < 2020 || p.After(t) {
+			return 0, 0, "", false
+		}
+		start = p
+	}
+	return start.UnixMilli(), start.AddDate(0, 1, 0).UnixMilli(), start.Format("2006-01"), true
+}
+
+// Mate is a mutual friend you watched with in a recap month.
+type Mate struct {
+	Name   string `json:"name"`
+	Avatar string `json:"avatar,omitempty"`
+	Sec    int64  `json:"sec"`   // time watched together (the shorter of the two, per room)
+	Rooms  int64  `json:"rooms"` // rooms you were both in
+}
+
+// TeamPick is the title with the highest team score of a recap month.
+type TeamPick struct {
+	Ref    string  `json:"ref"`
+	Title  string  `json:"title"`
+	Poster string  `json:"poster,omitempty"`
+	Stars  float64 `json:"stars"` // average of you and your mutual friends, 1–5
+	Votes  int     `json:"votes"`
+}
+
+// RecapData is one account's month (p0.28 `recap`); genres are added by the hub.
+type RecapData struct {
+	WatchSec int64     `json:"watchSec"`
+	Days     int64     `json:"days"`
+	Hours    [24]int64 `json:"hours"`    // watch seconds by hour of day, Turkey time
+	PeakHour int       `json:"peakHour"` // -1 when nothing was watched
+	Movies   int       `json:"movies"`   // titles that went onto İzlediklerim this month
+	Series   int       `json:"series"`
+	Mates    []Mate    `json:"mates"`
+	Best     *TeamPick `json:"best,omitempty"`
+	Seen     []Entry   `json:"-"` // for the genres
+}
+
+// Recap gathers user's month [from, to).
+func (s *Store) Recap(user, from, to int64) (RecapData, error) {
+	out := RecapData{PeakHour: -1, Mates: []Mate{}}
+	rows, err := s.db.Query(`SELECT ts, json_extract(payload, '$.ms') FROM events WHERE user_id = ? AND type = 'watch' AND ts >= ? AND ts < ?`, user, from, to)
+	if err != nil {
+		return out, err
+	}
+	days := map[int64]bool{}
+	for rows.Next() {
+		var ts int64
+		var ms sql.NullInt64
+		if err := rows.Scan(&ts, &ms); err != nil {
+			rows.Close()
+			return out, err
+		}
+		sec := ms.Int64 / 1000
+		out.WatchSec += sec
+		out.Hours[time.UnixMilli(ts).In(trt).Hour()] += sec
+		days[(ts+10800000)/86400000] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	out.Days = int64(len(days))
+	for h, sec := range out.Hours {
+		if sec > 0 && (out.PeakHour < 0 || sec > out.Hours[out.PeakHour]) {
+			out.PeakHour = h
+		}
+	}
+
+	mates, err := s.db.Query(`
+WITH mine AS (
+  SELECT room_id, SUM(json_extract(payload, '$.ms')) AS ms FROM events
+  WHERE user_id = ? AND type = 'watch' AND ts >= ? AND ts < ? AND room_id NOT LIKE 'solo:%' GROUP BY room_id
+), mates AS (
+  SELECT a.friend_id AS user_id FROM friends a
+  JOIN friends b ON b.user_id = a.friend_id AND b.friend_id = a.user_id WHERE a.user_id = ?
+), theirs AS (
+  SELECT e.user_id, e.room_id, SUM(json_extract(e.payload, '$.ms')) AS ms FROM events e JOIN mates m ON m.user_id = e.user_id
+  WHERE e.type = 'watch' AND e.ts >= ? AND e.ts < ? AND e.room_id IN (SELECT room_id FROM mine) GROUP BY e.user_id, e.room_id
+)
+SELECT u.username || '#' || u.tag, u.avatar, SUM(MIN(t.ms, m.ms)) / 1000 AS sec, COUNT(*)
+FROM theirs t JOIN mine m ON m.room_id = t.room_id JOIN users u ON u.id = t.user_id
+GROUP BY t.user_id ORDER BY sec DESC LIMIT 3`, user, from, to, user, from, to)
+	if err != nil {
+		return out, err
+	}
+	for mates.Next() {
+		var m Mate
+		if err := mates.Scan(&m.Name, &m.Avatar, &m.Sec, &m.Rooms); err != nil {
+			mates.Close()
+			return out, err
+		}
+		out.Mates = append(out.Mates, m)
+	}
+	mates.Close()
+	if err := mates.Err(); err != nil {
+		return out, err
+	}
+
+	seen, err := s.db.Query(`SELECT ref, kind, title, poster FROM list_items WHERE user_id = ? AND list = ? AND at >= ? AND at < ? ORDER BY at DESC`, user, ListSeen, from, to)
+	if err != nil {
+		return out, err
+	}
+	for seen.Next() {
+		var e Entry
+		if err := seen.Scan(&e.Ref, &e.Kind, &e.Title, &e.Poster); err != nil {
+			seen.Close()
+			return out, err
+		}
+		if e.Kind == "series" {
+			out.Series++
+		} else if e.Kind == "movie" {
+			out.Movies++
+		}
+		out.Seen = append(out.Seen, e)
+	}
+	seen.Close()
+	if err := seen.Err(); err != nil {
+		return out, err
+	}
+
+	// "En yüksek ekip puanı": titles you watched with someone this month, scored by
+	// you and your mutual friends.
+	var b TeamPick
+	err = s.db.QueryRow(`
+WITH team AS (
+  SELECT a.friend_id AS user_id FROM friends a
+  JOIN friends c ON c.user_id = a.friend_id AND c.friend_id = a.user_id WHERE a.user_id = ?
+  UNION SELECT ?
+)
+SELECT l.ref, l.title, l.poster, AVG(o.stars), COUNT(o.stars) FROM list_items l
+JOIN list_items o ON o.ref = l.ref AND o.list = 'seen' AND o.stars > 0 AND o.user_id IN (SELECT user_id FROM team)
+WHERE l.user_id = ? AND l.list = 'seen' AND l.at >= ? AND l.at < ? AND l.mates != '[]'
+GROUP BY l.ref ORDER BY 4 DESC, 5 DESC, l.at DESC LIMIT 1`, user, user, user, from, to).Scan(&b.Ref, &b.Title, &b.Poster, &b.Stars, &b.Votes)
+	switch {
+	case err == sql.ErrNoRows:
+	case err != nil:
+		return out, err
+	default:
+		b.Stars = math.Round(b.Stars*10) / 10
+		out.Best = &b
+	}
+	return out, nil
 }

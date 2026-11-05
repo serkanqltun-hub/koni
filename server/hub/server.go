@@ -110,6 +110,14 @@ func (h *Hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		writeJSON(ctx, c, h.Recs(ctx, in))
 		c.Close(websocket.StatusNormalClosure, "")
 		return
+	case "event": // film night (p0.28)
+		writeJSON(ctx, c, h.Event(in))
+		c.Close(websocket.StatusNormalClosure, "")
+		return
+	case "recap": // monthly recap (p0.28)
+		writeJSON(ctx, c, h.Recap(ctx, in))
+		c.Close(websocket.StatusNormalClosure, "")
+		return
 	case "feed":
 		writeJSON(ctx, c, h.Feed(in))
 		c.Close(websocket.StatusNormalClosure, "")
@@ -249,4 +257,5 @@ var errText = map[string]string{
 	"bad_entry":        "Başlık eksik",
 	"banned":           "Hesabın bir admin tarafından silindi",
 	"no_invites":       "Davet hakkın bir admin tarafından alındı",
+	"too_many_events":  "En fazla 10 planlanmış film gecen olabilir",
 }

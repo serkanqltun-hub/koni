@@ -197,6 +197,7 @@ type social struct {
 	calls   map[int64][]roomCall // target account → pending calls
 	poke    chan struct{}
 	start   sync.Once
+	plansAt time.Time // last look for film nights to open (plans.go)
 }
 
 func (h *Hub) pokePresence() {
@@ -287,6 +288,7 @@ func (h *Hub) presenceLoop() {
 		case <-t.C:
 		case <-h.soc.poke:
 		}
+		h.openDuePlans()
 		h.pushPresence()
 	}
 }
@@ -334,6 +336,7 @@ func (h *Hub) pushPresence() {
 		online[u] = true
 	}
 	cache := map[int64]store.FriendList{}
+	events := map[int64][]eventOut{} // film nights (p0.28)
 	for _, c := range conns {
 		list, ok := cache[c.user]
 		if !ok {
@@ -357,7 +360,15 @@ func (h *Hub) pushPresence() {
 		if calls == nil {
 			calls = []roomCall{}
 		}
-		b := enc(map[string]any{"t": "presence", "friends": friends, "requests": list.Requests, "calls": calls, "rooms": rooms})
+		evs, ok := events[c.user]
+		if !ok {
+			evs, _ = h.eventsFor(c.user)
+			if evs == nil {
+				evs = []eventOut{}
+			}
+			events[c.user] = evs
+		}
+		b := enc(map[string]any{"t": "presence", "friends": friends, "requests": list.Requests, "calls": calls, "rooms": rooms, "events": evs})
 		if string(b) == c.last {
 			continue
 		}
@@ -519,6 +530,9 @@ func (h *Hub) mayJoin(r *Room, user int64) bool {
 	h.soc.mu.Unlock()
 	if called {
 		h.dropCall(user, r.invite)
+		return true
+	}
+	if r.guests[user] { // film night (p0.28): host and guests
 		return true
 	}
 	inside := roomUsers(r)

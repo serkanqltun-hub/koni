@@ -1,6 +1,6 @@
 # KONİ — WebSocket Protokolü (Faz 0)
 
-> Sürüm: **p0.27** (taslak) · Kaynak: [design/sync.md §4](design/sync.md), hesaplar [design/accounts.md §5.1](design/accounts.md), keşif [design/discovery.md §7](design/discovery.md)
+> Sürüm: **p0.28** (taslak) · Kaynak: [design/sync.md §4](design/sync.md), hesaplar [design/accounts.md §5.1](design/accounts.md), keşif [design/discovery.md §7](design/discovery.md)
 > Kapsam: hesap (davet kodu + kullanıcı adı + argon2id şifre, oturum belirteci), oda oluştur/katıl, play/pause/seek, oda medyası (`media`), HOLD/countdown, Host Only + yardımcı host, ping/saat senkronu, yeniden bağlanma (`resume`), kronik stall → "olmadan devam et" / DETACHED, "Herkes İndirsin" bariyeri.
 > Henüz yok: admin araçları.
 >
@@ -27,6 +27,7 @@
 > p0.25: solo desteği. `lists` (§3.0g) `op: "progress"` (kaldığın yer, kendi cevabında `progress`), `op: "seen_ep"` / `"unseen_ep"` (bölüm izledim; `seen` satırında ve cevapta `episodes`), `rate` için `stars` (1–5) + `word`, `who` cevabında `stars` ortalaması; `remove` `list: "progress"` alır. Tek seferlik `watch` (§3.0i, solo izleme süresi → istatistik, `feed` satırında `solo`) ve `detail` (§3.0j, odasız künye + `similar`). Kartlara `backdrop`. Yalnızca ekleme; p0.24 sunucusu `watch`/`detail`'e `error` (`not_joined`), yeni `lists` op'larına `bad_message` döner.
 > p0.26: "Ne izlesem?" ve "Göz at". Tek seferlik `solo_night` / `solo_night_pick` (§3.0k, odasız deste: görülenler ve süre bütçesini aşanlar gelmez) ve `browse` (§3.0l, filtreli 30'luk sayfa). `night_start` için `pool: "lists"` (§3.9a, havuz odadakilerin İzleyeceklerim listelerinden dolar; `night` mesajında `source`). Yalnızca ekleme; p0.25 sunucusu yeni tiplere `error` (`not_joined`) döner, `pool`'u yok sayar.
 > p0.27: dizi takibi, intro işareti, öneriler. Tek seferlik `upcoming` (§3.0m, izlenen dizilerin sıradaki bölümü + izlenmemiş sayısı + `team`: odada birlikte izlenen dizide ekibin son bölümü), `skip` (§3.0n, sunucudaki herkesin paylaştığı intro/özet işareti, son yazan kazanır) ve `recs` (§3.0o, öneri rafları). Odada `series:tt…:s:e` bölümü %80'i geçince odadaki hesapların ekip kaydı güncellenir. Yalnızca ekleme; p0.26 sunucusu yeni tiplere `error` (`not_joined`) döner.
+> p0.28: mola, film gecesi, oda geçmişi, aylık özet. Oda içinde `cmd` `break` / `ready` (§3.3) → `break` mesajı (§4.19), son kişi hazır olunca "Hazır mısınız?" geri sayımı; oda `history` mesajı (§4.20, son 20 medya, kim açtı, kalınan yer); `snapshot.break` ve `snapshot.history`. Tek seferlik `event` (§3.0p, film gecesi planla / katılıyorum / iptal) ve `presence.events` (§3.0e); saatinde sunucu odayı açar. Tek seferlik `recap` (§3.0q, aylık özet). `lists` için `kind: "video"` (§3.0g). `denied.reason=no_break`, `error.code=too_many_events`. Yalnızca ekleme; p0.27 sunucusu `break`/`ready`'ye `denied` (`bad_op`), `event`/`recap`'e `error` (`not_joined`) döner.
 >
 > p0.13: oda modu: `cmd` `set_view` (§3.3), `view` mesajı (§4.17), `snapshot.view` (§4.1). Yalnızca ekleme; p0.12 sunucusu `set_view`'a `denied` (`bad_op`) döner, istemci `view` yoksa Sinema varsayar.
 >
@@ -149,6 +150,7 @@ Sunucu önce `{ "t": "hello", "protocol": "p0.18", "name", "tag", "avatar" }`, s
 ```
   `watch`: aynı odada aynı başlığı izleyenler bir satırda (en çok izleyen önce, `sec` en uzun süre); 5 dk altı düşer.
 - p0.22 oda içinde `{ "t": "close_room" }`: host odayı herkes için kapatır; diğerlerine `error` (`room_ended`), oda listeden hemen düşer.
+- p0.28 `presence.events`: planladığın ya da davet edildiğin film geceleri (§3.0p `event` cevabındaki `events` ile aynı), başlangıcından 6 saat sonrasına kadar.
 
 ### 3.0g `lists` — İzleyeceklerim / İzlediklerim (p0.23)
 Tek seferlik (cevap, sonra bağlantı kapanır). Başlık anahtarı `ref`: IMDb kimliği (`tt…`), yoksa `tmdb:<kind>:<id>`.
@@ -174,6 +176,8 @@ p0.25 eklemeleri (eski istekler aynen çalışır):
 - `seen_ep`: bölüm düzeyi izledim (`season` ≥ 0, `episode` ≥ 1). Başlığı İzlediklerim'e koymaz; dizi zaten `seen`'deyse satırında `episodes: ["s:e"]` görünür.
 - `rate` + `stars`: 1–5 yıldız ve isteğe bağlı tek kelime (`word`, en fazla 24 karakter, fazlası kesilir). ❤️/👎 `rating`'e dokunmaz; `stars: -1` yıldızı ve kelimeyi siler. `stars`/`word` yoksa p0.23 gibi `rating` ayarlanır. Yalnızca `seen`'deki başlıkta işe yarar (önce `add` `seen`).
 - `seen` satırlarında `stars`, `word`. `who`: `seen[]` satırlarında `stars`, `word`; `mine.stars`, `mine.word`, `mine.episodes`; en az bir puan varsa üstte `stars` (sen + karşılıklı arkadaşlar, bir ondalık) ve `starsCount`.
+
+p0.28: `entry.kind` `video` da olabilir (Keşfet'ten bir YouTube videosu İzleyeceklerim'e). `ref` istemcinin seçtiği anahtardır (ör. `yt:dQw4w9WgXcQ`), `poster` küçük resim. Video satırları dizi takibine, "Ne izlesek?" havuzuna ve öneri raflarının "Çünkü…" bölümüne girmez. Eski sunucu bilinmeyen `kind`'ı `movie` yapar.
 
 ### 3.0i `watch` — solo izleme süresi (p0.25)
 Tek seferlik. Solo oynatıcı oynarken istemci dakikada bir gönderir:
@@ -261,6 +265,52 @@ Cevap:
 - `together` ("Ayşe de izleyecek"): İzleyeceklerim'inde olup karşılıklı arkadaşlarından en az birinin de istediği başlıklar; liste satırı + `mates`. Listedeki sırayla (yeniden eskiye), en fazla 20.
 - Boş raf boş dizi olarak gelir.
 
+### 3.0p `event` — film gecesi (p0.28)
+Tek seferlik. Hesaplı sunucuda `auth` gerekir (açık sunucuda `no_accounts`).
+```json
+{ "t": "event", "auth": "…", "op": "create", "title": "Cuma filmi", "at": 1762455600000, "guests": ["Ayşe#0412", "Mert#1180"] }
+{ "t": "event", "auth": "…", "op": "rsvp", "id": 7, "rsvp": "yes" }
+{ "t": "event", "auth": "…", "op": "cancel", "id": 7 }
+{ "t": "event", "auth": "…" }
+```
+- `create`: `at` başlangıç (unix ms), şu andan sonra ve en fazla 60 gün ileride; değilse `bad_entry`. `title` en fazla 80 karakter, boşsa "Film gecesi". `guests` en fazla 7 hesap, hepsi karşılıklı arkadaşın olmalı (değilse `not_friends`, bilinmeyen ad `unknown_user`). Host başına en fazla 10 bekleyen gece (`too_many_events`). Cevaba `id` eklenir.
+- `rsvp`: davetli `yes` | `no` | `maybe` der. Davetli değilsen ya da gece iptal/kaçmışsa `bad_entry`.
+- `cancel`: yalnızca host, oda açılmadan önce.
+- `op` yok ya da `list`: yalnızca okuma. Başka `op` → `bad_message`.
+
+Cevap her op için:
+```json
+{ "t": "event", "id"?: 7, "events": [
+  { "id": 7, "title": "Cuma filmi", "at": 1762455600000, "host": { "name": "Serkan#3124", "avatar": "av01" },
+    "guests": [ { "name": "Ayşe#0412", "avatar": "av02", "rsvp": "yes" } ], "mine": true, "state": "open",
+    "room": { "invite": "k3F9…", "name": "Cuma filmi" } } ] }
+```
+- `events`: host olduğun ya da davet edildiğin geceler, başlangıcı 6 saatten eski olmayanlar, yakın olan önce (en fazla 20). İptaller gelmez.
+- `rsvp`: `""` (cevap yok) | `yes` | `no` | `maybe`. `mine`: host sensin. `state`: yoksa bekliyor; `open` oda açıldı; `missed` sunucu o saatte kapalıydı (2 saatten fazla geç kalınan gece açılmaz).
+- Saatinde sunucu gecenin adıyla boş bir oda açar (host adına, `free`). Host ve "hayır" demeyen davetliler çağrısız girer; davetlilere `presence.calls`'ta host'tan çağrı düşer. Oda açık kaldıkça `room` gelir. Odaya ilk giren host olur; kimse girmezse oda boş oda süresi sonunda kapanır.
+
+### 3.0q `recap` — aylık özet (p0.28)
+Tek seferlik. Hesaplı sunucuda `auth` gerekir.
+```json
+{ "t": "recap", "auth": "…", "month": "2026-10" }
+```
+`month` `YYYY-AA` (Türkiye saati); yoksa bu ay. Gelecek ay ya da geçersizse `error` `bad_period`.
+
+Cevap:
+```json
+{ "t": "recap", "month": "2026-10", "watchSec": 54000, "days": 12, "movies": 6, "series": 2,
+  "hours": [0, 0, 0, …24 değer…], "peakHour": 22,
+  "genres": [ { "name": "Gerilim", "count": 4 } ],
+  "mates": [ { "name": "Ayşe#0412", "avatar": "av02", "sec": 21600, "rooms": 5 } ],
+  "badges": [ { "id": "night", "title": "🦉 Gece Kuşu", "rule": "00:00–04:00 arası en çok izleyen" } ],
+  "best": { "ref": "tt1375666", "title": "Inception", "poster": "https://…", "stars": 4.5, "votes": 3 } }
+```
+- `watchSec`, `days`: o ay odada ve solo izleme süresi, izlenen gün sayısı. `hours`: saat başına izleme saniyesi (0–23, Türkiye saati); `peakHour` en çok izlenen saat, hiç yoksa `-1`.
+- `movies` / `series`: o ay İzlediklerim'e giren film / dizi sayısı. `genres`: bunların (en yeni 12) TMDB türleri, en çok geçen 5; keşif kapalıysa boş.
+- `mates`: o ay en çok birlikte izlediğin 3 karşılıklı arkadaş; `sec` aynı odada ikinizin de izlediği süre (oda başına kısa olan), `rooms` ortak oda sayısı. Solo izleme sayılmaz.
+- `badges`: o ayın rozetlerinden (§3.0a) senin kazandıkların.
+- `best` ("en yüksek ekip puanı"): o ay biriyle izleyip İzlediklerim'e giren başlıklardan, senin ve karşılıklı arkadaşlarının yıldız ortalaması en yüksek olan (bir ondalık; eşitlikte çok oy alan). Yoksa alan gelmez.
+
 ### 3.0f `admin` — yönetim (p0.19)
 Admin sunucuda verilir: `koni-server admin -db koni.db Ad#1234` (`-off` geri alır, `-list` hesapları listeler).
 ```json
@@ -329,6 +379,8 @@ Cevap `{ "t": "remote", "protocol": "p0.24", "name": "Ad#1234" }`. Sonra telefon
 | `continue_without` | `user` | Host ya da yardımcı host (host'u hedefleyemez). `user` üyesini DETACHED yapar: oda onu beklemez (HOLD'daysa `waitingFor`'dan düşer; boşalırsa `release`) |
 | `resync` | — | Gönderen DETACHED ise odaya döner (`member_detached` `detached:false`); her durumda gönderene `ack`'li `state` (`cause: "snapshot"`) gider |
 | `set_cohost` | `user`, `on` | Yalnızca host. `on: true` üyeyi yardımcı host yapar, `false` geri alır; herkese `member_role`. Değişiklik yoksa sessiz |
+| `break` | `min` (ops.) | p0.28 "Mola ver": oda `PAUSED` olur (`state` `cause: "pause"`), herkese `break` (§4.19). `min` 1–30 dk (yoksa 5, fazlası 30). `host_only`'de yalnızca hostlar. Medya yoksa `denied` (`no_media`). Yeni `break` öncekinin yerini alır |
+| `ready` | — | p0.28 molada "Hazırım". Bağlı (koptu/DETACHED olmayan) herkes hazır olunca mola biter ve oda kaldığı yerden "Hazır mısınız?" geri sayımıyla başlar (`state` `countdown`, `cause: "release"`, pay en az 3 sn). Mola yoksa `denied` (`no_break`) |
 
 - `cid`: istemcinin ürettiği, bağlantı içinde benzersiz kimlik. Sunucu `state`/`denied` içinde `ack` olarak geri verir; istemci kendi yankısını böyle tanır.
 - `pos` yoksa sunucu o anki oda konumunu kullanır (`position(now)`, bkz. §6).
@@ -486,6 +538,8 @@ p0.12–p0.15'te Lounge'a yerel ses dosyası eklemek için `POST /relay` vardı.
 
 `downloads`: geçerli "Herkes İndirsin" görevinde (`state.media.task`) durum bildirmiş üyeler; görev yoksa boş.
 
+p0.28: `break` (ops.): süren mola, §4.19 `break` mesajıyla aynı. `history` (ops.): odanın geçmişi, §4.20 `items` ile aynı.
+
 ### 4.2 `state` — oda state'i (anchor)
 ```json
 { "t": "state", "seq": 43, "mode": "paused", "anchorPos": 5050.120, "anchorTs": 1730130000180,
@@ -547,7 +601,7 @@ Hazır olunca sunucu `state` (`mode: "countdown"`, `cause: "release"`, `startAt`
 { "t": "denied", "ack": "c-90", "reason": "host_only" }
 { "t": "error", "code": "bad_invite", "message": "Davet geçersiz" }
 ```
-- `denied.reason`: `host_only` | `rate_limited` | `not_host` | `bad_op` | `bad_media`
+- `denied.reason`: `host_only` | `rate_limited` | `not_host` | `bad_op` | `bad_media` | `no_media` | `no_break` (p0.28)
 - `error.code`: `bad_message` | `bad_invite` | `bad_username` | `name_taken` | `not_joined` | `room_full` | `resume_failed` | hesap kodları (§3.0, §3.1) | `too_large` | `no_reports` (§3.0b)
 - `error` ile ilgili durumlarda bağlantı `create_room`/`join` aşamasında kapatılır, sonrasında açık kalır.
 
@@ -637,6 +691,24 @@ Herkes aynı ekranı görür: `browse` (arama, "Ne izlesek?", gömülü tarayıc
 { "t": "reaction", "user": "u2", "name": "Coni", "emoji": "😂" }
 ```
 Bir üyenin hızlı tepkisi (§3.13); gönderen dahil herkese. Saklanmaz, snapshot'ta yoktur.
+
+### 4.19 `break` — mola (p0.28)
+```json
+{ "t": "break", "by": "Serkan", "min": 10, "until": 1762455600000, "ready": ["u2"], "waiting": ["u1", "u3"] }
+{ "t": "break", "end": true, "cause": "ready" }
+```
+- Mola başlayınca ve hazır sayısı değişince (biri `ready` dedi, katıldı, ayrıldı, koptu, DETACHED oldu ya da döndü) herkese gider. `until`: molanın bitmesi beklenen an (unix ms); yalnızca gösterim içindir, oda kendiliğinden başlamaz. `ready` / `waiting`: bağlı üyelerin id'leri.
+- `end: true`: mola bitti. `cause`: `ready` (herkes hazır; ardından geri sayımlı `state`), `play` / `seek` (biri molayı beklemeden başlattı), `media` (medya değişti ya da kapandı). Oda boşalırsa mola sessizce düşer.
+
+### 4.20 `history` — oda geçmişi (p0.28)
+```json
+{ "t": "history", "items": [
+  { "media": { "kind": "url", "src": "https://…", "title": "Dune" }, "by": "Coni", "at": 1762455600000, "pos": 0 },
+  { "media": { "kind": "file", "src": "prisoners.mkv", "title": "Prisoners" }, "by": "Serkan", "at": 1762450000000, "pos": 4350.2 } ] }
+```
+- Odada bir üye medya açınca (`cmd media`) ve medya kapanınca herkese gider; en yeni önce, en fazla 20. Kuyruğun kendiliğinden geçtiği şarkılar girmez. Aynı medya (`kind` + `src` + `file`) yeniden açılırsa eski satırı silinir, en üste çıkar.
+- `media`: §3.3 nesnesi (yeniden açmak için olduğu gibi `cmd media` ile gönderilebilir). `by`: açan üyenin adı, `at`: açıldığı an. `pos`: oda o medyadan ayrılırken kaldığı yer (sn); şu anki medyada güncel konum.
+- Geçmiş oda belleğindedir; oda kapanınca silinir.
 
 ## 5. Oda state makinesi (Faz 0)
 

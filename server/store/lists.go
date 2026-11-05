@@ -109,7 +109,7 @@ func migrateStars(db *sql.DB) error {
 // Entry is one title on a list.
 type Entry struct {
 	Ref    string   `json:"ref"`
-	Kind   string   `json:"kind"` // "movie" | "series"
+	Kind   string   `json:"kind"` // "movie" | "series" | "video" (p0.28)
 	Title  string   `json:"title"`
 	Year   int      `json:"year,omitempty"`
 	Poster string   `json:"poster,omitempty"`
@@ -125,7 +125,7 @@ type Entry struct {
 
 func (e *Entry) clean() error {
 	e.Ref, e.Title = strings.TrimSpace(e.Ref), strings.TrimSpace(e.Title)
-	if e.Kind != "series" {
+	if e.Kind != "series" && e.Kind != "video" { // video: a YouTube video (p0.28)
 		e.Kind = "movie"
 	}
 	if e.Ref == "" || len(e.Ref) > 64 || e.Title == "" || len([]rune(e.Title)) > 200 || len(e.Poster) > 500 {
