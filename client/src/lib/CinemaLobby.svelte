@@ -11,6 +11,7 @@
   import { debridStatus, addonsList, type DetailRef } from "./player";
   import FreeShelf from "./FreeShelf.svelte";
   import RecShelves from "./RecShelves.svelte";
+  import LibraryPane from "./LibraryPane.svelte";
 
   let { value = $bindable(""), people, room, busy, error, hue, onOpen, onTitles, onNight, onDownload, onResume, onDetail, onCall = null }: {
     value: string;
@@ -161,7 +162,7 @@
           <div class="th" style="--p:{(r.pos / r.duration) * 100}%;--h:{hue(r.title)}"><span>{r.title.slice(0, 1)}</span></div>
           <span class="ct"><b title={r.title}>{r.title}</b><small>{ago(r.at)} · {left(r)}</small></span>
           <button class="x" title={t("Listeden çıkar")} onclick={() => forget(r)}><Icon name="x" size={12} /></button>
-          <button class="resume" disabled={busy} onclick={() => onResume(r)}><Icon name="play" size={12} /> {t("Devam")}</button>
+          <button class="resume" disabled={busy} onclick={() => (r.kind === "file" ? onOpen(r.src) : onResume(r))}><Icon name="play" size={12} /> {t("Devam")}</button>
         </div>
       {:else}
         <div class="none">{t("Yarım kalan film yok. İzlediğin her şeyin yeri burada tutulur.")}</div>
@@ -191,6 +192,8 @@
       </div>
     </div>
   </div>
+
+  <LibraryPane {busy} {onOpen} />
 
   <RecShelves onOpen={onDetail} {onCall} />
 

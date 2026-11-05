@@ -37,6 +37,9 @@ tauri-plugin-deep-link = "2"
 # Chromecast (cast/chromecast.rs): ağda bulma ve TV ile TLS bağlantısı.
 mdns-sd = "0.21.7"
 native-tls = "0.2"
+# Yerel kütüphane (library.rs): klasör seçme penceresi ve klasör gezme.
+tauri-plugin-dialog = "2"
+walkdir = "2"
 
 # Masaüstünde ikinci örnek açılırsa linki ilk örneğe iletir.
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]

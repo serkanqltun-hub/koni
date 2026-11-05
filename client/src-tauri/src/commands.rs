@@ -1605,6 +1605,38 @@ pub async fn catalog_search(query: String) -> CmdResult<Vec<crate::addons::Title
     crate::addons::search(&query).await
 }
 
+// ---- Yerel kütüphane (library.rs) ----------------
+
+#[tauri::command]
+pub async fn library_get(app: AppHandle) -> CmdResult<serde_json::Value> {
+    crate::library::get(&app).await
+}
+
+/// Klasör seçme penceresini açar; seçilen klasörü ekleyip tarar. Vazgeçilirse `None`.
+#[tauri::command]
+pub async fn library_add(app: AppHandle) -> CmdResult<Option<serde_json::Value>> {
+    use tauri_plugin_dialog::DialogExt;
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog().file().pick_folder(move |p| {
+        let _ = tx.send(p);
+    });
+    let Some(dir) = rx.await.ok().flatten() else {
+        return Ok(None);
+    };
+    let dir = dir.into_path().map_err(|e| e.to_string())?;
+    crate::library::add(&app, dir).await.map(Some)
+}
+
+#[tauri::command]
+pub async fn library_remove(app: AppHandle, folder: String) -> CmdResult<serde_json::Value> {
+    crate::library::remove(&app, &folder).await
+}
+
+#[tauri::command]
+pub async fn library_scan(app: AppHandle) -> CmdResult<serde_json::Value> {
+    crate::library::scan(&app).await
+}
+
 #[tauri::command]
 pub async fn catalog_popular() -> CmdResult<Vec<crate::addons::Title>> {
     crate::addons::popular().await
