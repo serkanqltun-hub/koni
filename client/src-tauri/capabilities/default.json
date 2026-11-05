@@ -51,6 +51,8 @@
     "allow-sync-set-cohost",
     "allow-sync-set-policy",
     "allow-sync-set-view",
+    "allow-sync-break",
+    "allow-sync-ready",
     "allow-web-search",
     "allow-media-list",
     "allow-sync-resync",

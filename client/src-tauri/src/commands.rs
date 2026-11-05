@@ -1288,6 +1288,12 @@ pub fn sync_seek(state: State<'_, AppState>, seconds: f64) -> CmdResult {
     sync_send(&state, UiCmd::Seek(seconds))
 }
 
+/// Odanın geçmişindeki bir medyayı yeniden aç (`cmd media`).
+#[tauri::command(async)]
+pub fn sync_reopen(state: State<'_, AppState>, media: koni_sync::protocol::Media) -> CmdResult {
+    sync_send(&state, UiCmd::Reopen(media))
+}
+
 /// Odada çalanı herkes için kapat (oda açık kalır).
 #[tauri::command(async)]
 pub fn sync_close(state: State<'_, AppState>) -> CmdResult {
@@ -1339,6 +1345,36 @@ pub fn sync_set_view(state: State<'_, AppState>, view: String) -> CmdResult {
     );
     let msg = serde_json::json!({ "t": "cmd", "cid": cid, "op": "set_view", "view": view });
     sync_send(&state, UiCmd::Fun(msg.to_string()))
+}
+
+/// Mola ver (p0.28 `cmd break`): oda durur, herkese "Hazırım" düğmesi çıkar.
+#[tauri::command]
+pub fn sync_break(state: State<'_, AppState>, min: u32) -> CmdResult {
+    sync_cmd_raw(
+        &state,
+        "break",
+        serde_json::json!({ "min": min.clamp(1, 30) }),
+    )
+}
+
+/// Molada "Hazırım" (p0.28 `cmd ready`).
+#[tauri::command]
+pub fn sync_ready(state: State<'_, AppState>) -> CmdResult {
+    sync_cmd_raw(&state, "ready", serde_json::json!({}))
+}
+
+fn sync_cmd_raw(state: &State<'_, AppState>, op: &str, extra: serde_json::Value) -> CmdResult {
+    let cid = format!(
+        "{op}-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_millis())
+    );
+    let mut msg = serde_json::json!({ "t": "cmd", "cid": cid, "op": op });
+    if let (Some(m), Some(e)) = (msg.as_object_mut(), extra.as_object()) {
+        m.extend(e.clone());
+    }
+    sync_send(state, UiCmd::Fun(msg.to_string()))
 }
 
 /// Keşfet: YouTube araması (yt-dlp `ytsearch`, anahtar gerekmez).

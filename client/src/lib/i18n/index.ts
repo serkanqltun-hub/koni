@@ -8,8 +8,10 @@ import panels from "./panels";
 import misc from "./misc";
 import rust from "./rust";
 import skip from "./skip";
+import roomHistory from "./roomHistory";
+import brk from "./break";
 import recap from "./recap";
 import { PATTERNS } from "./patterns";
 
-export const EN: Record<string, string> = { ...misc, ...panels, ...views, ...home, ...night, ...solo, ...app, ...rust, ...skip, ...recap };
+export const EN: Record<string, string> = { ...misc, ...panels, ...views, ...home, ...night, ...solo, ...app, ...rust, ...skip, ...roomHistory, ...brk, ...recap };
 export { PATTERNS };

@@ -57,6 +57,8 @@ pub enum UiCmd {
     },
     /// "Herkes İndirsin": odaya `download` medyası aç.
     OpenDownload(String),
+    /// Odanın geçmişinden aynı medyayı yeniden aç (`cmd media`).
+    Reopen(Media),
     /// Odaya Real-Debrid torrenti aç (`kind: debrid`); herkes kendi hesabıyla çözer.
     OpenDebrid(Media),
     /// Tarayıcıda senkron (`kind: page`): herkes sayfayı Keşfet'te açar.
@@ -103,6 +105,7 @@ const FUN_TYPES: &[&str] = &[
     "night_results",
     "night_detail",
     "called",
+    "break",
 ];
 
 /// Hızlı tepki gönderildikten sonra bu süre içinde gelen `bad_message` eski sunucunun
@@ -157,6 +160,26 @@ fn fun_msg(text: &str) -> Option<serde_json::Value> {
         return None;
     }
     serde_json::from_str(text).ok()
+}
+
+/// `joined` mesajında süren mola (p0.28 `snapshot.break`) varsa `break` mesajı olarak döner;
+/// yoksa "mola yok" (`end`) döner ki yeniden girişte eski mola ekranı kalmasın.
+fn joined_break(text: &str) -> Option<serde_json::Value> {
+    if !text.contains(r#""t":"joined""#) {
+        return None;
+    }
+    let v: serde_json::Value = serde_json::from_str(text).ok()?;
+    if v["t"] != "joined" {
+        return None;
+    }
+    match v["snapshot"].get("break") {
+        Some(b) if b.is_object() => {
+            let mut b = b.clone();
+            b["t"] = "break".into();
+            Some(b)
+        }
+        _ => Some(serde_json::json!({ "t": "break", "end": true, "cause": "join" })),
+    }
 }
 
 /// Odaya nasıl girileceği.
@@ -988,6 +1011,10 @@ async fn run(
                     let _ = app.emit("sync://fun", v);
                     continue;
                 }
+                if let Some(v) = joined_break(text.as_str()) {
+                    // p0.28: süren mola (snapshot.break) arayüze `break` olarak gider.
+                    let _ = app.emit("sync://fun", v);
+                }
                 let mut msg: ServerMsg = match serde_json::from_str(text.as_str()) {
                     Ok(m) => m,
                     Err(e) => {
@@ -1195,6 +1222,16 @@ async fn run(
                 UiCmd::OpenDownload(src) => {
                     let m = Media::new(MediaKind::Download, src, String::new());
                     vec![EngineEvent::Send(engine.user_media(m))]
+                }
+                UiCmd::Reopen(m) => {
+                    if room_has(&engine, m.kind, &m.src) {
+                        room_media.loaded = None;
+                        let media = engine.room().and_then(|r| r.media.as_deref());
+                        room_media.reconcile(app, media, &player.mpv);
+                        Vec::new()
+                    } else {
+                        vec![EngineEvent::Send(engine.user_media(m))]
+                    }
                 }
                 UiCmd::OpenDebrid(m) => {
                     if room_has(&engine, MediaKind::Debrid, &m.src) {

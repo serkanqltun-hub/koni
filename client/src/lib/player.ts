@@ -234,7 +234,12 @@ export type FunMsg =
   | { t: "night_suggestions"; items: Movie[]; total: number; error?: string }
   | { t: "night_results"; query: string; items: Movie[]; error?: string }
   | { t: "night_detail"; item: Movie; error?: string }
-  | { t: "called"; user: string };
+  | { t: "called"; user: string }
+  | BreakMsg;
+/** p0.28 mola (PROTOCOL §4.19): süren molanın durumu ya da bitişi. */
+export type BreakMsg =
+  | { t: "break"; end?: false; by: string; min: number; until: number; ready: string[]; waiting: string[] }
+  | { t: "break"; end: true; cause?: string };
 /** Hızlı tepkiler (PROTOCOL p0.14); sunucu başka değeri yok sayar. */
 export const REACTIONS = ["😂", "😱", "😍", "👏", "😭", "🔥"] as const;
 /** Odaya keşif/çark/altyazı mesajı. */
@@ -363,12 +368,21 @@ export interface DlStatus {
   error: string;
 }
 
+/** Odanın geçmişindeki bir medya (§4.20). `media` olduğu gibi `cmd media` ile yeniden açılır. */
+export interface HistoryItem {
+  media: { kind: MediaEvent["kind"]; src: string; title?: string; duration?: number; file?: string; idx?: number; referer?: string };
+  by: string;
+  at: number;
+  pos: number;
+}
+
 /** `sync://server`: docs/PROTOCOL.md §4 mesajları (pong hariç). */
 export type ServerMsg =
   | { t: "room_created"; room: string; name: string; invite: string; you: string }
-  | { t: "joined"; you: string; invite: string; resumed?: boolean; snapshot: { room: string; name: string; host: string; policy: Policy; view?: RoomView | ""; members: Member[]; downloads?: DlStatus[]; state: { media?: { task?: string } } } }
+  | { t: "joined"; you: string; invite: string; resumed?: boolean; snapshot: { room: string; name: string; host: string; policy: Policy; view?: RoomView | ""; members: Member[]; downloads?: DlStatus[]; history?: HistoryItem[]; state: { media?: { task?: string } } } }
   | ({ t: "dl_status"; taskId: string } & DlStatus)
   | { t: "state"; mode: RoomMode; by?: { id: string; name: string } }
+  | { t: "history"; items: HistoryItem[] }
   | { t: "activity"; kind: string; text: string }
   | { t: "member_joined"; member: Member }
   | { t: "member_left"; id: string; host?: string }
@@ -387,6 +401,8 @@ export type ServerMsg =
 
 export const syncConnect = (url: string, username: string, roomName: string | null, invite: string | null) =>
   invoke<void>("sync_connect", { url, username, roomName, invite });
+/** Odanın geçmişinden aynı medyayı yeniden aç. */
+export const syncReopen = (media: HistoryItem["media"]) => invoke<void>("sync_reopen", { media });
 export const syncPlay = () => invoke<void>("sync_play");
 export const syncPause = () => invoke<void>("sync_pause");
 export const syncSeek = (seconds: number) => invoke<void>("sync_seek", { seconds });
@@ -430,6 +446,10 @@ export const accountLogout = (url: string) => invoke<void>("account_logout", { u
 
 /** Odanın ortak ekranı: Keşfet (ne izlesek), Sinema, Müzik. */
 export type RoomView = "browse" | "watch" | "listen";
+/** Mola ver (1–30 dk). */
+export const syncBreak = (min: number) => invoke<void>("sync_break", { min });
+/** Molada "Hazırım". */
+export const syncReady = () => invoke<void>("sync_ready");
 export const syncSetView = (view: RoomView) => invoke<void>("sync_set_view", { view });
 export interface SearchHit { url: string; title: string; channel?: string; durationSecs?: number; thumbnail?: string; live?: boolean }
 /** YouTube araması (yt-dlp). */
