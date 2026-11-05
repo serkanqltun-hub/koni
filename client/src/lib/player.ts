@@ -162,6 +162,11 @@ export interface UpcomingItem { ref: string; title: string; poster?: string; sea
 export interface TeamItem { ref: string; title: string; room: string; season: number; episode: number; members: { name: string; avatar?: string }[]; ahead?: string[]; at: number }
 export interface Upcoming { t: "upcoming"; items: UpcomingItem[]; team: TeamItem[] }
 export const upcomingGet = (url: string) => invoke<Upcoming | null>("upcoming_get", { url });
+/** p0.27 `recs` (PROTOCOL §3.0o): öneri rafları. `friends`/`together` liste satırıdır. */
+export interface RecHolder { name: string; avatar?: string; stars?: number; word?: string }
+export interface RecEntry extends ListEntry { by?: RecHolder[]; mates?: RecHolder[] }
+export interface Recs { t: "recs"; because: { ref: string; title: string; items: Movie[] }[]; friends: RecEntry[]; together: RecEntry[] }
+export const recsGet = (url: string) => invoke<Recs | null>("recs_get", { url });
 export interface Ratings { tmdb?: number; imdb?: string; rt?: string; meta?: string }
 export interface Movie {
   id: number; title: string; original?: string; year?: number; overview?: string; poster?: string;
@@ -267,7 +272,9 @@ export const castControl = (device: CastDevice, control: CastControl) => invoke<
 /** TV'deki konum (saniye); TV bilmiyorsa `duration` 0. */
 export interface CastPosition { position: number; duration: number; playing: boolean }
 export const castPosition = (device: CastDevice) => invoke<CastPosition>("cast_position", { device });
-/** "Bilgisayara geri al": TV kapanır, video bilgisayarda TV'nin kaldığı yerden sürer. */
+/** Odada TV'den izleyenin raporundaki tampon değeri (Rust `cast::TV_BUFFER_SEC`): "📺 TV'de" rozeti. */
+export const TV_BUFFER_SEC = 9999;
+/** "Bilgisayara geri al": TV kapanır, video bilgisayarda TV'nin kaldığı yerden sürer (odadaysa odaya hizalanır). */
 export const castBack = (device: CastDevice) => invoke<void>("cast_back", { device });
 /** macOS: "Ekranı yansıt" (Windows Yayınla paneli) yok; AirPlay Denetim Merkezi'nden açılır. */
 export const isMac = /Macintosh|Mac OS X/.test(navigator.userAgent);
@@ -352,7 +359,7 @@ export type ServerMsg =
   | { t: "policy"; policy: Policy }
   | { t: "detach_offer"; user: string; name: string; stalls: number }
   | { t: "detached"; by?: string }
-  | { t: "member_status"; id: string; driftMs: number; state: string; bufferPct: number; rttMs?: number }
+  | { t: "member_status"; id: string; driftMs: number; state: string; bufferPct: number; bufferSec?: number; rttMs?: number }
   | { t: "buffer_status"; user: string; name?: string; bufferPct: number }
   | { t: "denied"; ack: string; reason: string }
   | { t: "error"; code: string; message: string }

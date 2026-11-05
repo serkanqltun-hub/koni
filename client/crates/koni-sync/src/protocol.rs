@@ -121,6 +121,10 @@ pub enum ClientMsg {
     Upcoming {
         auth: String,
     },
+    /// Tek seferlik (p0.27): öneri rafları (`because` / `friends` / `together`).
+    Recs {
+        auth: String,
+    },
     /// Tek seferlik (p0.22): ana ekran "Etkinlik" sekmesi, son 7 gün.
     Feed {
         auth: String,

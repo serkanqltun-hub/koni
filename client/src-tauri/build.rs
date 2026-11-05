@@ -59,6 +59,7 @@ const COMMANDS: &[&str] = &[
     "detail_get",
     "browse_get",
     "upcoming_get",
+    "recs_get",
     "solo_night",
     "solo_night_pick",
     "friends",

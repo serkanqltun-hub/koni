@@ -38,5 +38,10 @@ const en: Record<string, string> = {
   "Liste yüklenemedi.": "Couldn't load the list.",
   "Ücretsiz resmi kanal": "Free official channel",
   "Bu filmin oynatılabilir dosyası yok": "This film has no playable file",
+  "Çünkü izlediğin: {title}": "Because you watched {title}",
+  "Arkadaşların beğendi": "Your friends liked",
+  "Arkadaşların da izleyecek": "Your friends want to watch",
+  "{names} de istiyor": "{names} want(s) to watch it too",
+  "Birlikte aç · Çağır": "Watch together · Invite",
 };
 export default en;

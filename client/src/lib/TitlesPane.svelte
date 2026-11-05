@@ -12,13 +12,14 @@
   import SourceHunt from "./SourceHunt.svelte";
   import MovieDetail from "./MovieDetail.svelte";
   import BrowseTitles from "./BrowseTitles.svelte";
+  import RecShelves from "./RecShelves.svelte";
   import { rankSources, type Prefer, type SourceInfo } from "./sources";
   import { untrack } from "svelte";
   import { loadResume } from "./resume";
   import { prefs } from "./prefs.svelte";
   import { t, tx } from "./i18n.svelte";
 
-  let { inRoom, onPlay, onError, withSearch = false, onExit, initial = "", watch = null }: {
+  let { inRoom, onPlay, onError, withSearch = false, onExit, initial = "", watch = null, onCall = null }: {
     inRoom: boolean;
     onPlay: (s: Source, title: string, alts?: Source[]) => void;
     onError: (msg: string) => void;
@@ -29,7 +30,9 @@
     /** Açılışta aranacak metin (lobi kutusundan). */
     initial?: string;
     /** Profildeki listeden "İzle": başlığı aç, bölümü seç, kaynak aramasını başlat. */
-    watch?: { ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; prefer?: Prefer; season?: number; episode?: number } | null;
+    watch?: { ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; prefer?: Prefer; detailOnly?: boolean; season?: number; episode?: number } | null;
+    /** Öneri rafındaki "Çağır". */
+    onCall?: ((name: string) => void) | null;
   } = $props();
 
   let setup = $state(false);
@@ -132,7 +135,7 @@
     const w = watch;
     if (!w) return;
     untrack(() => {
-      autoPlay = true;
+      autoPlay = !w.detailOnly;
       pick({ id: w.ref, type: w.kind, name: w.title, poster: w.poster, releaseInfo: w.year ? String(w.year) : undefined });
     });
   });
@@ -374,6 +377,7 @@
   {#if pane === "browse"}
   <BrowseTitles {card} {onError} />
   {:else}
+  <RecShelves onOpen={openSimilar} {onCall} />
   <div class="pop-header">
     <div class="pop-left">
       <b>{t("Film & Dizi Galerisi")}</b>
