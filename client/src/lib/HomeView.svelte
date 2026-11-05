@@ -8,7 +8,7 @@
   import Avatar from "./Avatar.svelte";
   import SocialModals from "./SocialModals.svelte";
   import ProfileView from "./ProfileView.svelte";
-  import { loadResume, removeResume } from "./resume";
+  import { loadResume, pullResume, removeResume } from "./resume";
   import { feedGet, friendsCall, lobbyDecline, statsGet, type FeedItem, type ListEntry, type OpenRoom, type PresenceFriend, type RoomView, type Stats, type StatsPeriod } from "./player";
   import { refreshProfile, social, splitHandle } from "./social.svelte";
   import { i18n, t, tx, locale } from "./i18n.svelte";
@@ -209,6 +209,7 @@
 
   // ---- yarım kalanlar
   let resumes = $state(loadResume().sort((a, b) => b.at - a.at).slice(0, 3));
+  pullResume().then((l) => (resumes = l.slice(0, 3)));
   function drop(r: ResumeEntry) {
     removeResume(r.src);
     resumes = resumes.filter((x) => x.src !== r.src);

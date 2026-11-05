@@ -182,6 +182,7 @@ const en: Record<string, string> = {
   "Kaldığınız yerden": "Continue watching",
   "bu oda": "this room",
   "bu bilgisayar": "this computer",
+  "tüm cihazların": "all your devices",
   "Listeden çıkar": "Remove from list",
   "Yarım kalan film yok. İzlediğin her şeyin yeri burada tutulur.": "Nothing in progress. Your place in everything you watch is saved here.",
   "İndir": "Download",
@@ -225,5 +226,12 @@ const en: Record<string, string> = {
   // MovieDetail
   "Benzerleri": "More like this",
   "Bu başlık için kaynak aranamıyor": "Can't look for sources for this title",
+  // RateCard
+  "Puanın": "Your rating",
+  "Tek kelime (isteğe bağlı)": "One word (optional)",
+  "İzlediklerime ekle": "Add to my watched",
+  "Puanla": "Rate",
+  "✓ Kaydedildi": "✓ Saved",
+  "Kaydedilemedi": "Couldn't save",
 };
 export default en;

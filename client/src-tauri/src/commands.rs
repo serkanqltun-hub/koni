@@ -564,7 +564,10 @@ pub async fn lists_call(
     list: Option<String>,
     reference: Option<String>,
     rating: Option<i32>,
+    stars: Option<i32>,
+    word: Option<String>,
     entry: Option<serde_json::Value>,
+    extra: Option<serde_json::Map<String, serde_json::Value>>,
 ) -> CmdResult<Option<serde_json::Value>> {
     let url = ws_url(&url)?;
     let Some(acc) = account::get(&url) else {
@@ -577,7 +580,10 @@ pub async fn lists_call(
         list: list.unwrap_or_default(),
         reference: reference.unwrap_or_default(),
         rating,
+        stars,
+        word: word.unwrap_or_default(),
         entry,
+        extra,
     };
     Ok(Some(account::lists(&url, msg).await?))
 }
@@ -609,6 +615,18 @@ pub async fn feed_get(url: String) -> CmdResult<Option<serde_json::Value>> {
         return Ok(None);
     };
     Ok(Some(account::feed(&url, acc.token).await?))
+}
+
+/// Solo izleme süresi raporu (p0.25). Hesap yoksa `null`.
+#[tauri::command]
+pub async fn watch_report(url: String, sec: u32, title: Option<String>) -> CmdResult<Option<u32>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    Ok(Some(
+        account::watch(&url, acc.token, sec.min(120), title.unwrap_or_default()).await?,
+    ))
 }
 
 /// Arkadaş listesi; `op` `list` | `add` | `remove`. Hesap yoksa `null`.
