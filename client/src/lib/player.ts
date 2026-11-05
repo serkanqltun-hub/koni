@@ -142,6 +142,14 @@ export const bugReport = (url: string, username: string, note: string, log: stri
   invoke<string>("bug_report", { url, username, note, log });
 
 // ---- Keşif, çark, altyazı, kuyruk (PROTOCOL §3.9–3.11, §4.12–4.16) -------------
+/** p0.26 `browse` (PROTOCOL §3.0l): "Göz at" filtreli 30'luk sayfa; kartlar ayrıntısız. */
+export interface BrowseQuery {
+  genre?: number; yearFrom?: number; yearTo?: number; minRating?: number; maxMin?: number; lang?: string;
+  sort?: "popular" | "rating" | "new"; page?: number;
+}
+export interface BrowsePage { t: "browse"; kind: string; page: number; items: Movie[]; total: number; error?: string }
+export const browseGet = (url: string, kind: "movie" | "series", query: BrowseQuery) =>
+  invoke<BrowsePage | null>("browse_get", { url, kind, query });
 export interface Ratings { tmdb?: number; imdb?: string; rt?: string; meta?: string }
 export interface Movie {
   id: number; title: string; original?: string; year?: number; overview?: string; poster?: string;

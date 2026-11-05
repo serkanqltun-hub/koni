@@ -166,6 +166,7 @@ pub fn run() {
             commands::watch_report,
             commands::lists_call,
             commands::detail_get,
+            commands::browse_get,
             commands::friends,
             commands::profile,
             commands::admin,

@@ -502,6 +502,7 @@ impl SimRoom {
             | ClientMsg::Watch { .. }
             | ClientMsg::Lists { .. }
             | ClientMsg::Detail { .. }
+            | ClientMsg::Browse { .. }
             | ClientMsg::Friends { .. }
             | ClientMsg::Profile { .. }
             | ClientMsg::Admin { .. }
