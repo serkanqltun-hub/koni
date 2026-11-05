@@ -9,7 +9,7 @@
   import SocialModals from "./SocialModals.svelte";
   import ProfileView from "./ProfileView.svelte";
   import { loadResume, pullResume, removeResume } from "./resume";
-  import { feedGet, friendsCall, lobbyDecline, statsGet, type FeedItem, type ListEntry, type OpenRoom, type PresenceFriend, type RoomView, type Stats, type StatsPeriod } from "./player";
+  import { feedGet, friendsCall, lobbyDecline, statsGet, upcomingGet, type FeedItem, type TeamItem, type Upcoming, type UpcomingItem, type ListEntry, type OpenRoom, type PresenceFriend, type RoomView, type Stats, type StatsPeriod } from "./player";
   import { refreshProfile, social, splitHandle } from "./social.svelte";
   import { i18n, t, tx, locale } from "./i18n.svelte";
 
@@ -37,8 +37,8 @@
     onJoin: (code: string) => void;
     onSolo: () => void;
     onResume: (r: ResumeEntry) => void;
-    /** Profildeki İzleyeceklerim'den "İzle". */
-    onWatch: (e: ListEntry) => void;
+    /** Profildeki İzleyeceklerim'den "İzle"; dizide `season`/`episode` o bölümü açar. */
+    onWatch: (e: ListEntry & { season?: number; episode?: number }) => void;
   } = $props();
 
   /** Açık profil (p0.23): "" kendi profilin, `Ad#1234` arkadaşın; `null` ana ekran. */
@@ -207,6 +207,37 @@
   });
   const best = $derived(week.reduce((a, b) => (b.v > a.v ? b : a), week[0]));
 
+  // ---- dizi takibi (p0.27): bu hafta çıkan bölümler ve ekiple izlediğin diziler
+  let up = $state<Upcoming | null>(null);
+  $effect(() => {
+    void rev;
+    if (!social.server) return;
+    let live = true;
+    upcomingGet(social.server).then((u) => { if (live) up = u; }, () => {});
+    return () => { live = false; };
+  });
+  const dayDiff = (airs: string) => Math.round((new Date(airs + "T00:00").getTime() - new Date(new Date().toDateString()).getTime()) / 86400000);
+  const thisWeek = $derived((up?.items ?? []).filter((i) => i.airs && i.season && Math.abs(dayDiff(i.airs)) <= 6).slice(0, 3));
+  const team = $derived((up?.team ?? []).slice(0, 3));
+  function airDay(airs: string): string {
+    const d = dayDiff(airs);
+    if (d === 0) return t("Bugün");
+    if (d === 1) return t("Yarın");
+    if (d === -1) return t("Dün");
+    return new Date(airs + "T00:00").toLocaleDateString(locale(), { weekday: "long" });
+  }
+  const ep = (s: number, e: number) => t("S{s} B{e}", { s, e });
+  const bare = (n: string) => splitHandle(n)[0];
+  const showTitle = (title: string) => title.replace(/\s*·\s*S\d+E\d+$/, "");
+  function watchEp(i: UpcomingItem) {
+    onWatch({ ref: i.ref, kind: "series", title: i.title, poster: i.poster, season: i.season, episode: i.episode });
+  }
+  /** Aynı ekiple sonraki bölüm: oda adıyla oda kurulur, ekip çağrılır, bölüm açılır. */
+  function nextWithTeam(r: TeamItem) {
+    const file = `series:${r.ref}:${r.season}:${r.episode + 1}`;
+    onResume({ kind: "ref", src: file, file, title: showTitle(r.title), room: r.room, with: r.members.map((m) => bare(m.name)), pos: 0, duration: 0, at: Date.now() });
+  }
+
   // ---- yarım kalanlar
   let resumes = $state(loadResume().sort((a, b) => b.at - a.at).slice(0, 3));
   pullResume().then((l) => (resumes = l.slice(0, 3)));
@@ -298,6 +329,39 @@
         <button class="lg wide" onclick={onSolo}>{t("Oynatıcıyı aç")}</button>
       </div>
     </div>
+
+    {#if thisWeek.length}
+      <div class="lab">{t("Bu hafta")} <span class="hint">{t("takip ettiğin dizilerde yeni bölümler")}</span></div>
+      <div class="cont">
+        {#each thisWeek as i (i.ref)}
+          {@const out = dayDiff(i.airs!) <= 0}
+          <div class="ci">
+            <button class="go" disabled={busy || !out} onclick={() => watchEp(i)} title={out ? t("Şimdi izle") : t("Henüz yayınlanmadı")}>
+              <span class="th po" style="--h:{hue(i.title)};--w:0%;{i.poster ? `background-image:url('${i.poster}')` : ''}"></span>
+              <span class="t"><b>{i.title}</b><small>{ep(i.season!, i.episode ?? 1)}{i.name ? " · " + i.name : ""}</small>
+                <small class:soon={!out}>{airDay(i.airs!)}{i.unseen ? " · " + t("{n} izlenmemiş", { n: i.unseen }) : ""}</small></span>
+            </button>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
+    {#if team.length}
+      <div class="lab">{t("Ekiple izlediklerin")} <span class="hint">{t("aynı ekiple sonraki bölüm: oda kurulur, onlar çağrılır")}</span></div>
+      <div class="cont">
+        {#each team as r (r.ref + r.members.map((m) => m.name).join())}
+          <div class="ci">
+            <button class="go" disabled={busy} onclick={() => nextWithTeam(r)} title={t("Aynı ekiple sonraki bölüm")}>
+              <span class="th" style="--h:{hue(r.title)};--w:0%"></span>
+              <span class="t"><b>{showTitle(r.title)}</b>
+                <small>{t("Bu ekip {ep}'te · {names}", { ep: ep(r.season, r.episode), names: names(r.members.map((m) => m.name)) })}</small>
+                <span class="with">{#each r.members.slice(0, 3) as m (m.name)}<Avatar id={m.avatar} name={m.name} size={16} />{/each}
+                  {#if r.ahead?.length}<em class="ahead">{t("⚠ {names} önde", { names: names(r.ahead) })}</em>{:else}<em>{t("▶ Sonraki bölüm")}</em>{/if}</span></span>
+            </button>
+          </div>
+        {/each}
+      </div>
+    {/if}
 
     <div class="lab">{t("Senin KONİ'n")}
       <span class="seg per" role="tablist">
@@ -527,6 +591,9 @@
   .ci .go { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 9px; text-align: left; background: none; border: 0; }
   .th { width: 70px; height: 40px; border-radius: 8px; flex: none; position: relative; overflow: hidden; background: radial-gradient(40% 50% at 40% 40%, hsl(var(--h) 40% 35%), transparent 70%), hsl(var(--h) 30% 7%); }
   .th::after { content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--w); background: #ff375f; }
+  .th.po { background-size: cover; background-position: center; }
+  .t small.soon { color: var(--text-3); }
+  .with em.ahead { color: #ffb340; font-weight: 650; }
   .ci .x { flex: none; width: 26px; height: 26px; margin-right: 6px; padding: 0; display: grid; place-items: center; background: none; border: 0; color: var(--text-3); }
 
   .side { background: var(--panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; --dot-ring: var(--panel); }

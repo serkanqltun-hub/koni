@@ -3,7 +3,7 @@
   // listeleri düzenlersin; arkadaşının profilinde ikinizin de istediği filmler öne çıkar.
   import Avatar from "./Avatar.svelte";
   import Icon from "./Icon.svelte";
-  import { catalogSearch, listsAdd, listsGet, listsRate, listsRemove, type CatalogTitle, type ListEntry, type ListName, type Lists } from "./player";
+  import { catalogSearch, listsAdd, listsGet, listsRate, listsRemove, upcomingGet, type CatalogTitle, type ListEntry, type ListName, type Lists } from "./player";
   import { loadResume } from "./resume";
   import { social, splitHandle } from "./social.svelte";
   import { t, tx, locale } from "./i18n.svelte";
@@ -42,6 +42,15 @@
       (l) => { if (live) lists = l; },
       (e) => { if (live) error = String(e).includes("not_friends") ? t("Listeleri yalnızca karşılıklı arkadaşlar görebilir.") : t("Listeler alınamadı: {e}", { e: tx(String(e)) }); },
     );
+    return () => { live = false; };
+  });
+
+  // Dizi takibi (p0.27): kendi profilinde dizi kartında izlenmemiş bölüm sayısı
+  let unseen = $state<Record<string, number>>({});
+  $effect(() => {
+    if (!own || !social.server) return;
+    let live = true;
+    upcomingGet(social.server).then((u) => { if (live && u) unseen = Object.fromEntries(u.items.filter((i) => i.unseen > 0).map((i) => [i.ref, i.unseen])); }, () => {});
     return () => { live = false; };
   });
 
@@ -238,6 +247,8 @@
               {#if e.mates?.length}
                 <span class="mates">{#each e.mates.slice(0, 3) as m (m.name)}<Avatar id={m.avatar} name={m.name} size={20} />{/each}</span>
                 <span class="ortak">{t("ORTAK")}</span>
+              {:else if unseen[e.ref]}
+                <span class="ortak unseen" title={t("{n} izlenmemiş bölüm", { n: unseen[e.ref] })}>{unseen[e.ref]}</span>
               {/if}
               <span class="hov">
                 {#if own && onWatch}<button title={t("Şimdi izle")} onclick={() => onWatch(e)}>▶ {t("İzle")}</button>{/if}
@@ -339,6 +350,7 @@
   .mates :global(.avw) { margin-left: -5px; border-radius: 50%; box-shadow: 0 0 0 1.5px #000; }
   .mates :global(.avw:first-child) { margin-left: 0; }
   .ortak { position: absolute; right: 8px; top: 8px; padding: 2px 8px; border-radius: 99px; background: var(--green); color: #00170a; font-size: 10px; font-weight: 850; }
+  .ortak.unseen { background: #fff; color: #000; min-width: 20px; text-align: center; }
   .hov { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px; display: flex; gap: 6px; justify-content: center; opacity: 0; transition: opacity 0.15s; background: linear-gradient(0deg, rgba(0, 0, 0, 0.85), transparent); border-radius: 0 0 10px 10px; }
   .pw:hover .hov, .hov:focus-within { opacity: 1; }
   .hov button { height: 28px; padding: 0 10px; border-radius: 8px; font-size: 11.5px; font-weight: 700; background: rgba(255, 255, 255, 0.92); color: #000; border: 0; }

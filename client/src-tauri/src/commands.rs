@@ -719,6 +719,16 @@ pub async fn browse_get(
     Ok(Some(account::browse(&url, msg).await?))
 }
 
+/// Dizi takibi (p0.27): sıradaki bölümler + ekip kaydı. Hesap yoksa `null`.
+#[tauri::command]
+pub async fn upcoming_get(url: String) -> CmdResult<Option<serde_json::Value>> {
+    let url = ws_url(&url)?;
+    let Some(acc) = account::get(&url) else {
+        return Ok(None);
+    };
+    Ok(Some(account::upcoming(&url, acc.token).await?))
+}
+
 /// Ana ekran "Etkinlik" sekmesi (p0.22). Hesap yoksa `null`.
 #[tauri::command]
 pub async fn feed_get(url: String) -> CmdResult<Option<serde_json::Value>> {

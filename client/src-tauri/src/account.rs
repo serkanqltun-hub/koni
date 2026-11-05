@@ -187,6 +187,16 @@ pub async fn browse(url: &str, msg: ClientMsg) -> Result<serde_json::Value, Stri
     Ok(v)
 }
 
+/// `upcoming` el sıkışması (p0.27): dizi takibi; cevap olduğu gibi arayüze gider.
+pub async fn upcoming(url: &str, auth: String) -> Result<serde_json::Value, String> {
+    let t = exchange(url, &ClientMsg::Upcoming { auth }).await?;
+    let v: serde_json::Value = serde_json::from_str(&t).map_err(|e| e.to_string())?;
+    if v["t"] != "upcoming" {
+        return Err(tr!("beklenmeyen cevap: {t}", "unexpected response: {t}"));
+    }
+    Ok(v)
+}
+
 /// `watch` el sıkışması (p0.25): solo izleme süresi; cevaptaki sayılan saniye döner.
 pub async fn watch(url: &str, auth: String, sec: u32, title: String) -> Result<u32, String> {
     let t = exchange(url, &ClientMsg::Watch { auth, sec, title }).await?;

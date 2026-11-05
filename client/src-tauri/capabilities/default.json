@@ -69,6 +69,7 @@
     "allow-watch-report",
     "allow-detail-get",
     "allow-browse-get",
+    "allow-upcoming-get",
     "allow-solo-night",
     "allow-solo-night-pick",
     "allow-friends",

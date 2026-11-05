@@ -29,7 +29,7 @@
     /** Açılışta aranacak metin (lobi kutusundan). */
     initial?: string;
     /** Profildeki listeden "İzle": başlığı aç, bölümü seç, kaynak aramasını başlat. */
-    watch?: { ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; prefer?: Prefer } | null;
+    watch?: { ref: string; kind: "movie" | "series"; title: string; year?: number; poster?: string; prefer?: Prefer; season?: number; episode?: number } | null;
   } = $props();
 
   let setup = $state(false);
@@ -138,6 +138,13 @@
   });
   /** Dizide açılacak bölüm: yarım kalan en son bölüm, yoksa ilk bölüm. */
   function startEpisode(name: string, eps: Episode[]): Episode | undefined {
+    // İstenen bölüm (dizi takibi, ekiple sonraki bölüm); yoksa ondan sonraki ilk bölüm.
+    if (watch?.season && watch.ref === picked?.id) {
+      const want = watch.season * 10000 + (watch.episode ?? 1);
+      const next = eps.filter((e) => e.season > 0 && e.season * 10000 + e.episode >= want)
+        .sort((a, b) => a.season * 10000 + a.episode - (b.season * 10000 + b.episode))[0];
+      if (next) return next;
+    }
     const rs = loadResume();
     const last = eps.map((e) => ({ e, r: rs.find((r) => r.title === `${name} ${code(e)}`) }))
       .filter((x) => x.r).sort((a, b) => b.r!.at - a.r!.at)[0];
