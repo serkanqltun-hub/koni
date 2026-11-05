@@ -346,6 +346,7 @@ impl SimRoom {
                 ..self.state.clone()
             },
             downloads: Vec::new(),
+            history: Vec::new(),
         }
     }
 

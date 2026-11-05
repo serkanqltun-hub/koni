@@ -7,6 +7,8 @@
   import { browseOpen, browseEmbed, browseNav, browseState, snifferClose, syncPage, syncPlay, syncSeek, type BrowseState } from "./player";
   import Icon from "./Icon.svelte";
   import FreeShelf from "./FreeShelf.svelte";
+  import RoomHistory from "./RoomHistory.svelte";
+  import { roomHistory } from "./roomHistory.svelte";
   import { t, tx, locale } from "./i18n.svelte";
 
   type Person = { id: string; name: string; me: boolean; ready: boolean };
@@ -362,7 +364,9 @@
           <div><em>2</em><span><b>{t("KONİ'de izle'ye bas")}</b><small>{t("KONİ videoyu tanırsa kendi oynatıcısında herkese açar.")}</small></span></div>
           <div><em>3</em><span><b>{t("Tanımazsa sayfada oynat")}</b><small>{t("Video sitenin oynatıcısında kalır, herkeste eşitlenir.")}</small></span></div>
         </div>
-        {#if recent.length}
+        {#if inRoom && roomHistory.items.length}
+          <div><RoomHistory {onError} /></div>
+        {:else if recent.length}
           <div>
             <span class="k">{t("Son açılanlar")}</span>
             <div class="recent">

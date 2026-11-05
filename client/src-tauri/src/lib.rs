@@ -153,6 +153,7 @@ pub fn run() {
             commands::sync_toggle,
             commands::sync_seek_by,
             commands::sync_close,
+            commands::sync_reopen,
             commands::sync_leave,
             commands::sync_continue_without,
             commands::sync_set_cohost,
