@@ -164,6 +164,7 @@ pub fn run() {
             commands::stats_get,
             commands::feed_get,
             commands::lists_call,
+            commands::detail_get,
             commands::friends,
             commands::profile,
             commands::admin,

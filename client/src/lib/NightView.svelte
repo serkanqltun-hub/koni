@@ -11,6 +11,7 @@
   import { listsGet, syncFun, type ListEntry, type WantEntry, type Movie, type NightFilter, type NightKind } from "./player";
   import Wheel from "./Wheel.svelte";
   import ListButtons from "./ListButtons.svelte";
+  import TrailerCard from "./TrailerCard.svelte";
   import { social } from "./social.svelte";
   import DualRange from "./DualRange.svelte";
   import { t, locale, i18n } from "./i18n.svelte";
@@ -243,10 +244,8 @@
 
   // Künye + fragman
   let detailOf = $state<Movie | null>(null);
-  let trailerOn = $state(false);
   function openDetail(m: Movie) {
     detailOf = m;
-    trailerOn = false;
     if (fun.detail?.id !== m.id) send({ t: "night_detail", itemId: m.id });
     query = "";
   }
@@ -550,20 +549,7 @@
           <div class="detail">
             <button class="d-back" onclick={() => (detailOf = null)}>← {t("Önerilere dön")}</button>
             <div class="d-grid">
-              <div class="trailer">
-                {#if trailerOn && detail.trailer}
-                  <iframe title={t("Fragman")} allow="autoplay; encrypted-media; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"
-                    src="https://www.youtube-nocookie.com/embed/{detail.trailer}?autoplay=1&modestbranding=1&playsinline=1&rel=0"></iframe>
-                {:else}
-                  <div class="tr-img" style="--p:{grad(detail.title)}">{#if detail.poster}<img src={detail.poster} alt="" />{/if}</div>
-                  {#if detail.trailer}
-                    <button class="tr-play" onclick={() => (trailerOn = true)} title={t("Fragmanı oynat")}>▶</button>
-                    <span class="tr-cap">{t("Resmî fragman")}</span>
-                  {:else}
-                    <span class="tr-cap">{fun.detail?.id === detail.id ? t("Fragman bulunamadı") : t("Künye yükleniyor…")}</span>
-                  {/if}
-                {/if}
-              </div>
+              <TrailerCard title={detail.title} poster={detail.poster} trailer={detail.trailer} loading={fun.detail?.id !== detail.id} />
               <div class="d-info">
                 <div class="d-kick">{myLabel ? t("Sana göre · {x}", { x: lbl(myLabel) }) : t("Künye")}</div>
                 <h2>{detail.title}</h2>
@@ -977,13 +963,6 @@
   .d-back { justify-self: start; border: 0; background: none; padding: 4px 0; color: var(--text-2); font-weight: 600; }
   .d-back:hover { color: #fff; }
   .d-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 28px; min-height: 0; }
-  .trailer { position: relative; aspect-ratio: 16 / 9; align-self: start; border-radius: 16px; overflow: hidden; background: #000; box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08); }
-  .trailer iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-  .tr-img { position: absolute; inset: 0; background: var(--p); }
-  .tr-img img { position: absolute; inset: -10%; width: 120%; height: 120%; object-fit: cover; filter: blur(24px) brightness(0.6) saturate(1.3); }
-  .tr-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 74px; height: 74px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, 0.92); color: #000; display: grid; place-items: center; font-size: 26px; padding-left: 5px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6); transition: transform 0.2s cubic-bezier(0.34, 1.4, 0.5, 1); }
-  .tr-play:hover { transform: translate(-50%, -50%) scale(1.08); }
-  .tr-cap { position: absolute; left: 16px; bottom: 12px; font-size: 12px; color: rgba(255, 255, 255, 0.85); }
   .d-info { display: flex; flex-direction: column; gap: 11px; min-width: 0; }
   .d-kick, .kick { color: var(--text-2); font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.08em; }
   .d-info h2 { margin: 0; font-size: 42px; font-weight: 900; letter-spacing: -0.035em; line-height: 1.08; padding-bottom: 0.06em; }

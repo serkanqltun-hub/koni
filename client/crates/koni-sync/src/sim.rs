@@ -500,6 +500,7 @@ impl SimRoom {
             | ClientMsg::Stats { .. }
             | ClientMsg::Feed { .. }
             | ClientMsg::Lists { .. }
+            | ClientMsg::Detail { .. }
             | ClientMsg::Friends { .. }
             | ClientMsg::Profile { .. }
             | ClientMsg::Admin { .. }

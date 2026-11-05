@@ -119,6 +119,13 @@ export const listsAdd = (url: string, list: ListName, entry: ListEntry) => lists
 export const listsRemove = (url: string, list: ListName, ref: string) => listsCall<Lists>(url, "remove", { list, reference: ref });
 export const listsRate = (url: string, ref: string, rating: number) => listsCall<Lists>(url, "rate", { reference: ref, rating });
 export const listsWho = (url: string, ref: string) => listsCall<ListWho>(url, "who", { reference: ref });
+/** Odasız künye (p0.25, PROTOCOL §3.0j): `item` Ne izlesek künyesi + `backdrop`, `similar` en fazla 10 kart.
+ *  `ref` liste anahtarı (`tt…` ya da `tmdb:<movie|tv>:<id>`). Hesap yoksa `null`. */
+/** Detay sayfasında açılan başlık; künye gelene kadar bu kadarı görünür. */
+export interface DetailRef { ref: string; kind: "movie" | "series"; title: string; poster?: string; year?: number }
+export interface TitleDetail { t: "detail"; ref: string; item?: Movie; similar?: Movie[]; error?: string }
+export const detailGet = (url: string, ref: string, kind?: "movie" | "series") =>
+  invoke<TitleDetail | null>("detail_get", { url, reference: ref, kind: kind ?? null });
 /** "Sorun bildir": not + etkinlik logu (eskiden yeniye) + son senkron CSV'si sunucuya gider; döner: rapor adı. */
 export const bugReport = (url: string, username: string, note: string, log: string[]) =>
   invoke<string>("bug_report", { url, username, note, log });
@@ -130,6 +137,8 @@ export interface Movie {
   runtime?: number; genres?: string[]; imdb?: string; trailer?: string; ratings: Ratings;
   /** p0.17: "tv" dizi; `runtime` bölüm süresi, `director` yaratıcı. */
   kind?: "tv"; seasons?: number; votes?: number; director?: string; cast?: string[]; countries?: string[];
+  /** p0.25 `detail`: geniş arka plan görseli. */
+  backdrop?: string;
 }
 /** "Ne izlesek?" oturumu (PROTOCOL §3.9a). Tür id'leri TMDB film türleri. */
 export interface NightFilter {

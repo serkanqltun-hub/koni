@@ -5,12 +5,12 @@
   // Sinema'da kendi arama çubuğuyla (`withSearch`), Keşfet'te BrowseView'in çubuğuyla çalışır.
   import {
     addonStreams, addonsList, catalogEpisodes, catalogPopular, catalogSearch, debridStatus,
-    type CatalogTitle, type Episode, type Source,
+    type CatalogTitle, type DetailRef, type Episode, type Source,
   } from "./player";
   import DebridSettings from "./DebridSettings.svelte";
   import Icon from "./Icon.svelte";
   import SourceHunt from "./SourceHunt.svelte";
-  import ListButtons from "./ListButtons.svelte";
+  import MovieDetail from "./MovieDetail.svelte";
   import { rankSources, type SourceInfo } from "./sources";
   import { untrack } from "svelte";
   import { loadResume } from "./resume";
@@ -141,12 +141,22 @@
     return last?.e ?? eps.find((e) => e.season > 0) ?? eps[0];
   }
 
-  async function pick(ti: CatalogTitle) {
+  /** Benzerleri rafından geçilen başlıklar: geri düğmesi bir öncekine döner. */
+  let trail = $state<CatalogTitle[]>([]);
+  /** Detay sayfasını açar; film kaynakları "İzle" ile (listeden gelince hemen) aranır. */
+  async function pick(ti: CatalogTitle, from: "list" | "similar" = "list") {
+    trail = from === "similar" && picked ? [...trail, picked] : [];
     picked = ti;
     episodes = null;
     episode = null;
     sources = null;
-    if (ti.type === "movie") return loadSources("movie", ti.id);
+    needAddon = false;
+    await prepare(ti);
+  }
+  /** IMDb kimliği olan başlıkta bölümleri yükler (dizi) ya da istendiyse kaynakları arar (film). */
+  async function prepare(ti: CatalogTitle) {
+    if (!ti.id.startsWith("tt")) return; // tmdb: kimliği, künye IMDb kimliğini getirince
+    if (ti.type === "movie") { if (autoPlay) loadSources("movie", ti.id); return; }
     loading = true;
     try {
       episodes = await catalogEpisodes(ti.id);
@@ -162,6 +172,36 @@
     } finally {
       loading = false;
     }
+  }
+
+  /** Detay sayfasındaki ▶ İzle: film için kaynak avı, dizide yarım kalan ya da ilk bölüm. */
+  function watchPicked() {
+    if (!picked) return;
+    if (!picked.id.startsWith("tt")) return onError(t("Bu başlık için kaynak aranamıyor"));
+    autoPlay = true;
+    if (picked.type === "movie") return loadSources("movie", picked.id);
+    if (!episodes) return; // bölümler gelince pick() autoPlay ile seçer
+    const ep = startEpisode(picked.name, episodes);
+    if (ep) { season = ep.season; pickEpisode(ep); }
+  }
+  function openSimilar(d: DetailRef) {
+    autoPlay = false;
+    pick({ id: d.ref, type: d.kind, name: d.title, poster: d.poster, releaseInfo: d.year ? String(d.year) : undefined }, "similar");
+  }
+  function gotImdb(imdb: string) {
+    if (!picked || picked.id.startsWith("tt")) return;
+    picked = { ...picked, id: imdb };
+    prepare(picked);
+  }
+  const detailRef = $derived<DetailRef | null>(picked ? {
+    ref: picked.id, kind: picked.type, title: picked.name, poster: picked.poster,
+    year: Number.isFinite(parseInt(picked.releaseInfo ?? "", 10)) ? parseInt(picked.releaseInfo ?? "", 10) : undefined,
+  } : null);
+  function backFromTitle() {
+    autoPlay = false;
+    const prev = trail[trail.length - 1];
+    if (prev) { trail = trail.slice(0, -1); picked = prev; episodes = null; episode = null; sources = null; prepare(prev); }
+    else picked = null;
   }
 
   function pickEpisode(e: Episode) {
@@ -198,7 +238,7 @@
   }
   function back() {
     if (setup) return closeSetup();
-    if (picked) { picked = null; autoPlay = false; return; }
+    if (picked) return backFromTitle();
     onExit?.();
   }
   const left = (r: { pos: number; duration: number }) => {
@@ -235,7 +275,7 @@
 {#if withSearch}
   <div class="fd-top">
     {#if onExit || picked || setup}
-      <button class="back" onclick={back}><Icon name="back" size={14} />{setup ? t("Geri") : picked ? t("Sonuçlar") : t("Sinema")}</button>
+      <button class="back" onclick={back}><Icon name="back" size={14} />{setup ? t("Geri") : picked ? (trail.length ? trail[trail.length - 1].name : t("Sonuçlar")) : t("Sinema")}</button>
     {/if}
     <form class="q" onsubmit={(e) => { e.preventDefault(); search(q); }}>
       <Icon name="search" size={17} />
@@ -263,37 +303,10 @@
     {#if addonCount > 0}<button class="white done" onclick={closeSetup}>{t("Hazır, aramaya dön")}</button>{/if}
   </div>
 {:else if picked}
-  {@const meta = [picked.releaseInfo, picked.type === "series" && episodes ? t("{n} sezon", { n: seasons.filter((s) => s > 0).length }) : null,
-    picked.imdbRating ? `IMDb ${picked.imdbRating}` : null, picked.genres?.slice(0, 2).join(" · ")].filter(Boolean)}
-  <div class="tt">
-    <div class="ps" style="--h:{tint(picked.name)}">
-      {#if picked.poster && picked.poster.trim() && !failedPosters.has(picked.id)}
-        <img
-          src={picked.poster}
-          alt=""
-          referrerpolicy="no-referrer"
-          onerror={(e) => {
-            (e.currentTarget as HTMLElement).style.display = "none";
-            if (picked) failedPosters.add(picked.id);
-          }}
-        />
-      {:else}
-        <div class="ph-lg">
-          <Icon name={picked.type === "series" ? "activity" : "film"} size={44} />
-          <span>{picked.name}</span>
-        </div>
-      {/if}
-    </div>
-    <div class="tt-r">
-      {#if !withSearch}<button class="small back2" onclick={() => (picked = null)}><Icon name="back" size={13} /> {t("Sonuçlar")}</button>{/if}
-      <h2>{picked.name}</h2>
-      <div class="meta">{#each meta as m, i (i)}{#if i}<i></i>{/if}<span>{m}</span>{/each}</div>
-      {#if picked.id.startsWith("tt")}
-        {@const y = parseInt(picked.releaseInfo ?? "", 10)}
-        <ListButtons entry={{ ref: picked.id, kind: picked.type, title: picked.name, year: Number.isFinite(y) ? y : undefined,
-          poster: picked.poster?.startsWith("https://") ? picked.poster : undefined, source: "titles" }} />
-      {/if}
-
+  <MovieDetail title={detailRef!} watching={loading || !!sources?.length} onWatch={watchPicked} onOpen={openSimilar} onImdb={gotImdb}>
+    {#snippet top()}
+      {#if !withSearch}<button class="small back2" onclick={backFromTitle}><Icon name="back" size={13} /> {trail.length ? trail[trail.length - 1].name : t("Sonuçlar")}</button>{/if}
+    {/snippet}
       {#if episodes}
         <div class="seas">
           {#each seasons as s (s)}
@@ -333,8 +346,7 @@
       {:else if episodes}
         <div class="hint">{t("Bir bölüm seç; kaynaklar senin addon'larından gelir.")}</div>
       {/if}
-    </div>
-  </div>
+  </MovieDetail>
 {:else if loading}
   <div class="intro"><span>{t("Aranıyor…")}</span></div>
 {:else if titles === null}
@@ -357,7 +369,7 @@
   {:else if shownPopular.length}
     <div class="pgrid">
       {#each shownPopular as ti (ti.id)}
-        <button class="pg" title={ti.name} onclick={() => pick(ti)}>
+        <button class="pg" title={ti.name} onclick={() => { autoPlay = false; pick(ti); }}>
           {@render posterImg(ti)}
           <b>{ti.name}</b>
           <small>{[ti.releaseInfo, ti.imdbRating ? `IMDb ${ti.imdbRating}` : null].filter(Boolean).join(" · ")}</small>
@@ -376,7 +388,7 @@
   <div class="lab">{t("Sonuçlar")} <span>{t("Afişe tıkla: kaynaklar senin addon'larından gelir")}</span></div>
   <div class="pgrid">
     {#each titles as ti (ti.id)}
-      <button class="pg" title={ti.name} onclick={() => pick(ti)}>
+      <button class="pg" title={ti.name} onclick={() => { autoPlay = false; pick(ti); }}>
         {@render posterImg(ti)}
         <b>{ti.name}</b>
         <small>{[ti.releaseInfo, ti.imdbRating ? `IMDb ${ti.imdbRating}` : null].filter(Boolean).join(" · ")}</small>
@@ -419,7 +431,6 @@
 
   .pg img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .pg img:not([src]), .pg img[src=""] { display: none !important; }
-  .ps img:not([src]), .ps img[src=""] { display: none !important; }
 
   .ph {
     position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -431,13 +442,6 @@
     font-size: 13px; font-weight: 750; line-height: 1.25; color: #fff;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
   }
-  .ph-lg {
-    position: absolute; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 14px; padding: 24px;
-    text-align: center; color: #fff;
-  }
-  .ph-lg :global(svg) { opacity: 0.45; }
-  .ph-lg span { font-size: 22px; font-weight: 850; line-height: 1.2; letter-spacing: -0.02em; }
 
   .pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 18px 14px; }
   .pg { display: flex; flex-direction: column; gap: 5px; padding: 0; border: 0; background: transparent; text-align: left; min-width: 0; }
@@ -452,17 +456,6 @@
   .pg b { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 4px; }
   .pg small { color: var(--text-3); font-size: 11.5px; }
 
-  .tt { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr); gap: 30px; align-items: start; }
-  .ps {
-    position: sticky; top: 0; aspect-ratio: 2 / 3; border-radius: 14px; overflow: hidden; display: flex; align-items: flex-end; padding: 18px;
-    background: linear-gradient(165deg, hsl(var(--h, 220) 45% 32%), hsl(var(--h, 220) 50% 5%)); box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
-    font-weight: 900; font-size: 26px; line-height: 1;
-  }
-  .ps img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .tt-r { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-  .tt-r h2 { margin: 0; font-size: 36px; font-weight: 900; letter-spacing: -0.035em; line-height: 1.05; }
-  .meta { display: flex; flex-wrap: wrap; gap: 10px; color: var(--text-2); font-size: 13.5px; align-items: center; }
-  .meta i { width: 4px; height: 4px; border-radius: 50%; background: var(--text-3); }
 
   .seas { display: flex; flex-wrap: wrap; gap: 6px; }
   .seas button { padding: 5px 12px; height: auto; border-radius: 99px; font-weight: 600; font-size: 12.5px; color: var(--text-2); }

@@ -70,6 +70,14 @@ pub enum ClientMsg {
         #[serde(skip_serializing_if = "Option::is_none")]
         entry: Option<serde_json::Value>,
     },
+    /// Tek seferlik (p0.25): odasız künye + benzerleri; `ref` `tt…` ya da `tmdb:<movie|tv>:<id>`.
+    Detail {
+        auth: String,
+        #[serde(rename = "ref")]
+        reference: String,
+        #[serde(skip_serializing_if = "String::is_empty")]
+        kind: String,
+    },
     /// Tek seferlik (p0.22): ana ekran "Etkinlik" sekmesi, son 7 gün.
     Feed {
         auth: String,
