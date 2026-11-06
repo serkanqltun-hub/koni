@@ -618,7 +618,7 @@
   let soloEndArmed = "";
   $effect(() => {
     const m = soloMedia;
-    if (room || !m || soloEp || nowTrack()) return;
+    if (room || !m || autoEp || nowTrack()) return;
     if (!st?.eofReached) {
       if (st?.duration != null) soloEndArmed = m.src;
       return;
@@ -778,33 +778,38 @@
     eofArmed = false;
     untrack(() => stepList(1));
   });
-  // Solo'da sıradaki bölüm: son 60 sn'de sonraki bölüm hazırlanır, son 10 sn'de şeritte geri
-  // sayım, bitince sessiz avla açılır. Odada çalışmaz.
-  const soloEp = $derived(!room && soloMedia ? epRef(soloMedia.src, soloMedia.file) : null);
+  // Sıradaki bölüm: son 60 sn'de sonraki bölüm hazırlanır, son 10 sn'de şeritte geri sayım,
+  // bitince sessiz avla açılır. Odada yalnız ev sahibinde çalışır (açtığı bölüm herkese gider);
+  // odanın video sırasında bir şey varsa sıra önceliklidir.
+  const autoEp = $derived(
+    room
+      ? amHost && roomMedia && !queueHead ? epRef(roomMedia.src, roomMedia.file) : null
+      : soloMedia ? epRef(soloMedia.src, soloMedia.file) : null,
+  );
   /** Bölümün gerçekten oynadığı görüldü (yeni dosya yüklenirken eski dosyanın sonu sayılmaz). */
   let epArmed = $state("");
-  const epLeft = $derived(soloEp && epArmed === soloEp.key && st?.duration && st.timePos != null ? st.duration - st.timePos : null);
+  const epLeft = $derived(autoEp && epArmed === autoEp.key && st?.duration && st.timePos != null ? st.duration - st.timePos : null);
   $effect(() => {
-    const ep = soloEp;
+    const ep = autoEp;
     if (ep && st?.duration && !st.eofReached && (st.timePos ?? 0) < st.duration - 15) epArmed = ep.key;
   });
   $effect(() => {
-    const ep = soloEp;
+    const ep = autoEp;
     if (!ep || epLeft == null || epLeft > 60 || untrack(() => nextEp.for) === ep.key) return;
-    untrack(() => prefetchNext(ep, soloMedia?.title || soloTitle));
+    untrack(() => prefetchNext(ep, nowMedia?.title || soloTitle));
   });
-  const nextReady = $derived(!!soloEp && nextEp.for === soloEp.key && nextEp.cancelled !== soloEp.key);
+  const nextReady = $derived(!!autoEp && nextEp.for === autoEp.key && nextEp.cancelled !== autoEp.key);
   /** Şerit bandı: son 10 sn (sonraki bölüm ya da "Sezon bitti"). */
   const nextOn = $derived(nextReady && !nextEp.stop && epLeft != null && epLeft <= 10 && !st?.eofReached && (nextEp.last || !!nextEp.id));
   function nextNow() {
-    const key = soloEp?.key;
+    const key = autoEp?.key;
     if (!key) return;
-    playNext(() => soloEp?.key === key, openDebrid).then((ok) => {
+    playNext(() => autoEp?.key === key, openDebrid).then((ok) => {
       if (!ok && nextEp.cancelled === key) note("Sıradaki bölüm için açılan kaynak bulunamadı: {code}", { code: nextEp.code }, true);
     });
   }
   $effect(() => {
-    if (!nextReady || nextEp.stop || !st?.eofReached || epArmed !== soloEp?.key || !nextEp.id || nextEp.busy) return;
+    if (!nextReady || nextEp.stop || !st?.eofReached || epArmed !== autoEp?.key || !nextEp.id || nextEp.busy) return;
     untrack(nextNow);
   });
   // Odada listeden Lounge'a eklenenler: liste yeniden başlatılınca / durdurulunca
@@ -1575,7 +1580,7 @@
       </div>
       {#if rateEntry}{#key rateEntry.ref}<RateCard entry={rateEntry} />{/key}{/if}
       <div class="end-row">
-        {#if soloEp && nextEp.busy}
+        {#if autoEp && nextEp.busy}
           <button class="big w" disabled><Icon name="next" size={16} /> {t("{code} açılıyor…", { code: nextEp.code })}</button>
           <button class="big g" onclick={cancelNext}>{t("İptal")}</button>
         {:else if nextReady && nextEp.id}
@@ -1583,7 +1588,7 @@
         {:else if vidNext && queueHead}
           <button class="big w" onclick={vidNextGo}><Icon name="next" size={16} /> {t("Sıradaki: {title} · {n} sn", { title: queueHead.title, n: vidNextLeft })}</button>
           {#if canPlayback}<button class="big g" onclick={vidNextCancel}>{t("İptal")}</button>{/if}
-        {:else if queueHead && !soloEp && (room ? funControl : true)}
+        {:else if queueHead && !autoEp && (room ? funControl : true)}
           <button class="big w" onclick={vidNextGo}><Icon name="next" size={16} /> {t("Sıradaki: {title}", { title: queueHead.title })}</button>
         {:else if ep}
           <button class="big w" onclick={() => closeEnd(() => openTitles(ep[1]))}><Icon name="next" size={16} /> {t("Sonraki bölümü bul")}</button>
@@ -1595,7 +1600,7 @@
         {#if room ? funControl : true}<button class="big g" onclick={() => closeEnd(() => pickView("listen"))}><Icon name="music" size={16} /> {t("Müziğe geç")}</button>{/if}
         <button class="big g" title={t("Videoya dön")} onclick={() => closeEnd()}><Icon name="x" size={16} /></button>
       </div>
-      {#if soloEp}
+      {#if autoEp}
         <label class="end-stop"><input type="checkbox" checked={nextEp.stop} onchange={(e) => setStop(e.currentTarget.checked)} /> {t("Bölüm bitince dur")}</label>
       {/if}
     </div>
@@ -2167,7 +2172,7 @@
     </div>
   </footer>
   {:else if nextOn && barOn}
-  <!-- Solo, bölümün son 10 sn'si: şerit sıradaki bölüm bandına döner (video üstünde hiçbir şey yok). -->
+  <!-- Bölümün son 10 sn'si (solo ya da odada ev sahibi): şerit sıradaki bölüm bandına döner (video üstünde hiçbir şey yok). -->
   <footer class="bar nextb" in:fade={{ duration: 200 }}>
     {#if nextEp.last}
       <span class="h-t"><b>{t("Sezon bitti")}</b><small>{t("Bu dizinin son bölümü")}</small></span>
@@ -2176,7 +2181,7 @@
       <span class="nx-n">{Math.max(0, Math.ceil(epLeft ?? 0))}</span>
       <span class="h-t">
         <b>{t("Sıradaki: {code} · {n} sn", { code: nextEp.code, n: Math.max(0, Math.ceil(epLeft ?? 0)) })}</b>
-        <small>{nextEp.busy ? t("Kaynak aranıyor…") : nextEp.sources ? t("Bölüm bitince kendiliğinden açılır") : t("Kaynaklar hazırlanıyor…")}</small>
+        <small>{nextEp.busy ? t("Kaynak aranıyor…") : nextEp.sources ? (room ? t("Bölüm bitince herkeste açılır") : t("Bölüm bitince kendiliğinden açılır")) : t("Kaynaklar hazırlanıyor…")}</small>
       </span>
       <div class="h-act">
         <button onclick={cancelNext}>{t("İptal")}</button>

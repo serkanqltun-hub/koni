@@ -308,6 +308,7 @@ const en: Record<string, string> = {
   "Sıradaki: {code} · {n} sn": "Up next: {code} · {n} s",
   "Kaynak aranıyor…": "Finding a source…",
   "Bölüm bitince kendiliğinden açılır": "Starts automatically when this episode ends",
+  "Bölüm bitince herkeste açılır": "Starts for everyone when this episode ends",
   "Kaynaklar hazırlanıyor…": "Getting sources ready…",
   "Şimdi oynat": "Play now",
   "{code} açılıyor…": "Opening {code}…",
