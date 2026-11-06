@@ -119,6 +119,9 @@ pub fn run() {
             if let Ok(dir) = app.path().app_data_dir() {
                 media::spawn_ytdlp_update(dir);
             }
+            if let Ok(dir) = app.path().app_log_dir() {
+                cast::set_log_dir(dir);
+            }
             watchdog::spawn(app.handle().clone());
             Ok(())
         })

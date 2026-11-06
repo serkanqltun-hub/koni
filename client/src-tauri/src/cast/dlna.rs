@@ -7,24 +7,30 @@ use super::{Control, Device, Media, Position};
 use crate::i18n::trs;
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{TcpStream, ToSocketAddrs, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, TcpStream, ToSocketAddrs, UdpSocket};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 const AVT: &str = "urn:schemas-upnp-org:service:AVTransport:1";
 /// Son aramada yanıt vermese de bu kadar süre listede kalır (bazı TV'ler her aramaya yanıt vermez).
-const KEEP: Duration = Duration::from_secs(15);
+const KEEP: Duration = Duration::from_secs(30);
+/// Açıklama belgesi okunamayan ya da TV olmayan cihaz bu süre yeniden denenmez.
+const SKIP: Duration = Duration::from_secs(60);
 
 struct Renderer {
     name: String,
     /// AVTransport `controlURL`, tam adres.
     control: String,
+    /// TV'nin bildirdiği AVTransport sürümü (`…:AVTransport:1`, `:2`…); SOAP bununla gider.
+    service: String,
+    manufacturer: String,
     seen: Instant,
 }
 
 /// Bulunan TV'ler, `Device.id` ile. Açıklama belgesi yer (LOCATION) başına bir kez okunur.
 static FOUND: Mutex<Option<HashMap<String, Renderer>>> = Mutex::new(None);
 static BY_LOCATION: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
+static FAILED: Mutex<Option<HashMap<String, Instant>>> = Mutex::new(None);
 
 /// Ağdaki DLNA oynatıcılar (~1,5 s sürer).
 pub fn devices() -> Vec<Device> {
@@ -38,7 +44,21 @@ pub fn devices() -> Vec<Device> {
         let id = match known {
             Some(id) => id,
             None => {
+                let skip = FAILED
+                    .lock()
+                    .unwrap()
+                    .get_or_insert_with(HashMap::new)
+                    .get(&loc)
+                    .is_some_and(|t| now.duration_since(*t) < SKIP);
+                if skip {
+                    continue;
+                }
                 let Some((id, r)) = describe(&loc) else {
+                    FAILED
+                        .lock()
+                        .unwrap()
+                        .get_or_insert_with(HashMap::new)
+                        .insert(loc, now);
                     continue;
                 };
                 BY_LOCATION
@@ -73,35 +93,76 @@ pub fn devices() -> Vec<Device> {
     out
 }
 
-/// SSDP `M-SEARCH`: yanıt veren cihazların açıklama belgesi adresleri.
+/// SSDP `M-SEARCH`: yanıt veren cihazların açıklama belgesi adresleri. Arama her ağ
+/// kartından ayrı gider: Windows çok noktaya yayını yalnız varsayılan karttan gönderir,
+/// sanal ağ kartı (VPN, Hyper-V) varken TV'ler hiç duymayabilir. UDP paket kaybına karşı
+/// arama iki kez yapılır.
 fn search() -> Vec<String> {
-    let Ok(sock) = UdpSocket::bind("0.0.0.0:0") else {
-        return Vec::new();
+    let socks: Vec<UdpSocket> = local_v4()
+        .into_iter()
+        .filter_map(|ip| {
+            let s = UdpSocket::bind((ip, 0)).ok()?;
+            let _ = socket2::SockRef::from(&s).set_multicast_if_v4(&ip);
+            let _ = s.set_nonblocking(true);
+            Some(s)
+        })
+        .collect();
+    let send = || {
+        for sock in &socks {
+            for st in [AVT, "urn:schemas-upnp-org:device:MediaRenderer:1"] {
+                let msg = format!(
+                    "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\nST: {st}\r\n\r\n"
+                );
+                let _ = sock.send_to(msg.as_bytes(), "239.255.255.250:1900");
+            }
+        }
     };
-    let _ = sock.set_read_timeout(Some(Duration::from_millis(300)));
-    for st in [AVT, "urn:schemas-upnp-org:device:MediaRenderer:1"] {
-        let msg = format!(
-            "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\nST: {st}\r\n\r\n"
-        );
-        let _ = sock.send_to(msg.as_bytes(), "239.255.255.250:1900");
-    }
-    let end = Instant::now() + Duration::from_millis(1500);
+    send();
+    let start = Instant::now();
+    let mut again = false;
     let mut out = Vec::new();
     let mut buf = [0u8; 2048];
-    while Instant::now() < end {
-        let Ok((n, _)) = sock.recv_from(&mut buf) else {
-            // Windows'ta UDP hatası hemen dönebilir; boşa dönmesin.
-            std::thread::sleep(Duration::from_millis(20));
-            continue;
-        };
-        let text = String::from_utf8_lossy(&buf[..n]);
-        if let Some(loc) = header(&text, "location") {
-            if loc.starts_with("http://") && !out.iter().any(|l| l == loc) {
-                out.push(loc.to_string());
+    while start.elapsed() < Duration::from_millis(1800) {
+        if !again && start.elapsed() > Duration::from_millis(400) {
+            again = true;
+            send();
+        }
+        let mut got = false;
+        for sock in &socks {
+            let Ok((n, _)) = sock.recv_from(&mut buf) else {
+                continue;
+            };
+            got = true;
+            let text = String::from_utf8_lossy(&buf[..n]);
+            if let Some(loc) = header(&text, "location") {
+                if loc.starts_with("http://") && !out.iter().any(|l| l == loc) {
+                    out.push(loc.to_string());
+                }
             }
+        }
+        if !got {
+            std::thread::sleep(Duration::from_millis(20));
         }
     }
     out
+}
+
+/// Bu bilgisayarın ev ağındaki IPv4 adresleri (her ağ kartı için); bulunamazsa tümü.
+fn local_v4() -> Vec<Ipv4Addr> {
+    let mut ips: Vec<Ipv4Addr> = if_addrs::get_if_addrs()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|i| match i.ip() {
+            IpAddr::V4(v) if !v.is_loopback() && (v.is_private() || v.is_link_local()) => Some(v),
+            _ => None,
+        })
+        .collect();
+    ips.sort();
+    ips.dedup();
+    if ips.is_empty() {
+        ips.push(Ipv4Addr::UNSPECIFIED);
+    }
+    ips
 }
 
 /// Açıklama belgesinden ad ve AVTransport kontrol adresi; AVTransport yoksa `None`.
@@ -110,10 +171,7 @@ fn describe(location: &str) -> Option<(String, Renderer)> {
     if status != 200 {
         return None;
     }
-    let control = xml
-        .split("<service>")
-        .find(|s| s.contains(AVT))
-        .and_then(|s| tag(s, "controlURL"))?;
+    let (service, control) = avtransport(&xml)?;
     let base = tag(&xml, "URLBase").unwrap_or(location);
     let name = tag(&xml, "friendlyName")
         .map(unescape)
@@ -124,28 +182,69 @@ fn describe(location: &str) -> Option<(String, Renderer)> {
         Renderer {
             name,
             control: join(base, control),
+            service: service.into(),
+            manufacturer: tag(&xml, "manufacturer").unwrap_or("").to_string(),
             seen: Instant::now(),
         },
     ))
 }
 
-fn control_url(device: &Device) -> Result<String, String> {
+/// AVTransport hizmeti (her sürüm): (hizmet türü, `controlURL`).
+fn avtransport(xml: &str) -> Option<(&str, &str)> {
+    xml.split("<service>").find_map(|s| {
+        let kind = tag(s, "serviceType")?;
+        if !kind.contains(":service:AVTransport:") {
+            return None;
+        }
+        Some((kind, tag(s, "controlURL")?))
+    })
+}
+
+/// TV'nin adresi (bu bilgisayarın ona giden ağ adresini seçmek için).
+pub fn host(device: &Device) -> Option<IpAddr> {
+    let control = renderer(device).ok()?.0;
+    let rest = control.strip_prefix("http://")?;
+    let host = rest.split('/').next()?;
+    let host = host.rsplit_once(':').map_or(host, |(h, _)| h);
+    host.trim_matches(['[', ']']).parse().ok()
+}
+
+/// TV'ye bildirilen içerik türü. Samsung MKV'yi yalnız `video/x-mkv` ile tanır.
+pub fn mime(device: &Device, ext: &str) -> &'static str {
+    let samsung = FOUND
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|m| m.get(&device.id))
+        .is_some_and(|r| r.manufacturer.to_ascii_lowercase().contains("samsung"));
+    match ext {
+        "mkv" if samsung => "video/x-mkv",
+        "avi" if samsung => "video/x-avi",
+        // Uzantısız akış: çoğu TV video türü görmeden açmaz.
+        "" => "video/mp4",
+        e => super::serve::mime_of(e),
+    }
+}
+
+/// (kontrol adresi, AVTransport hizmet türü).
+fn renderer(device: &Device) -> Result<(String, String), String> {
     FOUND
         .lock()
         .unwrap()
         .as_ref()
         .and_then(|m| m.get(&device.id))
-        .map(|r| r.control.clone())
+        .map(|r| (r.control.clone(), r.service.clone()))
         .ok_or_else(|| format!("{}: {}", trs("TV bulunamadı", "TV not found"), device.name))
 }
 
 /// `media`yı TV'de açar ve oynamaya başladığını bekler.
 pub fn play(device: &Device, media: &Media) -> Result<(), String> {
-    let url = control_url(device)?;
-    let _ = soap(&url, "Stop", "");
+    let url = renderer(device)?;
+    let url = &(url.0.as_str(), url.1.as_str());
+    let _ = soap(url, "Stop", "");
     let meta = didl(media);
     let set = soap(
-        &url,
+        url,
         "SetAVTransportURI",
         &format!(
             "<CurrentURI>{}</CurrentURI><CurrentURIMetaData>{}</CurrentURIMetaData>",
@@ -154,18 +253,25 @@ pub fn play(device: &Device, media: &Media) -> Result<(), String> {
         ),
     );
     if let Err(e) = set {
+        super::log(&format!("DLNA {}: SetAVTransportURI {e}", device.name));
         return Err(cant_open(e));
     }
-    let _ = soap(&url, "Play", "<Speed>1</Speed>");
+    let _ = soap(url, "Play", "<Speed>1</Speed>");
     // Açılıp açılmadığını durumdan anlarız; bazı TV'ler kendiliğinden oynatır, bazıları
     // `Play` hatası verip yine de oynatır.
     let end = Instant::now() + Duration::from_secs(8);
     loop {
         std::thread::sleep(Duration::from_millis(500));
-        let info = soap(&url, "GetTransportInfo", "").unwrap_or_default();
+        let info = soap(url, "GetTransportInfo", "").unwrap_or_default();
         let state = tag(&info, "CurrentTransportState").unwrap_or("");
         let status = tag(&info, "CurrentTransportStatus").unwrap_or("OK");
         if status == "ERROR_OCCURRED" {
+            super::log(&format!(
+                "DLNA {}: TV oynatamadı ({}, altyazı {})",
+                device.name,
+                media.mime,
+                media.sub_url.is_some()
+            ));
             return Err(cant_open(String::new()));
         }
         if state == "PLAYING" {
@@ -173,7 +279,13 @@ pub fn play(device: &Device, media: &Media) -> Result<(), String> {
         }
         if Instant::now() >= end {
             return match state {
-                "STOPPED" | "NO_MEDIA_PRESENT" => Err(cant_open(String::new())),
+                "STOPPED" | "NO_MEDIA_PRESENT" => {
+                    super::log(&format!(
+                        "DLNA {}: TV açmadı ({state}, {})",
+                        device.name, media.mime
+                    ));
+                    Err(cant_open(String::new()))
+                }
                 _ => Ok(()), // hâlâ yükleniyor
             };
         }
@@ -193,13 +305,14 @@ fn cant_open(detail: String) -> String {
 }
 
 pub fn control(device: &Device, c: Control) -> Result<(), String> {
-    let url = control_url(device)?;
+    let url = renderer(device)?;
+    let url = &(url.0.as_str(), url.1.as_str());
     match c {
-        Control::Play => soap(&url, "Play", "<Speed>1</Speed>"),
-        Control::Pause => soap(&url, "Pause", ""),
-        Control::Stop => soap(&url, "Stop", ""),
+        Control::Play => soap(url, "Play", "<Speed>1</Speed>"),
+        Control::Pause => soap(url, "Pause", ""),
+        Control::Stop => soap(url, "Stop", ""),
         Control::Seek(s) => soap(
-            &url,
+            url,
             "Seek",
             &format!("<Unit>REL_TIME</Unit><Target>{}</Target>", hms(s)),
         ),
@@ -208,9 +321,10 @@ pub fn control(device: &Device, c: Control) -> Result<(), String> {
 }
 
 pub fn position(device: &Device) -> Result<Position, String> {
-    let url = control_url(device)?;
-    let pos = soap(&url, "GetPositionInfo", "")?;
-    let info = soap(&url, "GetTransportInfo", "").unwrap_or_default();
+    let url = renderer(device)?;
+    let url = &(url.0.as_str(), url.1.as_str());
+    let pos = soap(url, "GetPositionInfo", "")?;
+    let info = soap(url, "GetTransportInfo", "").unwrap_or_default();
     Ok(Position {
         position: tag(&pos, "RelTime").and_then(secs).unwrap_or(0.0),
         duration: tag(&pos, "TrackDuration").and_then(secs).unwrap_or(0.0),
@@ -218,14 +332,14 @@ pub fn position(device: &Device) -> Result<Position, String> {
     })
 }
 
-/// AVTransport eylemi; yanıt gövdesi ya da UPnP hata kodu.
-fn soap(url: &str, action: &str, args: &str) -> Result<String, String> {
+/// AVTransport eylemi (`(kontrol adresi, hizmet türü)`); yanıt gövdesi ya da UPnP hata kodu.
+fn soap(&(url, service): &(&str, &str), action: &str, args: &str) -> Result<String, String> {
     let body = format!(
         "<?xml version=\"1.0\" encoding=\"utf-8\"?>\
 <s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\
-<s:Body><u:{action} xmlns:u=\"{AVT}\"><InstanceID>0</InstanceID>{args}</u:{action}></s:Body></s:Envelope>"
+<s:Body><u:{action} xmlns:u=\"{service}\"><InstanceID>0</InstanceID>{args}</u:{action}></s:Body></s:Envelope>"
     );
-    let soap_action = format!("\"{AVT}#{action}\"");
+    let soap_action = format!("\"{service}#{action}\"");
     let headers = [
         ("Content-Type", "text/xml; charset=\"utf-8\""),
         ("SOAPACTION", soap_action.as_str()),
@@ -356,16 +470,17 @@ fn join(base: &str, url: &str) -> String {
     }
 }
 
-/// TV'ye giden içerik bilgisi (DIDL-Lite). Samsung harici altyazıyı `sec:CaptionInfoEx` ile alır.
+/// TV'ye giden içerik bilgisi (DIDL-Lite). Altyazı SRT olarak gider (DLNA TV'ler VTT
+/// okumaz): Samsung `sec:CaptionInfoEx` ile, diğerleri ikinci `res` ile alır.
 fn didl(m: &Media) -> String {
     let sub = m
         .sub_url
         .as_ref()
         .map(|s| {
+            let srt = escape(&s.replace("/sub.vtt", "/sub.srt"));
             format!(
-                "<sec:CaptionInfoEx sec:type=\"vtt\">{0}</sec:CaptionInfoEx>\
-<res protocolInfo=\"http-get:*:text/vtt:*\">{0}</res>",
-                escape(s)
+                "<sec:CaptionInfoEx sec:type=\"srt\">{srt}</sec:CaptionInfoEx>\
+<res protocolInfo=\"http-get:*:text/srt:*\">{srt}</res>"
             )
         })
         .unwrap_or_default();
@@ -374,9 +489,10 @@ fn didl(m: &Media) -> String {
 xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\" \
 xmlns:sec=\"http://www.sec.co.kr/\"><item id=\"0\" parentID=\"-1\" restricted=\"1\">\
 <dc:title>{}</dc:title><upnp:class>object.item.videoItem</upnp:class>\
-<res protocolInfo=\"http-get:*:{}:*\">{}</res>{sub}</item></DIDL-Lite>",
+<res protocolInfo=\"http-get:*:{}:{}\">{}</res>{sub}</item></DIDL-Lite>",
         escape(&m.title),
         m.mime,
+        super::serve::FEATURES,
         escape(&m.url)
     )
 }
@@ -423,11 +539,8 @@ mod tests {
 <controlURL>/cm</controlURL></service>\
 <service><serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType>\
 <controlURL>upnp/control/AVTransport1</controlURL></service></serviceList></device></root>";
-        let control = xml
-            .split("<service>")
-            .find(|s| s.contains(AVT))
-            .and_then(|s| tag(s, "controlURL"))
-            .unwrap();
+        let (service, control) = avtransport(xml).unwrap();
+        assert_eq!(service, AVT);
         assert_eq!(
             join(tag(xml, "URLBase").unwrap(), control),
             "http://192.168.1.5:9197/upnp/control/AVTransport1"
