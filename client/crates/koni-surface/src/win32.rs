@@ -29,7 +29,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SetWindowPlacement, SetWindowPos, ShowWindow, CS_DBLCLKS, GWL_STYLE, HWND_TOP, IDC_ARROW,
     MA_NOACTIVATE, SET_WINDOW_POS_FLAGS, SIZE_MINIMIZED, SWP_FRAMECHANGED, SWP_HIDEWINDOW,
     SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW,
-    SW_HIDE, SW_SHOWNA, WINDOWPLACEMENT, WINDOW_EX_STYLE, WM_DPICHANGED, WM_MOUSEACTIVATE,
+    SW_HIDE, SW_SHOWMAXIMIZED, SW_SHOWNA, SW_SHOWNORMAL, WINDOWPLACEMENT, WINDOW_EX_STYLE, WM_DPICHANGED, WM_MOUSEACTIVATE,
     WM_NCDESTROY, WM_SIZE, WM_WINDOWPOSCHANGED, WNDCLASSEXW, WS_CHILD, WS_CLIPCHILDREN,
     WS_CLIPSIBLINGS, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_VISIBLE,
 };
@@ -416,6 +416,15 @@ impl VideoSurface for Win32ChildSurface {
             let new_style = (style as u32 & !WS_OVERLAPPEDWINDOW.0) | WS_POPUP.0 | WS_VISIBLE.0;
             SetWindowLongPtrW(parent, GWL_STYLE, new_style as isize);
             let r = mi.rcMonitor;
+            // A borderless window that stays maximized gets its client area
+            // clamped to the work area (taskbar excluded), leaving a strip at
+            // the bottom. Un-maximize first; exit restores the saved placement.
+            if placement.showCmd == SW_SHOWMAXIMIZED.0 as u32 {
+                let mut normal = placement;
+                normal.showCmd = SW_SHOWNORMAL.0 as u32;
+                normal.rcNormalPosition = r;
+                let _ = SetWindowPlacement(parent, &normal);
+            }
             let res = SetWindowPos(
                 parent,
                 Some(HWND_TOP),
