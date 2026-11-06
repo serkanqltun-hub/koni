@@ -1,5 +1,5 @@
-// Solo'da sıradaki bölüm: dizi bölümü biterken sonraki bölüm ve kaynakları önceden bulunur,
-// bölüm bitince arayüzsüz avla (lib/hunt.ts) açılır. Odada kullanılmaz.
+// Sıradaki bölüm: dizi bölümü biterken sonraki bölüm ve kaynakları önceden bulunur,
+// bölüm bitince arayüzsüz avla (lib/hunt.ts) açılır. Odada yalnız ev sahibi kullanır.
 import { addonStreams, catalogEpisodes, type Source } from "./player";
 import { rankSources, type SourceInfo } from "./sources";
 import { huntSilent } from "./hunt";
