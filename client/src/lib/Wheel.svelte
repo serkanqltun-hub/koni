@@ -54,7 +54,7 @@
 <div class="eyebrow">{t("Çark")}</div>
 {#if fun.proposals.length}
   <div class="wheel-wrap">
-    <WheelDisc items={fun.proposals.map((p) => ({ id: p.id, title: p.item.title }))} {rot} {dur} />
+    <WheelDisc items={fun.proposals.map((p) => ({ id: p.id, title: p.item.title, poster: p.item.poster }))} {rot} {dur} />
   </div>
   {#if winner}
     <div class="winner"><span>🎡 {t("Kazanan")}</span><MovieCard movie={winner.item} compact /></div>
