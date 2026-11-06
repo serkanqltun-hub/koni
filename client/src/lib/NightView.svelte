@@ -1000,7 +1000,7 @@
   .i-k { padding: 6px 14px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line-2); color: rgba(255, 255, 255, 0.85); font-size: 12.5px; font-weight: 600; }
   .ib h2 { margin: 0; font-size: 72px; font-weight: 900; letter-spacing: -0.045em; background: linear-gradient(180deg, #fff, #9cc8ff); -webkit-background-clip: text; background-clip: text; color: transparent; padding-bottom: 0.08em; }
   .count { position: relative; width: 150px; height: 150px; display: grid; place-items: center; }
-  .count svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .count svg { position: absolute; inset: 0; transform: rotate(-90deg); overflow: visible; } /* drop-shadow SVG kutusunda kırpılıp kare parlama yapmasın */
   .count circle { fill: none; stroke-width: 6; }
   .count .bg { stroke: rgba(255, 255, 255, 0.1); }
   .count .fg { stroke: #fff; stroke-linecap: round; stroke-dasharray: 339; transition: stroke-dashoffset 0.9s linear; filter: drop-shadow(0 0 10px #0a84ff); }
