@@ -303,11 +303,21 @@ fn sub_bytes(f: &str) -> Option<Vec<u8>> {
     if !(f.starts_with("https://") || f.starts_with("http://")) {
         return std::fs::read(f.strip_prefix("file://").unwrap_or(f)).ok();
     }
-    let req = crate::addons::http().get(f);
-    let got = tauri::async_runtime::block_on(async move {
-        let res = req.send().await?.error_for_status()?;
-        res.bytes().await
-    });
+    // Tauri komutu Tokio iş parçacığında çalışır; orada `block_on` çöker. İndirme ayrı
+    // bir iş parçacığında beklenir.
+    let url = f.to_string();
+    let got = std::thread::spawn(move || {
+        tauri::async_runtime::block_on(async move {
+            let res = crate::addons::http()
+                .get(&url)
+                .send()
+                .await?
+                .error_for_status()?;
+            res.bytes().await
+        })
+    })
+    .join()
+    .ok()?;
     match got {
         Ok(b) => Some(b.to_vec()),
         Err(e) => {
@@ -362,6 +372,26 @@ mod tests {
         let v = super::to_vtt("1\r\n00:00:01,000 --> 00:00:02,500\r\nMerhaba, dünya\r\n").unwrap();
         assert!(v.starts_with("WEBVTT\n\n1\n00:00:01.000 --> 00:00:02.500\nMerhaba, dünya"));
         assert!(super::to_vtt("[Script Info]\n").is_none());
+    }
+
+    /// Tauri komutları Tokio iş parçacığında çalışır: altyazı indirme orada çökmemeli.
+    #[test]
+    fn fetches_sub_inside_runtime() {
+        use std::io::{Read, Write};
+        let up = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/tr.srt", up.local_addr().unwrap());
+        std::thread::spawn(move || {
+            let (mut c, _) = up.accept().unwrap();
+            let mut buf = [0u8; 1024];
+            let _ = c.read(&mut buf);
+            let _ = c.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi");
+        });
+        let got = tauri::async_runtime::block_on(async move {
+            tauri::async_runtime::spawn(async move { super::sub_bytes(&url) })
+                .await
+                .unwrap()
+        });
+        assert_eq!(got.as_deref(), Some(&b"hi"[..]));
     }
 
     #[test]
