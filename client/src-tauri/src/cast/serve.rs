@@ -426,7 +426,8 @@ fn relay(
     if let Some(r) = range {
         req = req.header(RANGE, r);
     }
-    let mut res = match block_on(req.send()) {
+    // `send` zamanlayıcısını hemen kurar: Tokio çalışma ortamı içinde çağrılmalı.
+    let mut res = match block_on(async move { req.send().await }) {
         Ok(r) => r,
         Err(e) => {
             super::log(&format!(
@@ -527,6 +528,44 @@ mod tests {
             vtt_to_srt(vtt),
             "1\n00:00:01,000 --> 00:00:02,500\nMerhaba\n\n2\n00:02:03,000 --> 00:02:04,000\nİki\nsatır\n"
         );
+    }
+
+    /// Aktarım düz bir iş parçacığından (Tokio dışından) çağrılır; çökmeden kaynağı iletmeli.
+    #[test]
+    fn relays_from_plain_thread() {
+        let up = TcpListener::bind("127.0.0.1:0").unwrap();
+        let up_addr = up.local_addr().unwrap();
+        std::thread::spawn(move || {
+            let (mut c, _) = up.accept().unwrap();
+            let mut buf = [0u8; 1024];
+            let _ = c.read(&mut buf);
+            let _ = c.write_all(
+                b"HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 2-4/10\r\nContent-Length: 3\r\n\r\nabc",
+            );
+        });
+        let tv = TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut client = TcpStream::connect(tv.local_addr().unwrap()).unwrap();
+        let (mut server, _) = tv.accept().unwrap();
+        let url = format!("http://{up_addr}/film.mkv");
+        std::thread::spawn(move || {
+            relay(
+                &mut server,
+                &url,
+                None,
+                "video/x-mkv",
+                Some("bytes=2-4"),
+                false,
+                "",
+            )
+        })
+        .join()
+        .unwrap()
+        .unwrap();
+        let mut out = String::new();
+        client.read_to_string(&mut out).unwrap();
+        assert!(out.starts_with("HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 2-4/10"));
+        assert!(out.contains("Content-Type: video/x-mkv\r\n"));
+        assert!(out.ends_with("\r\n\r\nabc"));
     }
 
     #[test]

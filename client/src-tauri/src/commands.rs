@@ -521,7 +521,9 @@ pub fn cast_play(state: State<'_, AppState>, device: crate::cast::Device) -> Cmd
         if device.kind != "dlna" || !remote {
             return Err(e);
         }
-        let direct = crate::cast::prepare(&mpv, None).map_err(|_| e.clone())?;
+        let mut direct = crate::cast::prepare(&mpv, None).map_err(|_| e.clone())?;
+        // TV'nin tanıdığı içerik türü (Samsung MKV'yi yalnız `video/x-mkv` ile açar).
+        direct.mime = media.mime.clone();
         crate::cast::log(&format!(
             "DLNA {}: aktarım açılmadı, doğrudan adres deneniyor",
             device.name
