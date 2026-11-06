@@ -13,7 +13,7 @@
   import ListButtons from "./ListButtons.svelte";
   import TrailerCard from "./TrailerCard.svelte";
   import SwipeCard from "./night/SwipeCard.svelte";
-  import { MOODS } from "./night/moods";
+  import { MOODS, YEAR, ERAS, GENRES, LANGS, COUNTS, type Draft, runtimeRange, blankDraft as blank, draftFilter as toFilter } from "./night/moods";
   import { social } from "./social.svelte";
   import DualRange from "./DualRange.svelte";
   import { t, locale, i18n } from "./i18n.svelte";
@@ -75,19 +75,6 @@
   });
 
   // ---- 1 · Kur ---------------------------------------------------------------
-  const YEAR = new Date().getFullYear();
-  const ERAS = [
-    { id: "80", label: "80'ler", from: 1980, to: 1989 },
-    { id: "90", label: "90'lar", from: 1990, to: 1999 },
-    { id: "00", label: "2000'ler", from: 2000, to: 2014 },
-    { id: "new", label: "Yeni", from: 2015, to: YEAR },
-  ];
-  const GENRES: [number, string][] = [
-    [53, "Gerilim"], [80, "Suç"], [9648, "Gizem"], [18, "Dram"], [28, "Aksiyon"], [878, "Bilimkurgu"], [27, "Korku"], [35, "Komedi"],
-    [10749, "Romantik"], [16, "Animasyon"], [99, "Belgesel"], [10752, "Savaş"], [37, "Western"], [14, "Fantastik"], [12, "Macera"], [10751, "Aile"],
-  ];
-  const LANGS: [string, string][] = [["en", "İngilizce"], ["tr", "Türkçe"], ["ko", "Korece"], ["fr", "Fransızca"], ["es", "İspanyolca"], ["ja", "Japonca"], ["it", "İtalyanca"], ["de", "Almanca"], ["hi", "Hintçe"]];
-  const COUNTS = [0, 100, 500, 1000, 5000, 20000, 50000, 100000];
 
   let moods = $state<string[]>([]);
   let maxRt = $state(0); // 0 = fark etmez
@@ -95,9 +82,8 @@
   let vote = $state(0);
   let custom = $state<NightFilter | null>(null);
   let panel = $state(false);
-  type Draft = { inc: number[]; exc: number[]; y0: number; y1: number; r0: number; r1: number; vote: number; count: number; langs: string[]; hideSeen: boolean };
-  const RT = $derived(tv ? { min: 15, max: 90 } : { min: 60, max: 200 });
-  const blankDraft = (): Draft => ({ inc: [], exc: [], y0: 1960, y1: YEAR, r0: RT.min, r1: RT.max, vote: 0, count: 0, langs: [], hideSeen: true });
+  const RT = $derived(runtimeRange(tv));
+  const blankDraft = () => blank(tv);
   let draft = $state<Draft>(blankDraft());
 
   function resetLocal() {
@@ -120,14 +106,7 @@
     else draft.inc = [...draft.inc, id];
   }
   const toggleLang = (l: string) => (draft.langs = draft.langs.includes(l) ? draft.langs.filter((x) => x !== l) : [...draft.langs, l]);
-  function draftFilter(d: Draft): NightFilter {
-    return {
-      genres: d.inc, without: d.exc,
-      yearFrom: d.y0 > 1960 ? d.y0 : undefined, yearTo: d.y1 < YEAR ? d.y1 : undefined,
-      runtimeMin: d.r0 > RT.min ? d.r0 : undefined, runtimeMax: d.r1 < RT.max ? d.r1 : undefined,
-      voteMin: d.vote || undefined, voteCountMin: d.count || undefined, languages: d.langs, hideSeen: d.hideSeen,
-    };
-  }
+  const draftFilter = (d: Draft) => toFilter(d, tv);
   function applyCustom() {
     custom = draftFilter(draft);
     moods = [];

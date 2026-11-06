@@ -10,3 +10,31 @@ export const MOODS: MoodTile[] = [
   { id: "korku", title: "Işıkları kapat", sub: "Korku; yalnız izlenmez", grad: "linear-gradient(135deg,#1a1a1a,#4a4a4a)", f: { genres: [27], voteMin: 6.2 } },
   { id: "herkes", title: "Hepimize uyar", sub: "Animasyon, her yaşa", grad: "linear-gradient(135deg,#0e3a20,#1f7a3f)", f: { genres: [16, 10751], voteMin: 7 } },
 ];
+
+// Kur adımının ortak sabitleri (Ne izlesek + Ne izlesem). Etiketler t() ile çevrilir.
+export const YEAR = new Date().getFullYear();
+export const ERAS = [
+  { id: "80", label: "80'ler", from: 1980, to: 1989 },
+  { id: "90", label: "90'lar", from: 1990, to: 1999 },
+  { id: "00", label: "2000'ler", from: 2000, to: 2014 },
+  { id: "new", label: "Yeni", from: 2015, to: YEAR },
+];
+export const GENRES: [number, string][] = [
+  [53, "Gerilim"], [80, "Suç"], [9648, "Gizem"], [18, "Dram"], [28, "Aksiyon"], [878, "Bilimkurgu"], [27, "Korku"], [35, "Komedi"],
+  [10749, "Romantik"], [16, "Animasyon"], [99, "Belgesel"], [10752, "Savaş"], [37, "Western"], [14, "Fantastik"], [12, "Macera"], [10751, "Aile"],
+];
+export const LANGS: [string, string][] = [["en", "İngilizce"], ["tr", "Türkçe"], ["ko", "Korece"], ["fr", "Fransızca"], ["es", "İspanyolca"], ["ja", "Japonca"], ["it", "İtalyanca"], ["de", "Almanca"], ["hi", "Hintçe"]];
+export const COUNTS = [0, 100, 500, 1000, 5000, 20000, 50000, 100000];
+/** Özel filtre taslağı; `draftFilter` ile NightFilter'a çevrilir. */
+export type Draft = { inc: number[]; exc: number[]; y0: number; y1: number; r0: number; r1: number; vote: number; count: number; langs: string[]; hideSeen: boolean };
+export const runtimeRange = (tv: boolean) => (tv ? { min: 15, max: 90 } : { min: 60, max: 200 });
+export const blankDraft = (tv: boolean): Draft => { const rt = runtimeRange(tv); return { inc: [], exc: [], y0: 1960, y1: YEAR, r0: rt.min, r1: rt.max, vote: 0, count: 0, langs: [], hideSeen: true }; };
+export function draftFilter(d: Draft, tv: boolean): NightFilter {
+  const rt = runtimeRange(tv);
+  return {
+    genres: d.inc, without: d.exc,
+    yearFrom: d.y0 > 1960 ? d.y0 : undefined, yearTo: d.y1 < YEAR ? d.y1 : undefined,
+    runtimeMin: d.r0 > rt.min ? d.r0 : undefined, runtimeMax: d.r1 < rt.max ? d.r1 : undefined,
+    voteMin: d.vote || undefined, voteCountMin: d.count || undefined, languages: d.langs, hideSeen: d.hideSeen,
+  };
+}
