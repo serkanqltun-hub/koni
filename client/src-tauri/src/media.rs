@@ -251,7 +251,7 @@ pub fn resolve_web(
 
 /// Yakalanan akışlar tarayıcı gibi istenir: bazı CDN'ler mpv'nin varsayılan
 /// user-agent'ını ya da Referer'sız isteği reddeder.
-const BROWSER_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
+pub(crate) const BROWSER_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
                           (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0";
 
 /// Yakalanan akış HLS mi: adres `.m3u8` ile bitmiyorsa ilk baytına bakılır. Siteler

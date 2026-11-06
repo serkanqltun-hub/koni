@@ -17,7 +17,7 @@ const OPENSUBTITLES_V3: &str = "https://opensubtitles-v3.strem.io";
 const MANIFEST: &str = "manifest.json";
 
 /// reqwest `rustls-no-provider` ile gelir: ilk istekten önce ring sağlayıcısını kurar.
-fn ensure_tls() {
+pub(crate) fn ensure_tls() {
     if rustls::crypto::CryptoProvider::get_default().is_none() {
         let _ = rustls::crypto::ring::default_provider().install_default();
     }

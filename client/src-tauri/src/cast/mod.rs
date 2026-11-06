@@ -1,7 +1,7 @@
 //! "TV'de oynat": oynatılan medyayı aynı ağdaki bir TV'ye gönderir.
 //!
-//! Yerel dosya ve altyazı `serve` ile ev ağına açılır; doğrudan `http(s)` akışlar
-//! TV'ye olduğu gibi verilir. Cihaz türleri (Chromecast, DLNA) kendi dosyalarında
+//! Yerel dosya ve altyazı `serve` ile ev ağına açılır. Doğrudan `http(s)` akışlar
+//! Chromecast'e olduğu gibi verilir, DLNA TV'lere bu bilgisayar üzerinden aktarılır. Cihaz türleri (Chromecast, DLNA) kendi dosyalarında
 //! `devices` ve `play` içine eklenir.
 
 pub mod chromecast;
@@ -14,6 +14,38 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+
+/// TV aktarımı günlüğü: `app_log_dir/cast.log`. Windows'ta konsol çıktısı görünmez;
+/// hata bildiriminde neyin ters gittiğini buradan okuruz. Adres ve belirteç yazılmaz.
+static LOG: Mutex<Option<std::path::PathBuf>> = Mutex::new(None);
+
+pub fn set_log_dir(dir: std::path::PathBuf) {
+    let _ = std::fs::create_dir_all(&dir);
+    *LOG.lock().unwrap_or_else(|e| e.into_inner()) = Some(dir.join("cast.log"));
+}
+
+/// Satırı konsola ve `cast.log`'a yazar (dosya 256 KB'ı geçince baştan başlar).
+pub fn log(msg: &str) {
+    use std::io::Write;
+    eprintln!("[koni] {msg}");
+    let Some(path) = LOG.lock().unwrap_or_else(|e| e.into_inner()).clone() else {
+        return;
+    };
+    let big = std::fs::metadata(&path).is_ok_and(|m| m.len() > 256 * 1024);
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .append(!big)
+        .truncate(big)
+        .open(&path);
+    if let Ok(mut f) = file {
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let _ = writeln!(f, "{secs} {msg}");
+    }
+}
 
 /// Ağda bulunan bir TV. `kind` hangi gönderim yolunun kullanılacağını söyler.
 #[derive(Clone, Serialize, Deserialize)]
@@ -188,13 +220,15 @@ pub fn send(c: Control) {
     };
     std::thread::spawn(move || {
         if let Err(e) = control(&device, c) {
-            eprintln!("[koni] TV komutu gitmedi: {e}");
+            log(&format!("TV komutu gitmedi: {e}"));
         }
     });
 }
 
 /// mpv'de açık olanı TV'ye hazırlar: yerel dosyayı ağa açar, altyazıyı VTT'ye çevirir.
-pub fn prepare(mpv: &Player) -> Result<Media, String> {
+/// `device` DLNA TV ise uzak akışlar da bu bilgisayar üzerinden aktarılır ve içerik türü
+/// TV'nin markasına göre seçilir.
+pub fn prepare(mpv: &Player, device: Option<&Device>) -> Result<Media, String> {
     let Some(path) = mpv.get_property_string("path").filter(|p| !p.is_empty()) else {
         return Err(trs("açık video yok", "nothing is playing").into());
     };
@@ -207,30 +241,70 @@ pub fn prepare(mpv: &Player) -> Result<Media, String> {
         .filter(|f| std::path::Path::new(f).is_file())
         .and_then(|f| std::fs::read(f).ok())
         .and_then(|b| to_vtt(&crate::addons::decode_sub_bytes(&b)));
-    if path.starts_with("https://") || path.starts_with("http://") {
+    let dlna = device.filter(|d| d.kind == "dlna");
+    let toward = dlna.and_then(dlna::host);
+    // Uzantı yoksa (indirme adresleri) mpv'nin tanıdığı kapsayıcıdan.
+    let ext = match serve::ext(&path) {
+        e if !e.is_empty() => e,
+        _ => format_ext(&mpv.get_property_string("file-format").unwrap_or_default()).into(),
+    };
+    let mime = match dlna {
+        Some(d) => dlna::mime(d, &ext),
+        None => serve::mime_of(&ext),
+    };
+    let remote = path.starts_with("https://") || path.starts_with("http://");
+    if remote && (dlna.is_none() || ext == "m3u8") {
         let sub_url = sub.map(serve::publish_sub).transpose()?;
         return Ok(Media {
-            mime: serve::mime(&path).into(),
+            mime: mime.into(),
             url: path,
             sub_url,
             title,
         });
     }
-    let file = path.strip_prefix("file://").unwrap_or(&path);
-    if !std::path::Path::new(file).is_file() {
-        return Err(trs(
-            "bu yayın TV'ye gönderilemiyor",
-            "this stream can't be sent to a TV",
-        )
-        .into());
-    }
-    let (url, sub_url) = serve::publish(file, sub)?;
+    let body = if remote {
+        serve::Body::Remote {
+            url: path.clone(),
+            referer: mpv
+                .get_property_string("referrer")
+                .filter(|r| !r.is_empty()),
+        }
+    } else {
+        let file = path.strip_prefix("file://").unwrap_or(&path);
+        if !std::path::Path::new(file).is_file() {
+            return Err(trs(
+                "bu yayın TV'ye gönderilemiyor",
+                "this stream can't be sent to a TV",
+            )
+            .into());
+        }
+        serve::Body::File(file.into())
+    };
+    let name_ext = if ext.is_empty() { "bin" } else { ext.as_str() };
+    let (url, sub_url) = serve::publish(body, name_ext, mime, sub, toward)?;
     Ok(Media {
         url,
         sub_url,
-        mime: serve::mime(file).into(),
+        mime: mime.into(),
         title,
     })
+}
+
+/// mpv `file-format` (FFmpeg kapsayıcı adları) → uzantı.
+fn format_ext(f: &str) -> &'static str {
+    if f.contains("matroska") {
+        "mkv"
+    } else if f.contains("mp4") {
+        "mp4"
+    } else if f.contains("mpegts") {
+        "ts"
+    } else if f.contains("avi") {
+        "avi"
+    } else if f.contains("hls") {
+        "m3u8"
+    } else {
+        ""
+    }
 }
 
 /// SRT ya da VTT metnini WebVTT'ye çevirir; ASS/SSA çevrilmez (`None`).
@@ -261,5 +335,12 @@ mod tests {
         let v = super::to_vtt("1\r\n00:00:01,000 --> 00:00:02,500\r\nMerhaba, dünya\r\n").unwrap();
         assert!(v.starts_with("WEBVTT\n\n1\n00:00:01.000 --> 00:00:02.500\nMerhaba, dünya"));
         assert!(super::to_vtt("[Script Info]\n").is_none());
+    }
+
+    #[test]
+    fn container_ext() {
+        assert_eq!(super::format_ext("matroska,webm"), "mkv");
+        assert_eq!(super::format_ext("mov,mp4,m4a,3gp,3g2,mj2"), "mp4");
+        assert_eq!(super::format_ext(""), "");
     }
 }

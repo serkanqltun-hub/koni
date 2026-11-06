@@ -503,7 +503,7 @@ pub fn cast_devices() -> Vec<crate::cast::Device> {
 #[tauri::command(async)]
 pub fn cast_prepare(state: State<'_, AppState>) -> CmdResult<crate::cast::Media> {
     let mpv = player(&state)?;
-    crate::cast::prepare(&mpv)
+    crate::cast::prepare(&mpv, None)
 }
 
 /// Açık videoyu `device` TV'sinde kaldığı yerden oynatır; bilgisayardaki oynatıcı durur.
@@ -511,7 +511,7 @@ pub fn cast_prepare(state: State<'_, AppState>) -> CmdResult<crate::cast::Media>
 #[tauri::command(async)]
 pub fn cast_play(state: State<'_, AppState>, device: crate::cast::Device) -> CmdResult {
     let mpv = player(&state)?;
-    let media = crate::cast::prepare(&mpv)?;
+    let media = crate::cast::prepare(&mpv, Some(&device))?;
     crate::cast::play(&device, &media)?;
     let at = mpv.time_pos().unwrap_or(0.0);
     if at > 1.0 {

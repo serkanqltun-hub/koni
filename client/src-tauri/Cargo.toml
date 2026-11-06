@@ -36,6 +36,9 @@ rustls = { version = "0.23", default-features = false, features = ["ring"] }
 tauri-plugin-deep-link = "2"
 # Chromecast (cast/chromecast.rs): ağda bulma ve TV ile TLS bağlantısı.
 mdns-sd = "0.21.7"
+# DLNA aramasını her ağ kartından ayrı göndermek için (mdns-sd zaten derliyor).
+if-addrs = "0.15"
+socket2 = "0.6"
 native-tls = "0.2"
 # Yerel kütüphane (library.rs): klasör seçme penceresi ve klasör gezme.
 tauri-plugin-dialog = "2"
