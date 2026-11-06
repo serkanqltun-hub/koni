@@ -253,8 +253,8 @@
               <span class="hov">
                 {#if own && onWatch}<button title={e.kind === "video" ? t("Keşfet'te aç") : t("Şimdi izle")} onclick={() => onWatch(e)}>▶ {t("İzle")}</button>{/if}
                 <button title={t("İzledim olarak işaretle")} onclick={() => markSeen(e)}>{t("✓ İzledim")}</button>
-                <button class="x2" title={t("Listemden çıkar")} aria-label={t("Listemden çıkar")} onclick={() => remove("want", e.ref)}><Icon name="x" size={11} /></button>
               </span>
+              <button class="x2" title={t("Listemden çıkar")} aria-label={t("Listemden çıkar")} onclick={() => remove("want", e.ref)}><Icon name="x" size={11} /></button>
             </div>
             <b>{e.title}</b><small>{wantLine(e)}</small>{#if stoppedAt(e)}<small class="resume">{stoppedAt(e)}</small>{/if}
           </div>
@@ -351,10 +351,11 @@
   .mates :global(.avw:first-child) { margin-left: 0; }
   .ortak { position: absolute; right: 8px; top: 8px; padding: 2px 8px; border-radius: 99px; background: var(--green); color: #00170a; font-size: 10px; font-weight: 850; }
   .ortak.unseen { background: #fff; color: #000; min-width: 20px; text-align: center; }
-  .hov { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px; display: flex; gap: 6px; justify-content: center; opacity: 0; transition: opacity 0.15s; background: linear-gradient(0deg, rgba(0, 0, 0, 0.85), transparent); border-radius: 0 0 10px 10px; }
-  .pw:hover .hov, .hov:focus-within { opacity: 1; }
-  .hov button { height: 28px; padding: 0 10px; border-radius: 8px; font-size: 11.5px; font-weight: 700; background: rgba(255, 255, 255, 0.92); color: #000; border: 0; }
-  .hov button.x2 { width: 28px; padding: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.6); color: #fff; border: 1px solid rgba(255, 255, 255, 0.25); }
+  .hov { position: absolute; left: 0; right: 0; bottom: 0; padding: 36px 8px 8px; display: flex; flex-direction: column; gap: 6px; opacity: 0; transition: opacity 0.15s; background: linear-gradient(0deg, rgba(0, 0, 0, 0.9) 40%, transparent); border-radius: 0 0 10px 10px; }
+  .pw:hover .hov, .hov:focus-within, .pw:hover .x2, .x2:focus-visible { opacity: 1; }
+  .hov button { height: 30px; padding: 0 10px; border-radius: 8px; font-size: 12px; font-weight: 700; white-space: nowrap; background: rgba(255, 255, 255, 0.92); color: #000; border: 0; }
+  .hov button + button { background: rgba(255, 255, 255, 0.16); color: #fff; }
+  .x2 { position: absolute; left: 8px; top: 8px; width: 26px; height: 26px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: rgba(0, 0, 0, 0.6); color: #fff; border: 1px solid rgba(255, 255, 255, 0.25); opacity: 0; transition: opacity 0.15s; }
   .addc { aspect-ratio: 2 / 3; height: auto; border-radius: 10px; border: 1.5px dashed rgba(255, 255, 255, 0.22); background: none; color: var(--text-2); font-size: 12px; font-weight: 650; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
   .addc span { font-size: 22px; font-weight: 400; }
 

@@ -509,6 +509,8 @@ export interface CatalogTitle {
 export interface Episode { id: string; season: number; episode: number; name: string; thumbnail?: string | null }
 export const catalogSearch = (query: string) => invoke<CatalogTitle[]>("catalog_search", { query });
 export const catalogPopular = () => invoke<CatalogTitle[]>("catalog_popular");
+/** IMDb kimliğinden dizi/film afişi (Cinemeta görsel sunucusu). */
+export const posterImg = (ref: string) => `https://images.metahub.space/poster/medium/${ref}/img`;
 export const catalogEpisodes = (id: string) => invoke<Episode[]>("catalog_episodes", { id });
 /** `hash` yoksa kaynak addon'un kendi hesabıyla çözülmüştür: odada paylaşılamaz. */
 export interface Source { addon: string; name: string; title: string; hash: string | null; url?: string | null; idx: number | null; file: string }
