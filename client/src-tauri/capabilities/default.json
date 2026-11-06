@@ -49,6 +49,7 @@
     "allow-sync-leave",
     "allow-sync-continue-without",
     "allow-sync-set-cohost",
+    "allow-sync-reopen",
     "allow-sync-set-policy",
     "allow-sync-set-view",
     "allow-sync-break",

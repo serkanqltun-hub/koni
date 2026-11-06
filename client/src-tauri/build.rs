@@ -38,6 +38,7 @@ const COMMANDS: &[&str] = &[
     "sync_leave",
     "sync_continue_without",
     "sync_set_cohost",
+    "sync_reopen",
     "sync_set_policy",
     "sync_set_view",
     "sync_break",
