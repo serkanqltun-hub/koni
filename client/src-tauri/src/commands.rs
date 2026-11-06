@@ -512,7 +512,22 @@ pub fn cast_prepare(state: State<'_, AppState>) -> CmdResult<crate::cast::Media>
 pub fn cast_play(state: State<'_, AppState>, device: crate::cast::Device) -> CmdResult {
     let mpv = player(&state)?;
     let media = crate::cast::prepare(&mpv, Some(&device))?;
-    crate::cast::play(&device, &media)?;
+    if let Err(e) = crate::cast::play(&device, &media) {
+        // Aktarılan akışı TV açamadıysa (ör. güvenlik duvarı TV'nin bu bilgisayara
+        // bağlanmasını engelliyor) akışın kendi adresi bir kez denenir.
+        let remote = mpv
+            .get_property_string("path")
+            .is_some_and(|p| p.starts_with("http://") || p.starts_with("https://"));
+        if device.kind != "dlna" || !remote {
+            return Err(e);
+        }
+        let direct = crate::cast::prepare(&mpv, None).map_err(|_| e.clone())?;
+        crate::cast::log(&format!(
+            "DLNA {}: aktarım açılmadı, doğrudan adres deneniyor",
+            device.name
+        ));
+        crate::cast::play(&device, &direct)?;
+    }
     let at = mpv.time_pos().unwrap_or(0.0);
     if at > 1.0 {
         if let Err(e) = crate::cast::control(&device, crate::cast::Control::Seek(at)) {
