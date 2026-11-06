@@ -15,7 +15,7 @@
     updateCheck, updateInstall, syncClose, playerAddSubtitleText, syncFun, mediaWaveform, mediaPrefetch, isSuperseded, queueAdd, mediaList, bugReport,
     type SyncStatus, type ServerMsg, type Member, type MediaEvent, type ListEntry, type LinkEvent, type DlStatus, type Policy,
     type SnifferEvent, type UpdateInfo, type FunMsg, type Movie, syncSetView, type RoomView, syncBreak, syncReady, syncPlay,
-    debridOpen, watchReport, type Source, playerMusicView, playerPlay, playerCover, relayOn, setRelay, setLangPrefs, langMode, subSize, lobbyRemoteState,
+    debridOpen, watchReport, type Source, playerMusicView, playerPlay, playerCover, posterImg, relayOn, setRelay, setLangPrefs, langMode, subSize, lobbyRemoteState,
   } from "./lib/player";
   import BrowseView from "./lib/BrowseView.svelte";
   import RateCard from "./lib/RateCard.svelte";
@@ -1558,9 +1558,13 @@
   {@const ep = title.match(/^(.*?)\s+S(\d{2})E(\d{2})$/)}
   {@const rateEntry = titleEntry(nowMedia?.file, ep ? ep[1] : title)}
   {@const here = Object.values(members).filter((m) => !m.away).length}
+  {@const art = rateEntry ? posterImg(rateEntry.ref) : musicCover}
   <div class="end" style="--h:{hue(title)}">
-    <div class="end-bd"></div>
-    <div class="end-poster"><span>{ep ? ep[1] : title}</span></div>
+    <div class="end-bd">{#if art}<img src={art} alt="" referrerpolicy="no-referrer" onerror={(e) => e.currentTarget.remove()} />{/if}</div>
+    <div class="end-poster">
+      <span>{ep ? ep[1] : title}</span>
+      {#if art}<img src={art} alt="" referrerpolicy="no-referrer" onerror={(e) => e.currentTarget.remove()} />{/if}
+    </div>
     <div class="end-info">
       <span class="end-k">{ep ? (nextReady && nextEp.last ? t("Sezon bitti") : t("Bölüm bitti")) : t("Bitti")} · {new Date().toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</span>
       <h2>{title}</h2>
@@ -1655,7 +1659,7 @@
       {/snippet}
     </TitleBar>
     <HomeView name={account ?? username} bind:roomName busy={connecting} error={noticeText} {welcome}
-      onCreate={createRoom} onJoin={(code) => connect(true, code)} onSolo={() => { notice = null; solo = true; }} onResume={resumeMovie}
+      onCreate={createRoom} onJoin={(code) => connect(true, code)} onSolo={() => { notice = null; solo = true; applyView("watch"); }} onResume={resumeMovie}
       onWatch={(e) => { notice = null; solo = true; if (e.kind === "video") { pageWait = "https://www.youtube.com/watch?v=" + e.ref.slice(3); return applyView("browse"); } openTitles(""); watchReq = { ref: e.ref, kind: e.kind, title: e.title, year: e.year, poster: e.poster, season: e.season, episode: e.episode }; }} />
   </div>
 {:else if !fullscreen}
@@ -2184,8 +2188,10 @@
   <footer class="bar" class:idle={!st?.duration} class:gone={!barOn} class:narrow={drawer !== null} inert={!barOn}>
     {#if roomView === "watch"}
       {@const nt = nowMedia?.title || soloTitle || ""}
+      {@const npRef = refOf(nowMedia?.file)}
+      {@const npArt = npRef ? posterImg(npRef.ref) : musicCover}
       <div class="np" title={nt}>
-        <span class="pst" style="--h:{hue(nt || "koni")}"></span>
+        <span class="pst" style="--h:{hue(nt || "koni")}">{#if npArt}{#key npArt}<img src={npArt} alt="" referrerpolicy="no-referrer" onerror={(e) => e.currentTarget.remove()} />{/key}{/if}</span>
         <span class="now-t"><b>{nt || t("Video")}</b><small>{[nowMedia ? t(KIND[nowMedia.kind]) : null, subLabel ? t("{sub} altyazı", { sub: subLabel }) : null].filter(Boolean).join(" · ")}</small></span>
       </div>
     {/if}
@@ -2364,6 +2370,8 @@
     box-shadow: 0 40px 90px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.1);
     font-weight: 900; font-size: 34px; letter-spacing: -0.03em; line-height: 0.95; overflow-wrap: anywhere;
   }
+  .end-poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+  .end-bd img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .end-info { position: relative; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .end-k { color: var(--text-2); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
   .end-info h2 { margin: 0; font-size: 46px; font-weight: 900; letter-spacing: -0.04em; line-height: 1.05; overflow-wrap: anywhere; }
@@ -2562,7 +2570,8 @@
   .bar.gone { opacity: 0; transform: translateY(16px); }
   .bar { gap: 18px; background: linear-gradient(180deg, #0c0d10, #08090b); }
   .np { flex: 0 1 240px; min-width: 0; display: flex; align-items: center; gap: 10px; }
-  .pst { width: 30px; height: 44px; border-radius: 5px; flex: none; background: linear-gradient(165deg, hsl(var(--h) 60% 45%), hsl(var(--h) 60% 12%)); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1); }
+  .pst { width: 30px; height: 44px; border-radius: 5px; flex: none; background: linear-gradient(165deg, hsl(var(--h) 60% 45%), hsl(var(--h) 60% 12%)); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1); overflow: hidden; }
+  .pst img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .now-t { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
   .now-t b { font-size: 13px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .now-t small { color: var(--text-2); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

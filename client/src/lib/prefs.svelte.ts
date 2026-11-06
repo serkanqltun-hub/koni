@@ -7,7 +7,7 @@ function flag(key: string, def: boolean) {
   };
 }
 const fs = flag("koni.fullscreenStart", false);
-const spoilers = flag("koni.hideSpoilers", true);
+const spoilers = flag("koni.hideSpoilers", false);
 
 export const prefs = {
   /** Video açılınca tam ekrana geç. */

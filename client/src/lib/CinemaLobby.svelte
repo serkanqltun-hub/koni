@@ -1,14 +1,14 @@
 <script lang="ts">
   // Boş Sinema (lobi): tek kutu (link/dosya yolu açar, düz yazı Film & Dizi'de arar),
-  // Ne izlesek? (tek başınaysa Ne izlesem?) / Film & Dizi / Herkes indirsin (tek başınaysa İndir) kartları,
+  // Ne izlesek? (tek başınaysa Ne izlesem?) / Film & Dizi kartları (kutuya link yapıştırınca yanında İndir),
   // "Kaldığınız yerden" ve tek başınayken "Çevrimdışı" rafı (indirilenler), "Ücretsiz & klasik" rafı
   // (film sağlayıcısı kurulu değilse kutunun hemen altında, öne çıkmış), öneri rafları.
   // mpv bu sırada gizli; sahneyi arayüz çizer (kokpit modeli bozulmaz).
-  import { loadResume, pullResume, removeResume, type ResumeEntry } from "./resume";
+  import { loadResume, pullResume, removeResume, refOf, type ResumeEntry } from "./resume";
   import Icon from "./Icon.svelte";
   import { t, tx, locale } from "./i18n.svelte";
   import { offline, initOffline, cancelOffline, deleteOffline } from "./offline.svelte";
-  import { debridStatus, addonsList, type DetailRef } from "./player";
+  import { debridStatus, addonsList, posterImg, type DetailRef } from "./player";
   import FreeShelf from "./FreeShelf.svelte";
   import RecShelves from "./RecShelves.svelte";
   import LibraryPane from "./LibraryPane.svelte";
@@ -54,11 +54,6 @@
     if (direct(text)) onOpen(text);
     else onTitles(text);
   }
-  function download() {
-    if (!onDownload) return;
-    if (isLink) return onDownload(text);
-    input?.focus();
-  }
 
   function ago(at: number): string {
     const d = Math.floor((Date.now() - at) / 86400_000);
@@ -70,6 +65,11 @@
   function left(r: ResumeEntry): string {
     const m = Math.max(1, Math.round((r.duration - r.pos) / 60));
     return m >= 60 ? t("{h} sa {m} dk kaldı", { h: Math.floor(m / 60), m: m % 60 }) : t("{m} dk kaldı", { m });
+  }
+  /** Kart görseli: dizinin/filmin afişi; yoksa baş harf. */
+  function thumb(r: ResumeEntry): string | undefined {
+    const id = refOf(r.file);
+    return id ? posterImg(id.ref) : r.poster;
   }
   function forget(r: ResumeEntry) {
     entries = removeResume(r.src);
@@ -120,6 +120,11 @@
     <Icon name="search" size={20} />
     <input class="bare" bind:this={input} bind:value placeholder={t("Film adı, YouTube linki ya da dosya yolu…")} spellcheck="false" />
     {#if !text}<span class="keys"><kbd>Ctrl</kbd><kbd>V</kbd> {t("yapıştır")}</span>{/if}
+    {#if onDownload && isLink}
+      <button class="dl" type="button" disabled={busy} onclick={() => onDownload(text)} title={room ? t("Herkes kendine indirir, hazır olunca birlikte başlar") : t("Sonra internetsiz izlemek için bu bilgisayara indir")}>
+        <Icon name="down" size={16} /> {room ? t("Herkes indirsin") : t("İndir")}
+      </button>
+    {/if}
     <button class="go" type="submit" disabled={!text || busy}>{busy ? t("Açılıyor…") : !text || direct(text) ? t("Aç") : t("Ara")}</button>
   </form>
 
@@ -141,26 +146,19 @@
           {/if}
         </button>
       {/if}
-      <button class="src" class:wide={!onDownload} onclick={() => onTitles(direct(text) ? "" : text)}>
+      <button class="src wide" onclick={() => onTitles(direct(text) ? "" : text)}>
         <span class="ico green"><Icon name="film" size={20} /></span>
         <h3>{t("Film & Dizi")}</h3><p>{room ? t("Film ve dizi ara, herkes kendi hesabıyla açar") : t("Film ve dizi ara")}</p>
       </button>
-      {#if onDownload}
-        <button class="src" onclick={download} title={isLink ? (room ? t("Bu linki herkes indirsin") : t("Bu linki indir")) : t("Önce kutuya bir link yapıştır")}>
-          <span class="ico orange"><Icon name="down" size={20} /></span>
-          {#if room}
-            <h3>{t("Herkes indirsin")}</h3><p>{isLink ? t("Kutudaki linki herkes kendine indirir") : t("Herkes kendine indirir, hazır olunca birlikte başlar")}</p>
-          {:else}
-            <h3>{t("İndir")}</h3><p>{isLink ? t("Kutudaki linki bu bilgisayara indir") : t("Sonra internetsiz izlemek için bu bilgisayara indir")}</p>
-          {/if}
-        </button>
-      {/if}
     </div>
     <div class="cont">
       <h4>{t("Kaldığınız yerden")} {#if list.length}<span>{onlyHere ? t("bu oda") : list.some((r) => r.kind === "ref") ? t("tüm cihazların") : t("bu bilgisayar")}</span>{/if}</h4>
       {#each list as r (r.src)}
+        {@const img = thumb(r)}
         <div class="ci">
-          <div class="th" style="--p:{(r.pos / r.duration) * 100}%;--h:{hue(r.title)}"><span>{r.title.slice(0, 1)}</span></div>
+          <div class="th" class:ps={!!img} style="--p:{(r.pos / r.duration) * 100}%;--h:{hue(r.title)}"><span>{r.title.slice(0, 1)}</span>
+            {#if img}<img src={img} alt="" loading="lazy" referrerpolicy="no-referrer" onerror={(e) => e.currentTarget.remove()} />{/if}
+          </div>
           <span class="ct"><b title={r.title}>{r.title}</b><small>{ago(r.at)} · {left(r)}</small></span>
           <button class="x" title={t("Listeden çıkar")} onclick={() => forget(r)}><Icon name="x" size={12} /></button>
           <button class="resume" disabled={busy} onclick={() => (r.kind === "file" ? onOpen(r.src) : onResume(r))}><Icon name="play" size={12} /> {t("Devam")}</button>
@@ -208,6 +206,7 @@
     position: absolute; inset: 0; display: flex; flex-direction: column; gap: 22px; padding: 34px 44px; overflow-y: auto;
     background: radial-gradient(70% 60% at 20% 0%, rgba(10, 132, 255, 0.16), transparent 70%), radial-gradient(50% 50% at 90% 100%, rgba(94, 92, 230, 0.12), transparent 70%), #08090b;
   }
+  .lobby > * { flex-shrink: 0; }
   .lb-h { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
   h1 { margin: 0; font-size: 40px; font-weight: 900; letter-spacing: -0.035em; line-height: 1.05; }
   .lb-h p { margin: 6px 0 0; color: var(--text-2); font-size: 14px; }
@@ -233,8 +232,9 @@
   .go { height: 44px; padding: 0 22px; border-radius: 13px; border: 0; background: #fff; color: #000; font-weight: 800; }
   .go:hover:not(:disabled) { background: #e8e8ed; }
   .go:disabled { opacity: 0.4; }
+  .dl { height: 44px; padding: 0 16px; border-radius: 13px; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap; }
 
-  .lb-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 22px; flex: 1; min-height: 300px; }
+  .lb-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 22px; flex: 1 0 auto; min-height: 300px; }
   .srcs { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 12px; }
   .srcs.few { grid-auto-rows: 170px; align-content: start; }
   .src {
@@ -269,7 +269,9 @@
     background: radial-gradient(50% 60% at 40% 40%, hsl(var(--h) 45% 30%), transparent 75%), hsl(var(--h) 30% 7%);
     font-weight: 900; font-size: 20px; color: rgba(255, 255, 255, 0.5);
   }
-  .th::after { content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--p); background: #ff375f; }
+  .th.ps { width: 40px; height: 58px; margin: -4px 26px -4px 26px; }
+  .th img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .th::after { content: ""; position: absolute; z-index: 1; left: 0; bottom: 0; height: 3px; width: var(--p); background: #ff375f; }
   .ct { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.25; }
   .ct b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ct small { color: var(--text-2); font-size: 11.5px; }
