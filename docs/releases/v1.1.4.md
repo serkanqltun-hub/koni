@@ -1,0 +1,27 @@
+# KONİ 1.1.4
+
+**Windows 10/11 x64** ve **macOS 11+ (Apple Silicon: M1 ve sonrası)**. Kurulu KONİ kendiliğinden güncellenir.
+
+**İndir**: https://github.com/Savas07/koni-releases/releases/latest
+
+TV'ye göndermeyi onaran bir düzeltme ve odada küçük iyileştirmeler.
+
+**Düzeltme**
+- 1.1.3'te TV'ye göndermek (DLNA) altyazı indirilirken çöküyordu; artık çalışıyor.
+- "Ne izlesek" geri sayımındaki halkada görünen kare parlama giderildi.
+
+**Yenilik**
+- Odada Mola süreleri kontrol çubuğundaki Mola düğmesinden seçilebiliyor.
+- Odada sıradaki bölüme otomatik geçiş artık yalnızca oda sahibinde çalışıyor; herkesin aynı anda tetiklemesi engellendi.
+
+**Sunucu**: değişiklik yok, **p0.28** ile çalışır.
+
+**Bilinen küçük eksikler**
+- Videonun içine gömülü (MKV) altyazılar TV'ye aktarılmıyor.
+- Ücretsiz & klasik rafından açılan filmde oynatıcı başlığı dosya adını gösteriyor.
+- "Yeni bölüm çıktı" için masaüstü bildirimi yok.
+- Mola ve sıradaki bölüm değişikliği gerçek odada henüz denenmedi; Mac gerçek cihazda denenmedi. Sorun görürseniz `cast.log` ile bildirin.
+
+---
+
+**English (short)**: KONİ 1.1.4 fixes casting to TV (a crash while fetching subtitles in 1.1.3), removes a square glow on the countdown ring, shows Break durations in the room control bar, and makes auto-next-episode run only for the room host. No server change (p0.28).
