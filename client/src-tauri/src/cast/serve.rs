@@ -81,7 +81,8 @@ fn add_sub(files: &mut HashMap<String, Entry>, base: &str, vtt: String) -> Strin
     files.insert(
         "sub.srt".into(),
         Entry {
-            body: Body::Text(vtt_to_srt(&vtt)),
+            // BOM: bazı TV'ler UTF-8'i ancak bununla tanıyor (Türkçe harfler).
+            body: Body::Text(format!("\u{feff}{}", vtt_to_srt(&vtt))),
             mime: "text/srt; charset=utf-8".into(),
         },
     );

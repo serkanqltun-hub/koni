@@ -238,9 +238,16 @@ pub fn prepare(mpv: &Player, device: Option<&Device>) -> Result<Media, String> {
         .unwrap_or_else(|| crate::media::file_name(&path));
     let sub = mpv
         .get_property_string("current-tracks/sub/external-filename")
-        .filter(|f| std::path::Path::new(f).is_file())
-        .and_then(|f| std::fs::read(f).ok())
+        .and_then(|f| sub_bytes(&f))
         .and_then(|b| to_vtt(&crate::addons::decode_sub_bytes(&b)));
+    log(&format!(
+        "TV'ye hazırlanıyor: altyazı {}",
+        match (&sub, mpv.get_property_string("current-tracks/sub/id")) {
+            (Some(_), _) => "var",
+            (None, Some(_)) => "seçili ama gönderilemiyor (gömülü ya da ASS)",
+            (None, None) => "yok",
+        }
+    ));
     let dlna = device.filter(|d| d.kind == "dlna");
     let toward = dlna.and_then(dlna::host);
     // Uzantı yoksa (indirme adresleri) mpv'nin tanıdığı kapsayıcıdan.
@@ -288,6 +295,26 @@ pub fn prepare(mpv: &Player, device: Option<&Device>) -> Result<Media, String> {
         mime: mime.into(),
         title,
     })
+}
+
+/// Seçili dış altyazının içeriği: yerel dosya ya da altyazı kaynağından gelen adres
+/// (çevrim içi altyazılar mpv'ye adresle eklenir).
+fn sub_bytes(f: &str) -> Option<Vec<u8>> {
+    if !(f.starts_with("https://") || f.starts_with("http://")) {
+        return std::fs::read(f.strip_prefix("file://").unwrap_or(f)).ok();
+    }
+    let req = crate::addons::http().get(f);
+    let got = tauri::async_runtime::block_on(async move {
+        let res = req.send().await?.error_for_status()?;
+        res.bytes().await
+    });
+    match got {
+        Ok(b) => Some(b.to_vec()),
+        Err(e) => {
+            log(&format!("altyazı indirilemedi: {}", e.without_url()));
+            None
+        }
+    }
 }
 
 /// mpv `file-format` (FFmpeg kapsayıcı adları) → uzantı.
