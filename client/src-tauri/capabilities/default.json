@@ -24,6 +24,8 @@
     "allow-player-set-volume",
     "allow-player-add-subtitle",
     "allow-player-sub-delay",
+    "allow-player-sub-pick",
+    "allow-player-sub-restore",
     "allow-player-state",
     "allow-player-tracks",
     "allow-player-music-view",
