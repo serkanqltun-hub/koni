@@ -13,6 +13,8 @@ const COMMANDS: &[&str] = &[
     "player_set_volume",
     "player_add_subtitle",
     "player_sub_delay",
+    "player_sub_pick",
+    "player_sub_restore",
     "player_state",
     "player_tracks",
     "player_music_view",
