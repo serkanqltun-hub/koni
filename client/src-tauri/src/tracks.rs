@@ -26,6 +26,14 @@ struct Current {
 
 static CURRENT: Mutex<Option<Current>> = Mutex::new(None);
 
+/// Kayıtlı altyazı seçimi geri yüklenen dosyanın yolu: dil tercihi bu seçimi ezmez.
+static KEPT_SUB: Mutex<String> = Mutex::new(String::new());
+
+fn sub_kept(mpv: &Player) -> bool {
+    mpv.get_property_string("path")
+        .is_some_and(|p| !p.is_empty() && *KEPT_SUB.lock().unwrap() == p)
+}
+
 /// Dil tercihi: `dub` (Türkçe dublaj → Türkçe altyazı), `sub` (Türkçe altyazı), `off` (dokunma).
 static LANG_MODE: Mutex<String> = Mutex::new(String::new());
 
@@ -61,6 +69,9 @@ pub fn apply_prefs(mpv: &Player) {
             }
             return;
         }
+    }
+    if sub_kept(mpv) {
+        return;
     }
     if let Some(s) = ts.iter().find(|t| t.kind == "sub" && is_tr(t)) {
         if !s.selected {
@@ -134,7 +145,7 @@ fn add_subs(mpv: &Player, subs: Vec<SubFile>) {
                 || t.title.to_lowercase().contains("türk")
                 || t.title.to_lowercase().contains("turk"))
     });
-    let mut pick = !has_tr;
+    let mut pick = !has_tr && !sub_kept(mpv);
     for s in subs {
         let tr = s.lang.to_lowercase().starts_with("tr");
         let flag = if pick && tr { "select" } else { "auto" };
@@ -392,6 +403,63 @@ pub fn select(mpv: &Player, kind: &str, key: &str) -> Result<(), String> {
         follow_muxed_audio(mpv, &ts, key);
     }
     Ok(())
+}
+
+/// Seçili altyazı ve gecikmesi: aynı medya yeniden açılınca geri yüklenir (arayüz saklar).
+#[derive(Serialize, Debug)]
+pub struct SubPick {
+    /// Dışarıdan eklenen altyazının dosyası/adresi; dosyanın kendi iziyse yok.
+    pub file: Option<String>,
+    /// mpv iz kimliği ya da `no` (kapalı).
+    pub key: String,
+    pub delay: f64,
+    /// Açık dosya: arayüz başka medyaya ait seçimi kaydetmesin.
+    pub path: String,
+}
+
+pub fn sub_pick(mpv: &Player) -> SubPick {
+    let ts = read_tracks(mpv);
+    let sel = ts.iter().find(|t| t.kind == "sub" && t.selected);
+    SubPick {
+        file: sel.and_then(|t| t.external.clone()),
+        key: sel.map_or_else(|| "no".into(), |t| t.id.clone()),
+        delay: mpv
+            .get_property_string("sub-delay")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0.0),
+        path: mpv.get_property_string("path").unwrap_or_default(),
+    }
+}
+
+/// Kayıtlı seçimi uygular: dış altyazı zaten ekliyse seçilir, değilse yeniden eklenir;
+/// dosyanın kendi izi kimliğiyle seçilir. Gecikme her durumda kayıttaki değere döner.
+pub fn sub_restore(mpv: &Player, file: Option<&str>, key: &str, delay: f64) -> Result<(), String> {
+    if file.is_some_and(|f| !f.is_empty()) || !key.is_empty() {
+        *KEPT_SUB.lock().unwrap() = mpv.get_property_string("path").unwrap_or_default();
+    }
+    let ts = read_tracks(mpv);
+    let subs = || ts.iter().filter(|t| t.kind == "sub");
+    if let Some(f) = file.filter(|f| !f.is_empty()) {
+        if let Some(t) = subs().find(|t| t.external.as_deref() == Some(f)) {
+            mpv.set_property_string("sid", &t.id)
+                .map_err(|e| e.to_string())?;
+        } else if f.contains("://") || std::path::Path::new(f).is_file() {
+            mpv.command(&["sub-add", f, "select"])
+                .map_err(|e| e.to_string())?;
+        }
+    } else if key == "no" {
+        let _ = mpv.set_property_string("sid", "no");
+    } else if subs().any(|t| t.id == key && t.external.is_none()) {
+        mpv.set_property_string("sid", key)
+            .map_err(|e| e.to_string())?;
+    }
+    let d = if delay.is_finite() {
+        delay.clamp(-600.0, 600.0)
+    } else {
+        0.0
+    };
+    mpv.set_property_string("sub-delay", &d.to_string())
+        .map_err(|e| e.to_string())
 }
 
 /// m3u8 kalitesi değişti ve ses o kalitenin içindeyse: sesi de yeni kaliteninkine geçir

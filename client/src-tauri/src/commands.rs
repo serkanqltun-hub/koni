@@ -363,6 +363,23 @@ pub fn player_sub_delay(state: State<'_, AppState>, delta: f64) -> CmdResult<f64
     Ok(v)
 }
 
+/// Seçili altyazı ve gecikmesi (`tracks::SubPick`).
+#[tauri::command(async)]
+pub fn player_sub_pick(state: State<'_, AppState>) -> CmdResult<crate::tracks::SubPick> {
+    Ok(crate::tracks::sub_pick(&*player(&state)?))
+}
+
+/// Kayıtlı altyazıyı ve gecikmesini geri yükler; kayıt yoksa gecikme 0'a döner.
+#[tauri::command(async)]
+pub fn player_sub_restore(
+    state: State<'_, AppState>,
+    file: Option<String>,
+    key: String,
+    delay: f64,
+) -> CmdResult {
+    crate::tracks::sub_restore(&*player(&state)?, file.as_deref(), &key, delay)
+}
+
 /// Kalite · ses · altyazı listesi (`tracks::Tracks`).
 #[tauri::command(async)]
 pub fn player_tracks(state: State<'_, AppState>) -> CmdResult<crate::tracks::Tracks> {

@@ -555,3 +555,8 @@ export const libraryScan = () => invoke<LibraryData>("library_scan");
 /** Bölüm düzeyi izledim (p0.25 `seen_ep`). */
 export const listsSeenEp = (url: string, ref: string, season: number, episode: number) =>
   listsCall<Lists>(url, "seen_ep", { reference: ref, extra: { season, episode } });
+/** Seçili altyazı ve gecikmesi: aynı medya yeniden açılınca geri yüklenir (`subMemory.ts`). */
+export interface SubPick { file: string | null; key: string; delay: number }
+/** `path`: açık dosya (seçim başka medyaya ait mi diye bakılır). */
+export const playerSubPick = () => invoke<SubPick & { path: string }>("player_sub_pick");
+export const playerSubRestore = (p: SubPick) => invoke<void>("player_sub_restore", { file: p.file, key: p.key, delay: p.delay });
