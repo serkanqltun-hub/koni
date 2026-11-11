@@ -136,6 +136,8 @@ pub fn run() {
             commands::player_set_volume,
             commands::player_add_subtitle,
             commands::player_sub_delay,
+            commands::player_sub_pick,
+            commands::player_sub_restore,
             commands::player_tracks,
             commands::player_music_view,
             commands::player_cover,

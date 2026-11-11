@@ -7,7 +7,7 @@
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import {
     COCKPIT_LAYOUT, playerLoad, playerPause, playerTogglePause, playerSeek, playerSetSpeed, playerScreenshot,
-    playerSetVolume, playerAddSubtitle, playerSubDelay, playerTracks, playerSetTrack,
+    playerSetVolume, playerAddSubtitle, playerSubDelay, playerTracks, playerSetTrack, playerSubPick, playerSubRestore,
     type Tracks, type TrackKind,
     playerState, setLayout, setFullscreen, openCastPanel, isMac, castDevices, castPrepare, castPlay, castControl, castPosition, castBack, TV_BUFFER_SEC, type CastDevice, type CastPosition, type PlayerState,
     syncConnect, syncSeek, syncToggle, syncPause, syncSeekBy, syncLeave, syncContinueWithout, syncResync, syncDownload,
@@ -28,6 +28,7 @@
   import { onRemote, pic, social, startSocial, stopSocial, type RemoteOp } from "./lib/social.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
   import { prefs } from "./lib/prefs.svelte";
+  import { findSub, saveSub, subKey } from "./lib/subMemory";
   import { DEFAULT_SERVER, normServer } from "./lib/server";
   import { loadRecent, rememberRoom, forgetRoom, type RecentRoom } from "./lib/recent";
   import ResumeBar from "./lib/ResumeBar.svelte";
@@ -295,10 +296,38 @@
   let trackTab = $state<TrackKind>("sub");
   /** Altyazı gecikmesi (sn; mpv'nin döndürdüğü), medya değişince sıfırlanır. */
   let subDelay = $state(0);
-  const nudgeSub = (d: number) => playerSubDelay(d).then((v) => (subDelay = v), (err) => add(String(err), true));
+  const nudgeSub = (d: number) => playerSubDelay(d).then((v) => { subDelay = v; rememberSub(); }, (err) => add(String(err), true));
   function pickTrack(kind: TrackKind, key: string, name: string) {
     const pre = kind === "sub" ? "Altyazı: {name}" : kind === "audio" ? "Ses: {name}" : "Kalite: {name}";
-    run(pre.replace("{name}", name), playerSetTrack(kind, key).then(loadTracks), true, () => t(pre, { name }));
+    run(pre.replace("{name}", name), playerSetTrack(kind, key).then(() => { loadTracks(); if (kind === "sub") rememberSub(); }), true, () => t(pre, { name }));
+  }
+  /** Açık medyanın altyazı hafızası anahtarı; geri yükleme bitene kadar boş (erken kayıt eski seçimi ezmesin). */
+  let subMemKey = "", subMemPath = "", subGen = 0;
+  /** Seçili altyazıyı ve gecikmesini bu medya için hatırla (oynatıcıda hâlâ aynı dosya açıksa). */
+  function rememberSub() {
+    const key = subMemKey;
+    if (!key) return;
+    playerSubPick().then((p) => {
+      if (subMemKey !== key || !p.path) return;
+      if (p.path === subMemPath) saveSub(key, p);
+      else restoreSub(key); // dosya geri yüklemeden sonra açıldı (odada geç yüklenen medya)
+    }, () => {});
+  }
+  /** Bu medyanın kayıtlı altyazısını ve gecikmesini uygular; yoksa gecikme 0'a döner. */
+  async function restoreSub(key: string) {
+    const gen = subGen;
+    const saved = key ? findSub(key) : undefined;
+    try {
+      await playerSubRestore(saved ?? { file: null, key: "", delay: 0 });
+      subDelay = saved?.delay ?? 0;
+      if (saved && (saved.file || saved.key !== "no" || saved.delay)) note("Altyazı ayarın geri yüklendi");
+    } catch { /* oynatıcı yok (TV'de) */ }
+    loadTracks();
+    let path = "";
+    try { path = (await playerSubPick()).path; } catch { /* oynatıcı yok */ }
+    if (gen !== subGen) return; // bu arada başka medya açıldı
+    subMemPath = path;
+    subMemKey = path ? key : "";
   }
   let drawer = $state<Drawer | null>(null);
   function toggle(d: Drawer) {
@@ -911,7 +940,7 @@
       return;
     }
     if (m.t === "subtitle") {
-      run(`Altyazı (${m.by}): ${m.name}`, playerAddSubtitleText(m.name, m.text), false, () => t("Altyazı ({by}): {name}", { by: m.by, name: m.name }));
+      run(`Altyazı (${m.by}): ${m.name}`, playerAddSubtitleText(m.name, m.text).then(rememberSub), false, () => t("Altyazı ({by}): {name}", { by: m.by, name: m.name }));
       return;
     }
     // yeni Ne izlesek? turu, deste ya da eşleşme: herkeste pencere açılsın
@@ -1019,7 +1048,7 @@
     const s = (path ?? src).trim().replace(/^"(.*)"$/, "$1");
     if (!s || opening) return;
     if (SUB_EXT.test(s) && !/^https?:\/\//i.test(s)) {
-      return run("Altyazı", playerAddSubtitle(s).then((n) => note("Altyazı: {name}", { name: n })), true);
+      return run("Altyazı", playerAddSubtitle(s).then((n) => { note("Altyazı: {name}", { name: n }); rememberSub(); }), true);
     }
     opening = true;
     try {
@@ -1536,11 +1565,18 @@
   /** Seçili altyazı adı (şerit çipi); izler medya açılınca bir kez okunur. */
   const subLabel = $derived(tracks?.sub.find((t) => t.selected && t.key !== "no")?.label ?? "");
   const trackKey = $derived(st?.duration != null && roomView === "watch" ? (nowMedia?.src ?? "?") : "");
+  // Medya açılınca: bu film/bölüm için son seçilen altyazı ve gecikmesi geri gelir (yoksa gecikme 0).
+  // Sonra seçim birkaç saniyede bir hatırlanır (çevrim içi altyazı, dosya, odada paylaşılan da yakalanır).
   $effect(() => {
     if (!trackKey) return;
+    const m = untrack(() => nowMedia);
+    const key = m && m.kind !== "page" ? subKey(m) : "";
+    subMemKey = "";
+    subGen++;
     subDelay = 0;
-    const id = setTimeout(loadTracks, 1200);
-    return () => clearTimeout(id);
+    const id = setTimeout(() => restoreSub(key), 1500);
+    const poll = setInterval(rememberSub, 4000);
+    return () => { clearTimeout(id); clearInterval(poll); subMemKey = ""; };
   });
   /** Kendi tamponun (%; hedef 12 s, sunucuyla aynı); oda oynamıyorsa yok. */
   const myBufferPct = $derived(

@@ -88,6 +88,7 @@ const en: Record<string, string> = {
   "{name} çağrıldı": "{name} was called",
   "Altyazı ({by}): {name}": "Subtitles ({by}): {name}",
   "Altyazı: {name}": "Subtitles: {name}",
+  "Altyazı ayarın geri yüklendi": "Your subtitle settings were restored",
   "Ses: {name}": "Audio: {name}",
   "Kalite: {name}": "Quality: {name}",
   "Açıldı: {title}": "Opened: {title}",
