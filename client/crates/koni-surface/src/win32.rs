@@ -30,8 +30,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     MA_NOACTIVATE, SET_WINDOW_POS_FLAGS, SIZE_MINIMIZED, SWP_FRAMECHANGED, SWP_HIDEWINDOW,
     SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW,
     SW_HIDE, SW_SHOWMAXIMIZED, SW_SHOWNA, SW_SHOWNORMAL, WINDOWPLACEMENT, WINDOW_EX_STYLE,
-    WM_DPICHANGED, WM_MOUSEACTIVATE, WM_NCDESTROY, WM_SIZE, WM_WINDOWPOSCHANGED, WNDCLASSEXW,
-    WS_CHILD, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_VISIBLE,
+    WM_DPICHANGED, WM_MOUSEACTIVATE, WM_NCCALCSIZE, WM_NCDESTROY, WM_SIZE, WM_WINDOWPOSCHANGED,
+    WNDCLASSEXW, WS_CHILD, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_OVERLAPPEDWINDOW, WS_POPUP,
+    WS_VISIBLE,
 };
 
 use crate::{video_rect, LayoutConfig, LayoutMode, MpvTarget, SurfaceError, VideoSurface};
@@ -132,6 +133,11 @@ unsafe extern "system" fn parent_subclass_proc(
             }
         }
         WM_WINDOWPOSCHANGED => shared.relayout(),
+        // While fullscreen the whole window is client area. Without this the
+        // borderless-window frame logic below us (shadow insets on the sides
+        // and bottom, or the work area when maximized) shrinks the client
+        // area and leaves strips around the video.
+        WM_NCCALCSIZE if shared.lock().fullscreen.is_some() => return LRESULT(0),
         WM_DPICHANGED => {
             // Apply the rect Windows suggests for the new DPI, then relayout.
             let suggested = lparam.0 as *const RECT;
