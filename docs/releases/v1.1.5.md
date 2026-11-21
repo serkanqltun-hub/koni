@@ -1,0 +1,26 @@
+# KONİ 1.1.5
+
+**Windows 10/11 x64** ve **macOS 11+ (Apple Silicon: M1 ve sonrası)**. Kurulu KONİ kendiliğinden güncellenir.
+
+**İndir**: https://github.com/Savas07/koni-releases/releases/latest
+
+Altyazı seçiminin hatırlanması ve Windows'ta tam ekran düzeltmeleri.
+
+**Yenilik**
+- Bir film ya da bölüm için son seçtiğiniz altyazı ve altyazı gecikmesi hatırlanıyor; aynı videoyu yeniden açınca ("Devam et" dahil) kendiliğinden geri geliyor. Tek başına izlerken de odada da çalışır, kayıt yalnızca bu bilgisayarda tutulur.
+
+**Düzeltme**
+- Windows: Büyütülmüş pencereden tam ekrana geçince altta görünen ince şerit giderildi.
+- Windows: Tam ekranda kenarlarda ve altta kalan boşluklar giderildi; video artık ekranın tamamını kaplıyor.
+
+**Sunucu**: değişiklik yok, **p0.28** ile çalışır.
+
+**Bilinen küçük eksikler**
+- Videonun içine gömülü (MKV) altyazılar TV'ye aktarılmıyor.
+- Ücretsiz & klasik rafından açılan filmde oynatıcı başlığı dosya adını gösteriyor.
+- "Yeni bölüm çıktı" için masaüstü bildirimi yok.
+- Tam ekran düzeltmeleri farklı Windows ekran ayarlarında henüz geniş çapta denenmedi; Mac gerçek cihazda denenmedi.
+
+---
+
+**English (short)**: KONİ 1.1.5 remembers the last chosen subtitle and its delay per movie/episode (solo and in rooms, stored on this computer), and fixes thin strips at the bottom and edges in fullscreen on Windows. No server change (p0.28).
