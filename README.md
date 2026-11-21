@@ -173,6 +173,11 @@ More detail: [docs/design/sync.md](docs/design/sync.md) and [docs/PROTOCOL.md](d
 > [!IMPORTANT]
 > KONİ is a player, not a content source. It hosts and ships no media and no streaming sources. Title info such as names, posters, ratings and episode lists comes from public metadata services. Use KONİ with your own files and with content you have the right to watch.
 
+### macOS
+
+Built with GitHub Actions for Apple Silicon, but the author does not own a Mac. macOS testers and PRs are extremely welcome!
+If you try it, please share how it went with a [macOS feedback](https://github.com/serkanqltun-hub/koni/issues/new?template=mac_feedback.md) issue, even if everything worked.
+
 <details>
 <summary><b>🖥️ Host your own server</b></summary>
 <br>
@@ -216,6 +221,8 @@ cd server
 go test ./...
 go run ./cmd/koni-server -db koni.db   # listens on :8080
 ```
+
+Step-by-step setup (including libmpv on Windows and macOS): [CONTRIBUTING.md](CONTRIBUTING.md). Using an AI assistant? Start it with [CLAUDE.md](CLAUDE.md).
 
 Details: [client/README.md](client/README.md), [docs/LIBMPV.md](docs/LIBMPV.md), [docs/UPDATES.md](docs/UPDATES.md), the plan in [docs/PLAN.md](docs/PLAN.md) and decisions in [docs/adr/](docs/adr/).
 
